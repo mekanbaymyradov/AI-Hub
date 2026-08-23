@@ -11,7 +11,6 @@ class State(TypedDict):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[State]:
-    # app runs here
     yield {}
     # app stops here
 
