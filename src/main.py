@@ -4,14 +4,19 @@ from contextlib import asynccontextmanager
 from typing import TypedDict
 
 from src.config import settings
+from src.llm.config import llm_settings
+from src.llm.registry import LLMRegistry, build_registry
+from src.llm.router import llm_router
 
 class State(TypedDict):
-    pass
+    registry: LLMRegistry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[State]:
-    yield {}
+    # app starts here
+    registry = build_registry(llm_settings)
+    yield {"registry": registry} # app runs here
     # app stops here
 
 app = FastAPI(
@@ -25,4 +30,6 @@ app = FastAPI(
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
-    return {"status": "ok"} 
+    return {"status": "ok"}
+
+app.include_router(llm_router)

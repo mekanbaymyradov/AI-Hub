@@ -4,9 +4,9 @@ from src.config import AIHubBaseSettings
 
 
 class LLMSettings(AIHubBaseSettings):
-    google_api_key: SecretStr
-    openai_api_key: SecretStr
-    antropic_api_key: SecretStr
-    
+    anthropic_api_key: SecretStr | None = None
+    openai_api_key: SecretStr | None = None
+    google_api_key: SecretStr | None = None
 
 
+llm_settings = LLMSettings()
