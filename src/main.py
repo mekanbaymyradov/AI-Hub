@@ -7,6 +7,12 @@ from src.config import settings
 from src.llm.config import llm_settings
 from src.llm.registry import LLMRegistry, build_registry
 from src.llm.router import llm_router
+from src.logging import setup_logging
+from src.middleware import AccessLogMiddleware
+
+
+# setup logging
+setup_logging(settings.log_level, settings.environment)
 
 class State(TypedDict):
     registry: LLMRegistry
@@ -27,6 +33,8 @@ app = FastAPI(
     redoc_url="/redocs" if settings.environment == "local" else None,
     lifespan=lifespan
 )
+
+app.add_middleware(AccessLogMiddleware)
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:

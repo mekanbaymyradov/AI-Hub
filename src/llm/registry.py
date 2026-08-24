@@ -1,5 +1,3 @@
-import logging
-
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -10,9 +8,10 @@ from pydantic_ai.providers.google import GoogleProvider
 
 from src.llm.catalog import CATALOG, ModelSpec, ProviderId
 from src.llm.config import LLMSettings
+from src.logging import get_logger
 
-logger = logging.getLogger(__name__)
 
+logger = get_logger(__name__)
 
 class LLMRegistry:
     def __init__(self, models: dict[str, Model], specs: dict[str, ModelSpec]):
