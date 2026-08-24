@@ -7,7 +7,7 @@ import structlog
 
 
 def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
-    """Configure structlog with JSON rendering outside local dev."""
+    """Setup structlog with JSON rendering outside local dev."""
 
     shared_processors = [
         structlog.contextvars.merge_contextvars,
