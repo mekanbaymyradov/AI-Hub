@@ -1,3 +1,6 @@
+from collections.abc import AsyncIterator, Iterable
+from contextlib import AsyncExitStack, asynccontextmanager
+
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.openai import OpenAIChatModel
@@ -27,6 +30,9 @@ class LLMRegistry:
     def available(self) -> list[ModelSpec]:
         return list(self._specs.values())
 
+    def models(self) -> Iterable[Model]:
+        return self._models.values()
+
 def build_model(spec: ModelSpec, settings: LLMSettings) -> Model | None:
     match spec.provider:
         case ProviderId.ANTHROPIC if settings.anthropic_api_key:
@@ -45,10 +51,7 @@ def build_model(spec: ModelSpec, settings: LLMSettings) -> Model | None:
                 provider=GoogleProvider(api_key=settings.google_api_key.get_secret_value())
             )
         case _:
-            logger.warning(
-                "Skipping model '%s': no API key configured for provider '%s'",
-                spec.id, spec.provider
-            )
+            logger.warning("Skipping model, no API key configured", provider=spec.provider)
             return None
 
 def build_registry(settings: LLMSettings) -> LLMRegistry:
@@ -60,3 +63,17 @@ def build_registry(settings: LLMSettings) -> LLMRegistry:
             models[spec.id] = model
             specs[spec.id] = spec
     return LLMRegistry(models, specs)
+
+
+@asynccontextmanager
+async def llm_lifespan(settings: LLMSettings) -> AsyncIterator[LLMRegistry]:
+    """Build the registry and keep each model's HTTP client open for the app's lifetime.
+
+    Without this, the model an agent run is handed is exited when that run ends, which
+    closes the provider's connection pool and forces a handshake on every request.
+    """
+    registry = build_registry(settings)
+    async with AsyncExitStack() as stack:
+        for model in registry.models():
+            await stack.enter_async_context(model)
+        yield registry
