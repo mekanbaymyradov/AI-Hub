@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TypedDict
+import logfire
 
 from src.config import settings
 from src.llm.config import llm_settings
@@ -9,6 +10,7 @@ from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
 from src.logging import setup_logging
 from src.middleware import AccessLogMiddleware
+
 
 setup_logging(settings.log_level, settings.environment)
 
@@ -31,6 +33,9 @@ app = FastAPI(
     redoc_url="/redocs" if settings.environment == "local" else None,
     lifespan=lifespan
 )
+
+logfire.configure()
+logfire.instrument_fastapi(app)
 
 app.add_middleware(AccessLogMiddleware)
 

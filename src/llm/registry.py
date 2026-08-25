@@ -22,10 +22,8 @@ class LLMRegistry:
         self._specs = specs
 
     def model(self, model_id: str) -> Model:
-        try:
-            return self._models[model_id]
-        except KeyError:
-            raise ValueError(f"Provider not available for model '{model_id}'") from None
+        return self._models.get(model_id)
+
 
     def available(self) -> list[ModelSpec]:
         return list(self._specs.values())
