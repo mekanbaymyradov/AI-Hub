@@ -7,7 +7,7 @@ import structlog
 
 
 def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
-    """Setup structlog with JSON rendering outside local dev."""
+    """Setup structlog with JSON rendering for production."""
 
     shared_processors = [
         structlog.contextvars.merge_contextvars,
@@ -31,7 +31,7 @@ def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
 
     renderer = (
         structlog.processors.JSONRenderer()
-        if environment != "local"
+        if environment == "production"
         else structlog.dev.ConsoleRenderer()
     )
 
@@ -52,6 +52,12 @@ def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
     root_logger.addHandler(handler)
     root_logger.setLevel(log_level)
 
+    for name in ("uvicorn", "uvicorn.error"):
+        uvicorn_logger = logging.getLogger(name)
+        uvicorn_logger.handlers.clear()
+        uvicorn_logger.propagate = True
+
+    # Request logging is handled by AccessLogMiddleware.
     logging.getLogger("uvicorn.access").disabled = True
 
 
