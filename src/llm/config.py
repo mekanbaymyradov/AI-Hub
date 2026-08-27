@@ -1,9 +1,9 @@
 from pydantic import SecretStr
 
-from src.config import AIHubBaseSettings
+from src.config import AppBaseSettings
 
 
-class LLMSettings(AIHubBaseSettings):
+class LLMSettings(AppBaseSettings):
     anthropic_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None

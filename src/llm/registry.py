@@ -21,7 +21,7 @@ class LLMRegistry:
         self._models = models
         self._specs = specs
 
-    def model(self, model_id: str) -> Model:
+    def model(self, model_id: str) -> Model | None:
         return self._models.get(model_id)
 
 

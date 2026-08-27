@@ -5,14 +5,15 @@ from typing import TypedDict
 import logfire
 
 from src.config import settings
+from src.error_handlers import register_error_handlers
 from src.llm.config import llm_settings
 from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
 from src.logging import setup_logging
 from src.middleware import AccessLogMiddleware
 
-
 setup_logging(settings.log_level, settings.environment)
+
 
 class State(TypedDict):
     registry: LLMRegistry
@@ -38,6 +39,8 @@ logfire.configure()
 logfire.instrument_fastapi(app)
 
 app.add_middleware(AccessLogMiddleware)
+
+register_error_handlers(app)
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
