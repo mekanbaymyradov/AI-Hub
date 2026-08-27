@@ -1,9 +1,9 @@
 from pydantic import BaseModel, ConfigDict
 
-from src.enums import AIHubEnum
+from src.enums import AppEnum
 
 
-class ProviderId(AIHubEnum):
+class ProviderId(AppEnum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     GOOGLE = "google"

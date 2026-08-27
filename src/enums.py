@@ -1,7 +1,7 @@
 from enum import StrEnum
 
 
-class AIHubEnum(StrEnum):
+class AppEnum(StrEnum):
     """
     Custom Enum class that extends StrEnum.
 
