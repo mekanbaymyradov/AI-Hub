@@ -1,6 +1,9 @@
 from collections.abc import Sequence
 
+
 class AppError(Exception):
+    """Base error carrying the status, type and message of the response."""
+
     status = 500
     type = "internal_error"
     msg = "An unexpected error occurred."
@@ -15,6 +18,7 @@ class AppError(Exception):
         super().__init__(self.msg)
 
     def serialize(self) -> dict:
+        """Return the error as one detail item."""
         d = {"msg": self.msg, "type": self.type}
         if self.loc:
             d["loc"] = self.loc
@@ -22,6 +26,8 @@ class AppError(Exception):
 
 
 class NotFoundError(AppError):
+    """A requested resource does not exist."""
+
     status = 404
     type = "not_found"
     msg = "Not Found."

@@ -13,6 +13,7 @@ logger = get_logger(__name__)
 
 
 async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
+    """Render an application error with its own status, message and type."""
     return JSONResponse(
         status_code=exc.status,
         content={"detail": [exc.serialize()]},
@@ -35,11 +36,13 @@ async def handle_http_exception(
 
 
 async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
+    """Log an uncaught exception and hide it behind a generic 500."""
     logger.exception("unhandled_error")
     return await handle_app_error(request, AppError())
 
 
 def register_error_handlers(app: FastAPI) -> None:
-    app.add_exception_handler(AppError, handle_app_error)
-    app.add_exception_handler(StarletteHTTPException, handle_http_exception)
+    """Attach every handler to the app."""
+    app.add_exception_handler(AppError, handle_app_error)  # ty: ignore[invalid-argument-type]
+    app.add_exception_handler(StarletteHTTPException, handle_http_exception)  # ty: ignore[invalid-argument-type]
     app.add_exception_handler(Exception, handle_unexpected_error)
