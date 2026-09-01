@@ -19,9 +19,7 @@ async def get_models_list(llm_registry: LLMRegistryDep):
 # send_message api is just example of sending message to llms, later I will move this to /src/chat
 @llm_router.post("/chat/{model_id}/message", response_class=EventSourceResponse)
 async def send_message(
-    request: SendMessageRequest,
-    model: ModelDep,
-    model_id: str
+    request: SendMessageRequest, model: ModelDep, model_id: str
 ) -> AsyncIterable[ServerSentEvent]:
     """Stream the model's reply to the prompt as server-sent events."""
     async with agent.run_stream(model=model, user_prompt=request.prompt) as response:
