@@ -4,12 +4,16 @@ from src.enums import AppEnum
 
 
 class ProviderId(AppEnum):
+    """Supported LLM providers."""
+
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     GOOGLE = "google"
 
 
 class ModelSpec(BaseModel):
+    """A model offered by the app and the provider serving it."""
+
     model_config = ConfigDict(frozen=True)
 
     id: str
@@ -42,5 +46,5 @@ CATALOG: tuple[ModelSpec, ...] = (
         provider=ProviderId.GOOGLE,
         model_name="gemini-3.7-flash",
         display_name="Gemini 3.7 Flash",
-    )
+    ),
 )

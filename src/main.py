@@ -1,8 +1,9 @@
-from fastapi import FastAPI
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TypedDict
+
 import logfire
+from fastapi import FastAPI
 
 from src.config import settings
 from src.error_handlers import register_error_handlers
@@ -16,15 +17,19 @@ setup_logging(settings.log_level, settings.environment)
 
 
 class State(TypedDict):
+    """Objects shared by every request for the app's lifetime."""
+
     registry: LLMRegistry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[State]:
+    """Build the LLM registry on startup and release it on shutdown."""
     # app starts here
     async with llm_lifespan(llm_settings) as registry:
-        yield {"registry": registry} # app runs here
+        yield {"registry": registry}  # app runs here
     # app stops here
+
 
 app = FastAPI(
     title=settings.project_title,
@@ -32,7 +37,7 @@ app = FastAPI(
     docs_url="/docs" if settings.environment == "local" else None,
     openapi_url="/openapi.json" if settings.environment == "local" else None,
     redoc_url="/redocs" if settings.environment == "local" else None,
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 logfire.configure()
@@ -42,8 +47,11 @@ app.add_middleware(AccessLogMiddleware)
 
 register_error_handlers(app)
 
+
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
+    """Report that the app is up."""
     return {"status": "ok"}
+
 
 app.include_router(llm_router)

@@ -4,6 +4,8 @@ from src.config import AppBaseSettings
 
 
 class LLMSettings(AppBaseSettings):
+    """Provider API keys."""
+
     anthropic_api_key: SecretStr | None = None
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
