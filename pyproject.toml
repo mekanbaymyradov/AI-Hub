@@ -8,6 +8,7 @@ dependencies = [
     "alembic>=1.19.1",
     "fastapi[standard]>=0.141.1",
     "logfire[fastapi]>=4.41.0",
+    "psycopg[binary]>=3.3.5",
     "pydantic-ai>=2.33.0",
     "pydantic-settings>=2.15.0",
     "structlog>=26.1.0",
@@ -17,6 +18,9 @@ dependencies = [
 entrypoint = "src.main:app"
 
 [tool.ruff]
+exclude = [
+    "migrations"
+]
 
 [tool.ruff.lint]
 extend-select = ["FAST", "D101", "D102", "D103"]

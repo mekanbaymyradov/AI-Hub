@@ -52,7 +52,7 @@ class Settings(AppBaseSettings):
             path=self.postgres_db,
         )
 
-    
+
 @lru_cache
 def get_settings() -> Settings:
     """Cache the settings."""
