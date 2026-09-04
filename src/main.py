@@ -4,9 +4,7 @@ from typing import TypedDict
 
 import logfire
 from fastapi import FastAPI
-from redis.asyncio import Redis
 
-from src.auth.router import auth_router
 from src.config import settings
 from src.error_handlers import register_error_handlers
 from src.llm.config import llm_settings
@@ -14,7 +12,6 @@ from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
 from src.logging import setup_logging
 from src.middleware import AccessLogMiddleware
-from src.redis import create_redis_client
 
 setup_logging(settings.log_level, settings.environment)
 
@@ -23,19 +20,14 @@ class State(TypedDict):
     """Objects shared by every request for the app's lifetime."""
 
     registry: LLMRegistry
-    redis: Redis
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[State]:
-    """Build the LLM registry and Redis client on startup, release them on shutdown."""
+    """Build the LLM registry on startup and release it on shutdown."""
     # app starts here
-    redis = create_redis_client(str(settings.redis_uri))
-    try:
-        async with llm_lifespan(llm_settings) as registry:
-            yield {"registry": registry, "redis": redis}  # app runs here
-    finally:
-        await redis.aclose()
+    async with llm_lifespan(llm_settings) as registry:
+        yield {"registry": registry}  # app runs here
     # app stops here
 
 
@@ -62,5 +54,4 @@ async def healthz() -> dict:
     return {"status": "ok"}
 
 
-app.include_router(auth_router)
 app.include_router(llm_router)
