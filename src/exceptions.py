@@ -31,3 +31,11 @@ class NotFoundError(AppError):
     status = 404
     type = "not_found"
     msg = "Not Found."
+
+
+class UnauthorizedError(AppError):
+    """The request carries no valid credentials."""
+
+    status = 401
+    type = "unauthorized"
+    msg = "Not authenticated."

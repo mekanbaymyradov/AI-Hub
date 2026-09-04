@@ -41,7 +41,7 @@ def create_db_engine(connection_str: str) -> AsyncEngine:
     return create_async_engine(url, **db_kwargs)
 
 
-engine = create_db_engine(str(settings.sqlalchemy_database_uri))
+engine = create_db_engine(str(settings.database_uri))
 
 
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False)

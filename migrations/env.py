@@ -13,7 +13,7 @@ config = context.config
 
 logger = logging.getLogger(__name__)
 
-config.set_main_option("sqlalchemy.url", str(settings.sqlalchemy_database_uri))
+config.set_main_option("sqlalchemy.url", str(settings.database_uri))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:

@@ -3,7 +3,7 @@ from collections.abc import AsyncIterable
 from fastapi import APIRouter
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
-from src.llm.agent import agent
+from src.llm.agents import agent
 from src.llm.deps import LLMRegistryDep, ModelDep
 from src.llm.schemas import ModelPublic, SendMessageRequest
 
