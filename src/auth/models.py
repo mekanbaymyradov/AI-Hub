@@ -5,7 +5,7 @@ from src.database import Base
 from src.mixins import TimestampMixin
 
 
-class User(TimestampMixin, Base):
+class User(Base, TimestampMixin):
     """User model."""
 
     id: Mapped[int] = mapped_column(primary_key=True)
