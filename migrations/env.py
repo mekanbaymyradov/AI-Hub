@@ -1,33 +1,26 @@
+import logging
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
-from src.database import Base
+from src import models
 from src.config import settings
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
 
-config.set_main_option("sqlalchemy.url", str(settings.sqlalchemy_database_uri))
+logger = logging.getLogger(__name__)
+
+config.set_main_option("sqlalchemy.url", str(settings.database_uri))
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
+target_metadata = models.Base.metadata
 
 
 def run_migrations_offline() -> None:
@@ -61,6 +54,13 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
+
+    def process_revision_directives(context, revision, directives):
+        script = directives[0]
+        if script.upgrade_ops.is_empty():
+            directives[:] = []
+            logger.info("No changes found skipping revision creation.")
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
@@ -69,7 +69,10 @@ def run_migrations_online() -> None:
 
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            process_revision_directives=process_revision_directives,
+            compare_type=True,
         )
 
         with context.begin_transaction():
