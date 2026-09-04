@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn, RedisDsn, SecretStr
+from pydantic import PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -38,18 +38,10 @@ class Settings(AppBaseSettings):
     database_engine_max_overflow: int = 10
     database_engine_echo: bool = False
 
-    redis_host: str = "localhost"
-    redis_port: int = 6379
-    redis_password: SecretStr | None = None
-    redis_index: int = 0
-
-    resend_api_key: SecretStr
-    email_from: str = "onboarding@resend.dev"
-
     @property
-    def database_uri(self) -> PostgresDsn:
+    def sqlalchemy_database_uri(self) -> PostgresDsn:
         """
-        Build database uri.
+        Build sqlalchemy database uri.
         """
         return PostgresDsn.build(
             scheme="postgresql+psycopg",
@@ -58,22 +50,6 @@ class Settings(AppBaseSettings):
             host=self.postgres_host,
             port=self.postgres_port,
             path=self.postgres_db,
-        )
-
-    @property
-    def redis_uri(self) -> RedisDsn:
-        """
-        Build redis uri.
-        """
-        password = (
-            self.redis_password.get_secret_value() if self.redis_password else None
-        )
-        return RedisDsn.build(
-            scheme="redis",
-            password=password,
-            host=self.redis_host,
-            port=self.redis_port,
-            path=str(self.redis_index),
         )
 
 
