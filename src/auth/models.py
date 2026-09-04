@@ -2,7 +2,7 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.database import Base
-from src.models import TimestampMixin
+from src.mixins import TimestampMixin
 
 
 class User(TimestampMixin, Base):
