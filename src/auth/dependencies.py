@@ -14,11 +14,6 @@ BearerToken = Annotated[HTTPAuthorizationCredentials | None, Depends(bearer_sche
 
 
 async def get_current_user(db: DbSession, credentials: BearerToken) -> User:
-    """Resolve the bearer token to a user.
-
-    Only the signature is checked; Redis is never consulted. A revoked session's
-    outstanding access tokens stay usable until they expire on their own.
-    """
     if credentials is None:
         raise NotAuthenticated()
 

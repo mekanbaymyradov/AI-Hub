@@ -1,5 +1,3 @@
-"""Exception handlers rendering every error as {"detail": [{msg, type, loc?}]}."""
-
 from http import HTTPStatus
 
 from fastapi import FastAPI, Request
@@ -13,7 +11,6 @@ logger = get_logger(__name__)
 
 
 async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
-    """Render an application error with its own status, message and type."""
     return JSONResponse(
         status_code=exc.status,
         content={"detail": [exc.serialize()]},
@@ -23,7 +20,6 @@ async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
 async def handle_http_exception(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    """Covers the 404s and 405s Starlette raises for unmatched routes and methods."""
     item = {
         "msg": exc.detail,
         "type": HTTPStatus(exc.status_code).phrase.lower().replace(" ", "_"),

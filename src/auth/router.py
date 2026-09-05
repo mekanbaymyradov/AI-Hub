@@ -1,53 +1,25 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Cookie, Response, status
+from fastapi import APIRouter, Response, status
 
 from src.auth import flows
 from src.auth.config import auth_settings
+from src.auth.cookies import (
+    RefreshCookie,
+    clear_refresh_cookie,
+    set_refresh_cookie,
+)
 from src.auth.dependencies import CurrentUser
 from src.auth.exceptions import InvalidRefreshToken
-from src.auth.schemas import (
+from src.auth.models import (
     OTPRequest,
     OTPVerify,
-    RefreshRequest,
-    TokenPair,
+    Token,
     UserPublic,
     UserUpdate,
 )
-from src.config import settings
 from src.database import DbSession
 from src.redis import RedisDep
 
-REFRESH_COOKIE = "refresh_token"
-COOKIE_PATH = "/auth"
-
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
-
-RefreshCookie = Annotated[str | None, Cookie(alias=REFRESH_COOKIE)]
-
-
-def token_response(
-    response: Response, access_token: str, refresh_token: str
-) -> TokenPair:
-    """Set the refresh cookie and return the pair in the body.
-
-    Web clients read the cookie and ignore the body's refresh token; native clients
-    do the opposite. One code path serves both, with no client detection.
-    """
-    response.set_cookie(
-        REFRESH_COOKIE,
-        refresh_token,
-        max_age=auth_settings.refresh_token_ttl,
-        httponly=True,
-        secure=settings.environment == "production",
-        samesite="lax",
-        path=COOKIE_PATH,
-    )
-    return TokenPair(
-        access_token=access_token,
-        refresh_token=refresh_token,
-        expires_in=auth_settings.access_token_ttl,
-    )
 
 
 @auth_router.post(
@@ -56,9 +28,8 @@ def token_response(
     summary="Email a sign-in code",
     description="Always accepted, whether or not the address is registered.",
 )
-async def request_otp(payload: OTPRequest, redis: RedisDep) -> None:
-    """Send a one-time code to this address."""
-    await flows.request_otp(redis, email=payload.email)
+async def request_otp(payload: OTPRequest, db: DbSession, redis: RedisDep) -> None:
+    await flows.request_otp(db, redis, email=payload.email)
 
 
 @auth_router.post(
@@ -72,33 +43,37 @@ async def request_otp(payload: OTPRequest, redis: RedisDep) -> None:
 )
 async def verify_otp(
     payload: OTPVerify, db: DbSession, redis: RedisDep, response: Response
-) -> TokenPair:
-    """Sign in with a one-time code."""
+) -> Token:
     access_token, refresh_token = await flows.verify_otp(
         db, redis, email=payload.email, code=payload.code
     )
-    return token_response(response, access_token, refresh_token)
+    set_refresh_cookie(response, refresh_token)
+    return Token(
+        access_token=access_token, expires_in=auth_settings.access_token_ttl
+    )
 
 
 @auth_router.post(
     "/token/refresh",
     summary="Rotate the token pair",
-    description="Reads the refresh cookie when present, otherwise the request body.",
+    description="Reads the refresh token from the HttpOnly cookie.",
     responses={401: {"description": "Unknown, malformed or replayed refresh token"}},
 )
 async def refresh_tokens(
-    payload: RefreshRequest,
     redis: RedisDep,
     response: Response,
     refresh_token: RefreshCookie = None,
-) -> TokenPair:
-    """Issue a new token pair and invalidate the old refresh token."""
-    raw_token = refresh_token or payload.refresh_token
-    if raw_token is None:
+) -> Token:
+    if refresh_token is None:
         raise InvalidRefreshToken()
 
-    access_token, new_refresh_token = await flows.refresh(redis, raw_token=raw_token)
-    return token_response(response, access_token, new_refresh_token)
+    access_token, new_refresh_token = await flows.refresh(
+        redis, raw_token=refresh_token
+    )
+    set_refresh_cookie(response, new_refresh_token)
+    return Token(
+        access_token=access_token, expires_in=auth_settings.access_token_ttl
+    )
 
 
 @auth_router.post(
@@ -111,28 +86,23 @@ async def refresh_tokens(
     ),
 )
 async def logout(
-    payload: RefreshRequest,
     redis: RedisDep,
     response: Response,
     refresh_token: RefreshCookie = None,
 ) -> None:
-    """Sign out of this session."""
-    raw_token = refresh_token or payload.refresh_token
-    if raw_token is not None:
-        await flows.logout(redis, raw_token=raw_token)
-    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH)
+    if refresh_token is not None:
+        await flows.logout(redis, raw_token=refresh_token)
+    clear_refresh_cookie(response)
 
 
-@auth_router.get("/me", summary="Read the signed-in user")
+@auth_router.get("/me", summary="Read the current user")
 async def read_me(user: CurrentUser) -> UserPublic:
-    """Return the current user."""
     return UserPublic.model_validate(user, from_attributes=True)
 
 
-@auth_router.patch("/me", summary="Update the signed-in user")
+@auth_router.patch("/me", summary="Update the current user")
 async def update_me(
     payload: UserUpdate, db: DbSession, user: CurrentUser
 ) -> UserPublic:
-    """Change the current user's display name."""
     updated = await flows.update_profile(db, user=user, name=payload.name)
     return UserPublic.model_validate(updated, from_attributes=True)

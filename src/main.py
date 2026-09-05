@@ -28,7 +28,6 @@ class State(TypedDict):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[State]:
-    """Build the LLM registry and Redis client on startup, release them on shutdown."""
     # app starts here
     redis = create_redis_client(str(settings.redis_uri))
     try:
@@ -58,7 +57,6 @@ register_error_handlers(app)
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz() -> dict:
-    """Report that the app is up."""
     return {"status": "ok"}
 
 

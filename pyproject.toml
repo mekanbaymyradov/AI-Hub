@@ -24,7 +24,7 @@ entrypoint = "src.main:app"
 [tool.ruff]
 
 [tool.ruff.lint]
-extend-select = ["FAST", "D101", "D102", "D103"]
+extend-select = ["FAST"]
 
 [dependency-groups]
 dev = []
