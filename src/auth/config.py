@@ -4,8 +4,6 @@ from src.config import AppBaseSettings
 
 
 class AuthSettings(AppBaseSettings):
-    """Token and one-time-code parameters."""
-
     jwt_secret: SecretStr
     jwt_algorithm: str = "HS256"
     access_token_ttl: int = 900  # 15 minutes

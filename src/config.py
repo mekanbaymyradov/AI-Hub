@@ -79,7 +79,6 @@ class Settings(AppBaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    """Cache the settings."""
     return Settings()
 
 

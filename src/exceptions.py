@@ -26,16 +26,12 @@ class AppError(Exception):
 
 
 class NotFoundError(AppError):
-    """A requested resource does not exist."""
-
     status = 404
     type = "not_found"
     msg = "Not Found."
 
 
 class UnauthorizedError(AppError):
-    """The request carries no valid credentials."""
-
     status = 401
     type = "unauthorized"
     msg = "Not authenticated."
