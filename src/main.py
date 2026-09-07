@@ -4,6 +4,7 @@ from typing import TypedDict
 
 import logfire
 from fastapi import FastAPI
+from mypy_boto3_s3 import S3Client
 from redis.asyncio import Redis
 
 from src.auth.router import auth_router
@@ -15,6 +16,7 @@ from src.llm.router import llm_router
 from src.logging import setup_logging
 from src.middleware import AccessLogMiddleware
 from src.redis import create_redis_client
+from src.storage import create_storage_client
 
 setup_logging(settings.log_level, settings.environment)
 
@@ -24,17 +26,21 @@ class State(TypedDict):
 
     registry: LLMRegistry
     redis: Redis
+    storage: S3Client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[State]:
     # app starts here
     redis = create_redis_client(str(settings.redis_uri))
+    storage = create_storage_client()
     try:
         async with llm_lifespan(llm_settings) as registry:
-            yield {"registry": registry, "redis": redis}  # app runs here
+            # app runs here
+            yield {"registry": registry, "redis": redis, "storage": storage}
     finally:
         await redis.aclose()
+        storage.close()
     # app stops here
 
 
