@@ -24,3 +24,11 @@ async def update_user(db: AsyncSession, *, user: User, name: str) -> User:
     user.name = name
     await db.flush()
     return user
+
+
+async def update_avatar(
+    db: AsyncSession, *, user: User, avatar_key: str | None
+) -> User:
+    user.avatar_key = avatar_key
+    await db.flush()
+    return user

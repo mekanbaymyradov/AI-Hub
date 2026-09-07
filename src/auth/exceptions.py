@@ -20,3 +20,15 @@ class InvalidRefreshToken(UnauthorizedError):
 class NotAuthenticated(UnauthorizedError):
     type = "auth.not_authenticated"
     msg = "Not authenticated."
+
+
+class UnsupportedImageType(AppError):
+    status = 415
+    type = "auth.unsupported_image_type"
+    msg = "Avatar must be a WebP image."
+
+
+class AvatarTooLarge(AppError):
+    status = 413
+    type = "auth.avatar_too_large"
+    msg = "Avatar is too large."

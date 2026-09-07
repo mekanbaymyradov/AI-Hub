@@ -22,11 +22,11 @@ Organize by domain, not by file type. One package per bounded context.
 
 ```
 src/
-├── {domain}/           # e.g., auth/, posts/, aws/
+├── {domain}/           # e.g., auth/, chat/, llm/
 │   ├── router.py       # API endpoints
-│   ├── schemas.py      # Pydantic models
-│   ├── models.py       # SQLAlchemy ORM models
-│   ├── service.py      # Business logic
+│   ├── models.py       # SQLAlchemy and Pydantic models
+│   ├── service.py      # db crud
+│   ├── flows.py        # Business logic
 │   ├── dependencies.py # Route dependencies
 │   ├── config.py       # Domain-scoped BaseSettings
 │   ├── constants.py    # Constants and error codes

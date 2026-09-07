@@ -11,6 +11,7 @@ class AuthSettings(AppBaseSettings):
     otp_ttl: int = 300  # 5 minutes
     otp_length: int = 6
     otp_max_attempts: int = 5
+    avatar_max_bytes: int = 2_097_152  # 2 MiB
 
 
 auth_settings = AuthSettings()

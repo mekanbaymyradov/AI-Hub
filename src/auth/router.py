@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Response, status
+from typing import Annotated
+
+from fastapi import APIRouter, BackgroundTasks, File, Response, UploadFile, status
 
 from src.auth import flows
 from src.auth.config import auth_settings
@@ -18,6 +20,7 @@ from src.auth.models import (
 )
 from src.database import DbSession
 from src.redis import RedisDep
+from src.storage import StorageDep
 
 auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -48,9 +51,7 @@ async def verify_otp(
         db, redis, email=payload.email, code=payload.code
     )
     set_refresh_cookie(response, refresh_token)
-    return Token(
-        access_token=access_token, expires_in=auth_settings.access_token_ttl
-    )
+    return Token(access_token=access_token, expires_in=auth_settings.access_token_ttl)
 
 
 @auth_router.post(
@@ -71,9 +72,7 @@ async def refresh_tokens(
         redis, raw_token=refresh_token
     )
     set_refresh_cookie(response, new_refresh_token)
-    return Token(
-        access_token=access_token, expires_in=auth_settings.access_token_ttl
-    )
+    return Token(access_token=access_token, expires_in=auth_settings.access_token_ttl)
 
 
 @auth_router.post(
@@ -106,3 +105,45 @@ async def update_me(
 ) -> UserPublic:
     updated = await flows.update_profile(db, user=user, name=payload.name)
     return UserPublic.model_validate(updated, from_attributes=True)
+
+
+@auth_router.put(
+    "/me/avatar",
+    summary="Replace the current user's avatar",
+    description=(
+        "Expects a WebP image the client has already resized and compressed. "
+        "The previous avatar is deleted once the response is sent."
+    ),
+    responses={
+        413: {"description": "Image exceeds the size limit"},
+        415: {"description": "Image is not a WebP"},
+    },
+)
+async def set_avatar(
+    db: DbSession,
+    storage: StorageDep,
+    user: CurrentUser,
+    background_tasks: BackgroundTasks,
+    file: Annotated[UploadFile, File()],
+) -> UserPublic:
+    updated, old_key = await flows.set_avatar(db, storage, user=user, file=file)
+    if old_key and old_key != updated.avatar_key:
+        background_tasks.add_task(flows.delete_avatar_object, storage, key=old_key)
+    return UserPublic.model_validate(updated, from_attributes=True)
+
+
+@auth_router.delete(
+    "/me/avatar",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Remove the current user's avatar",
+    description="Clients fall back to `avatar_initial` once the avatar is gone.",
+)
+async def delete_avatar(
+    db: DbSession,
+    storage: StorageDep,
+    user: CurrentUser,
+    background_tasks: BackgroundTasks,
+) -> None:
+    old_key = await flows.remove_avatar(db, user=user)
+    if old_key:
+        background_tasks.add_task(flows.delete_avatar_object, storage, key=old_key)

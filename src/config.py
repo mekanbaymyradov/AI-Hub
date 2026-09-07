@@ -43,8 +43,15 @@ class Settings(AppBaseSettings):
     redis_password: SecretStr | None = None
     redis_index: int = 0
 
+    s3_endpoint_url: str
+    s3_access_key_id: SecretStr
+    s3_secret_access_key: SecretStr
+    s3_region: str = "auto"
+    s3_bucket: str 
+    s3_public_base_url: str
+
     resend_api_key: SecretStr
-    email_from: str = "onboarding@resend.dev"
+    email_from: str
 
     @property
     def database_uri(self) -> PostgresDsn:

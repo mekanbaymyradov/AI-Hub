@@ -4,7 +4,7 @@ from fastapi import APIRouter
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from src.llm.agents import agent
-from src.llm.deps import LLMRegistryDep, ModelDep
+from src.llm.dependencies import LLMRegistryDep, ModelDep
 from src.llm.schemas import ModelPublic, SendMessageRequest
 
 llm_router = APIRouter(prefix="/llm", tags=["LLM"])
