@@ -8,6 +8,7 @@ from mypy_boto3_s3 import S3Client
 from redis.asyncio import Redis
 
 from src.auth.router import auth_router
+from src.chat.router import chat_router
 from src.config import settings
 from src.error_handlers import register_error_handlers
 from src.llm.config import llm_settings
@@ -68,3 +69,4 @@ async def healthz() -> dict:
 
 app.include_router(auth_router)
 app.include_router(llm_router)
+app.include_router(chat_router)

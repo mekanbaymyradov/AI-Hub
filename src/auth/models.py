@@ -1,10 +1,17 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from pydantic import BaseModel, EmailStr, Field, computed_field
 from sqlalchemy import String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.database import Base
 from src.mixins import TimestampMixin
 from src.storage import public_url
+
+if TYPE_CHECKING:
+    from src.chat.models import Chat
 
 
 class User(Base, TimestampMixin):
@@ -14,7 +21,7 @@ class User(Base, TimestampMixin):
     avatar_key: Mapped[str | None] = mapped_column(String(255))
 
     # relationships
-    # chats: Mapped[list[Chat]] = relationship("Chat", back_populates="user")
+    chats: Mapped[list[Chat]] = relationship("Chat", back_populates="user")
 
 
 # Pydantic Models
