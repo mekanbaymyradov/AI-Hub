@@ -9,8 +9,9 @@ from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
-from src.llm.catalog import CATALOG, ModelSpec, ProviderId
 from src.llm.config import LLMSettings
+from src.llm.enums import Provider
+from src.llm.models import CATALOG, ModelSpec
 from src.logging import get_logger
 
 logger = get_logger(__name__)
@@ -39,21 +40,21 @@ class LLMRegistry:
 def build_model(spec: ModelSpec, settings: LLMSettings) -> Model | None:
     """Build the model for this spec, or None if its provider has no API key."""
     match spec.provider:
-        case ProviderId.ANTHROPIC if settings.anthropic_api_key:
+        case Provider.ANTHROPIC if settings.anthropic_api_key:
             return AnthropicModel(
                 spec.model_name,
                 provider=AnthropicProvider(
                     api_key=settings.anthropic_api_key.get_secret_value()
                 ),
             )
-        case ProviderId.OPENAI if settings.openai_api_key:
+        case Provider.OPENAI if settings.openai_api_key:
             return OpenAIChatModel(
                 spec.model_name,
                 provider=OpenAIProvider(
                     api_key=settings.openai_api_key.get_secret_value()
                 ),
             )
-        case ProviderId.GOOGLE if settings.google_api_key:
+        case Provider.GOOGLE if settings.google_api_key:
             return GoogleModel(
                 spec.model_name,
                 provider=GoogleProvider(
