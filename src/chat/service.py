@@ -1,9 +1,11 @@
 from collections.abc import Sequence
+from typing import Any, cast
 
-from sqlalchemy import select
+from sqlalchemy import CursorResult, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from src.chat.models import Chat, Message
+from src.chat.models import Attachment, Chat, Message
 
 
 async def get_chat(db: AsyncSession, *, chat_id: int, user_id: int) -> Chat | None:
@@ -34,12 +36,74 @@ async def delete_chat(db: AsyncSession, *, chat: Chat) -> None:
 
 async def get_messages(db: AsyncSession, *, chat_id: int) -> Sequence[Message]:
     result = await db.execute(
-        select(Message).where(Message.chat_id == chat_id).order_by(Message.id)
+        select(Message)
+        .where(Message.chat_id == chat_id)
+        .order_by(Message.id)
+        .options(selectinload(Message.attachments))
     )
     return result.scalars().all()
 
 
-async def add_message(
+async def create_message(
     db: AsyncSession, *, chat_id: int, content: dict, model_id: str | None
-) -> None:
-    db.add(Message(chat_id=chat_id, content=content, model_id=model_id))
+) -> Message:
+    message = Message(chat_id=chat_id, content=content, model_id=model_id)
+    db.add(message)
+    await db.flush()
+    return message
+
+
+async def create_attachment(
+    db: AsyncSession, *, user_id: int, key: str, filename: str, media_type: str
+) -> Attachment:
+    attachment = Attachment(
+        user_id=user_id, key=key, filename=filename, media_type=media_type
+    )
+    db.add(attachment)
+    await db.flush()
+    return attachment
+
+
+async def get_attachments(
+    db: AsyncSession, *, attachment_ids: Sequence[int], user_id: int
+) -> Sequence[Attachment]:
+    """Return this user's attachments that are not spoken for by a message yet.
+
+    Ordered by id to match the order the message relationship replays them in, so
+    a prompt's files read the same live as they do in the chat's history.
+    """
+    result = await db.execute(
+        select(Attachment)
+        .where(
+            Attachment.id.in_(attachment_ids),
+            Attachment.user_id == user_id,
+            Attachment.message_id.is_(None),
+        )
+        .order_by(Attachment.id)
+    )
+    return result.scalars().all()
+
+
+async def attach_to_message(
+    db: AsyncSession, *, attachment_ids: Sequence[int], message_id: int
+) -> int:
+    """Claim unclaimed attachments for a message, returning how many were claimed.
+
+    Still requiring message_id to be unset is what keeps two sends of the same
+    attachment from both claiming it: the later one claims nothing rather than
+    taking the file away from the message that already has it.
+    """
+    result = await db.execute(
+        update(Attachment)
+        .where(Attachment.id.in_(attachment_ids), Attachment.message_id.is_(None))
+        .values(message_id=message_id)
+    )
+    # execute() is typed for selects; a DML statement always returns a cursor result.
+    return cast(CursorResult[Any], result).rowcount
+
+
+async def touch_chat(db: AsyncSession, *, chat_id: int) -> None:
+    """Mark the chat as active now, so list_chats can order by real activity."""
+    await db.execute(
+        update(Chat).where(Chat.id == chat_id).values(updated_at=func.now())
+    )

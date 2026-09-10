@@ -32,3 +32,13 @@ StorageDep = Annotated[S3Client, Depends(get_storage)]
 def public_url(key: str) -> str:
     """Build the publicly served URL of a stored object."""
     return f"{settings.s3_public_base_url.rstrip('/')}/{key}"
+
+
+def presigned_url(client: S3Client, *, bucket: str, key: str, expires_in: int) -> str:
+    """Sign a time-limited GET URL for an object in a private bucket.
+
+    Unlike the calls that reach S3, signing is local HMAC, so it needs no threadpool.
+    """
+    return client.generate_presigned_url(
+        "get_object", Params={"Bucket": bucket, "Key": key}, ExpiresIn=expires_in
+    )

@@ -94,22 +94,30 @@ async def logout(
     clear_refresh_cookie(response)
 
 
-@auth_router.get("/me", summary="Read the current user")
-async def read_me(user: CurrentUser) -> UserPublic:
-    return UserPublic.model_validate(user, from_attributes=True)
+@auth_router.get(
+    path="/me", 
+    summary="Read the current user",
+    response_model=UserPublic
+)
+async def read_me(user: CurrentUser):
+    return user
 
 
-@auth_router.patch("/me", summary="Update the current user")
+@auth_router.patch(
+    path="/me", 
+    summary="Update the current user",
+    response_model=UserPublic
+)
 async def update_me(
     payload: UserUpdate, db: DbSession, user: CurrentUser
-) -> UserPublic:
-    updated = await flows.update_profile(db, user=user, name=payload.name)
-    return UserPublic.model_validate(updated, from_attributes=True)
-
+):
+    return await flows.update_profile(db, user=user, name=payload.name)
+    
 
 @auth_router.put(
     "/me/avatar",
     summary="Replace the current user's avatar",
+    response_model=UserPublic,
     description=(
         "Expects a WebP image the client has already resized and compressed. "
         "The previous avatar is deleted once the response is sent."
@@ -125,11 +133,11 @@ async def set_avatar(
     user: CurrentUser,
     background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File()],
-) -> UserPublic:
+) :
     updated, old_key = await flows.set_avatar(db, storage, user=user, file=file)
     if old_key and old_key != updated.avatar_key:
         background_tasks.add_task(flows.delete_avatar_object, storage, key=old_key)
-    return UserPublic.model_validate(updated, from_attributes=True)
+    return updated
 
 
 @auth_router.delete(
