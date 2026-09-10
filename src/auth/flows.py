@@ -74,7 +74,7 @@ async def set_avatar(
 
     await run_in_threadpool(
         storage.put_object,
-        Bucket=settings.s3_bucket,
+        Bucket=settings.s3_public_bucket,
         Key=key,
         Body=file.file,
         ContentType=AVATAR_CONTENT_TYPE,
@@ -99,7 +99,7 @@ async def delete_avatar_object(storage: S3Client, *, key: str) -> None:
     """Drop a replaced avatar. Best effort — a leaked object costs nothing."""
     try:
         await run_in_threadpool(
-            storage.delete_object, Bucket=settings.s3_bucket, Key=key
+            storage.delete_object, Bucket=settings.s3_public_bucket, Key=key
         )
     except Exception:
         logger.exception("avatar_delete_failed", key=key)

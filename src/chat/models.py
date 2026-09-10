@@ -8,6 +8,7 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.chat.config import chat_settings
 from src.database import Base
 from src.mixins import TimestampMixin
 
@@ -42,6 +43,35 @@ class Message(Base, TimestampMixin):
 
     # relationships
     chat: Mapped[Chat] = relationship(back_populates="messages")
+    attachments: Mapped[list[Attachment]] = relationship(
+        back_populates="message",
+        cascade="all, delete-orphan",
+        order_by="Attachment.id",
+        passive_deletes=True,
+    )
+
+
+class Attachment(Base, TimestampMixin):
+    """A file uploaded for a message, held in the private attachments bucket.
+
+    A row is created when the file is uploaded and only gains its message once
+    the prompt it belongs to is sent, so message_id is nullable and the owner
+    is tracked separately.
+    """
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("user.id", ondelete="cascade"), index=True
+    )
+    message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("message.id", ondelete="cascade"), index=True
+    )
+    key: Mapped[str] = mapped_column(String(255))
+    filename: Mapped[str] = mapped_column(String(255))
+    media_type: Mapped[str] = mapped_column(String(100))
+
+    # relationships
+    message: Mapped[Message | None] = relationship(back_populates="attachments")
 
 
 # Pydantic Models
@@ -51,6 +81,9 @@ class MessageRequest(BaseModel):
     chat_id: int | None = None
     model_id: str
     prompt: str = Field(min_length=1)
+    attachment_ids: list[int] = Field(
+        default_factory=list, max_length=chat_settings.attachment_max_count
+    )
 
 
 class ChatPublic(BaseModel):
@@ -60,9 +93,19 @@ class ChatPublic(BaseModel):
     updated_at: datetime
 
 
+class AttachmentPublic(BaseModel):
+    """An uploaded file, with a URL the client can read it from for a while."""
+
+    id: int
+    filename: str
+    media_type: str
+    url: str
+
+
 class MessagePublic(BaseModel):
     id: int
-    role: Literal["user", "assistant"]
-    text: str
+    kind: Literal["request", "response"]
+    content: str
     model_id: str | None
     created_at: datetime
+    attachments: list[AttachmentPublic] = []

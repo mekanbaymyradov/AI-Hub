@@ -23,3 +23,16 @@ Minimum code that solves the problem. Nothing speculative.
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
 - Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
+
+# Conventions
+
+## Dependency alias naming
+
+`Annotated[...]` aliases are named for what they inject. Append `Dep` only when
+the bare name would shadow the class being injected.
+
+- `CurrentUser`, `DbSession` — nothing shadowed, no suffix.
+- `ChatDep`, `ModelDep`, `RedisDep` — `Chat`, `Model` and `Redis` are real
+  symbols in scope, so the alias needs the suffix.
+
+This looks inconsistent at a glance; it isn't. Don't unify it.

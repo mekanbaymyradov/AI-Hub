@@ -11,6 +11,8 @@ class ModelSpec(BaseModel):
     provider: Provider
     model_name: str
     display_name: str
+    supports_files: bool = True
+    """Whether the model accepts image and PDF attachments."""
 
     @computed_field
     @property

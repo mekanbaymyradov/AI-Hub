@@ -21,7 +21,12 @@ class User(Base, TimestampMixin):
     avatar_key: Mapped[str | None] = mapped_column(String(255))
 
     # relationships
-    chats: Mapped[list[Chat]] = relationship("Chat", back_populates="user")
+    chats: Mapped[list[Chat]] = relationship(
+        "Chat",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
 
 
 # Pydantic Models

@@ -24,9 +24,17 @@ class LLMRegistry:
         self._models = models
         self._specs = specs
 
-    def model(self, model_id: str) -> Model | None:
-        """Return the model with this id, or None if it is unavailable."""
-        return self._models.get(model_id)
+    def model(self, spec: ModelSpec) -> Model:
+        """Return the model built for this spec.
+
+        Both are written together by build_registry, so a spec in hand means the
+        model exists.
+        """
+        return self._models[spec.id]
+
+    def spec(self, model_id: str) -> ModelSpec | None:
+        """Return the spec of the model with this id, or None if it is unavailable."""
+        return self._specs.get(model_id)
 
     def available(self) -> list[ModelSpec]:
         """Return the spec of every available model."""
