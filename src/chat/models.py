@@ -32,6 +32,9 @@ class Chat(Base, TimestampMixin):
         passive_deletes=True,
     )
 
+    def __repr__(self):
+        return f"Chat(id={self.id}, name={self.name}, user_id={self.user_id})"
+
 
 class Message(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -109,3 +112,6 @@ class MessagePublic(BaseModel):
     model_id: str | None
     created_at: datetime
     attachments: list[AttachmentPublic] = []
+
+class ChatRename(BaseModel):
+    name: str = Field(min_length=1, max_length=255)

@@ -10,6 +10,7 @@ from src.chat.dependencies import Attachments, ChatDep, MessageChatDep, ModelDep
 from src.chat.models import (
     AttachmentPublic,
     ChatPublic,
+    ChatRename,
     MessagePublic,
     MessageRequest,
 )
@@ -99,7 +100,6 @@ async def send_message(
     db: DbSession,
     storage: StorageDep,
 ) -> AsyncIterable[ServerSentEvent]:
-    """Stream the model's reply to the prompt, then store the exchange."""
     if chat is None:
         chat = await flows.create_chat(db, user_id=user.id, prompt=message.prompt)
         history = []
@@ -114,10 +114,9 @@ async def send_message(
         model=model, message_history=history, user_prompt=user_prompt
     ) as result:
         async for text in result.stream_text(delta=True):
-            yield ServerSentEvent(raw_data=text)
+            yield ServerSentEvent(data=text)
 
-        # Only reached when the stream ran to completion. An abandoned reply is
-        # left unsaved, so a chat never holds a prompt without its answer.
+        # Only reached when the stream ran to completion.
         await flows.create_message(
             db,
             chat_id=chat.id,
@@ -126,3 +125,15 @@ async def send_message(
             prompt=message.prompt,
             attachments=attachments,
         )
+
+
+@chat_router.patch(
+    path="/{chat_id}/rename",
+    summary="Rename the chat name",
+    responses={404: {"description": "No such chat"}},
+    response_model=ChatPublic
+)
+async def rename_chat(
+    payload: ChatRename, chat: ChatDep, db: DbSession
+):
+    return await flows.rename_chat(db, chat=chat, name=payload.name)

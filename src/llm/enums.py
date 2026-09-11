@@ -7,3 +7,4 @@ class Provider(AppEnum):
     ANTHROPIC = "anthropic"
     OPENAI = "openai"
     GOOGLE = "google"
+    GROQ = "groq"

@@ -4,9 +4,11 @@ from contextlib import AsyncExitStack, asynccontextmanager
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
+from pydantic_ai.models.groq import GroqModel
 from pydantic_ai.models.openai import OpenAIChatModel
 from pydantic_ai.providers.anthropic import AnthropicProvider
 from pydantic_ai.providers.google import GoogleProvider
+from pydantic_ai.providers.groq import GroqProvider
 from pydantic_ai.providers.openai import OpenAIProvider
 
 from src.llm.config import LLMSettings
@@ -68,6 +70,11 @@ def build_model(spec: ModelSpec, settings: LLMSettings) -> Model | None:
                 provider=GoogleProvider(
                     api_key=settings.google_api_key.get_secret_value()
                 ),
+            )
+        case Provider.GROQ if settings.groq_api_key:
+            return GroqModel(
+                spec.model_name,
+                provider=GroqProvider(api_key=settings.groq_api_key.get_secret_value()),
             )
         case _:
             logger.warning(
