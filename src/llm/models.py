@@ -41,6 +41,24 @@ CATALOG: tuple[ModelSpec, ...] = (
         model_name="gemini-3.7-flash",
         display_name="Gemini 3.7 Flash",
     ),
+    ModelSpec(
+        provider=Provider.GROQ,
+        model_name="openai/gpt-oss-20b",
+        display_name="GPT-OSS 20B",
+        supports_files=False,
+    ),
+    ModelSpec(
+        provider=Provider.GROQ,
+        model_name="openai/gpt-oss-120b",
+        display_name="GPT-OSS 120B",
+        supports_files=False,
+    ),
+    ModelSpec(
+        provider=Provider.GROQ,
+        model_name="qwen/qwen3.8-27b",
+        display_name="Qwen3.8 27B",
+        supports_files=False,
+    ),
 )
 
 

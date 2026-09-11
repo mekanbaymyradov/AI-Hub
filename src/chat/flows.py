@@ -251,6 +251,10 @@ async def create_message(
                     expected=len(attachments),
                     claimed=claimed,
                 )
-
-    await service.touch_chat(db, chat_id=chat_id)
     await db.commit()
+
+
+async def rename_chat(db: AsyncSession, *, chat: Chat, name: str) -> Chat:
+    chat = await service.rename_chat(db, chat=chat, name=name)
+    await db.commit()
+    return chat

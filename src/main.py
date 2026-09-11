@@ -56,7 +56,7 @@ app = FastAPI(
 
 logfire.configure()
 logfire.instrument_fastapi(app)
-
+logfire.instrument_pydantic_ai()
 app.add_middleware(AccessLogMiddleware)
 
 register_error_handlers(app)

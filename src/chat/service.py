@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, func, select, update
+from sqlalchemy import CursorResult, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -87,23 +87,16 @@ async def get_attachments(
 async def attach_to_message(
     db: AsyncSession, *, attachment_ids: Sequence[int], message_id: int
 ) -> int:
-    """Claim unclaimed attachments for a message, returning how many were claimed.
-
-    Still requiring message_id to be unset is what keeps two sends of the same
-    attachment from both claiming it: the later one claims nothing rather than
-    taking the file away from the message that already has it.
-    """
+    """Claim unclaimed attachments for a message, returning how many were claimed."""
     result = await db.execute(
         update(Attachment)
         .where(Attachment.id.in_(attachment_ids), Attachment.message_id.is_(None))
         .values(message_id=message_id)
     )
-    # execute() is typed for selects; a DML statement always returns a cursor result.
     return cast(CursorResult[Any], result).rowcount
 
 
-async def touch_chat(db: AsyncSession, *, chat_id: int) -> None:
-    """Mark the chat as active now, so list_chats can order by real activity."""
-    await db.execute(
-        update(Chat).where(Chat.id == chat_id).values(updated_at=func.now())
-    )
+async def rename_chat(db: AsyncSession, *, chat: Chat, name: str) -> Chat:
+    chat.name = name
+    await db.flush()
+    return chat
