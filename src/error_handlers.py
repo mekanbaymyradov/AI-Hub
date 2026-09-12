@@ -14,19 +14,20 @@ async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status,
         content={"detail": [exc.serialize()]},
+        headers=exc.headers,
     )
 
 
 async def handle_http_exception(
     request: Request, exc: StarletteHTTPException
 ) -> JSONResponse:
-    item = {
+    detail = {
         "msg": exc.detail,
         "type": HTTPStatus(exc.status_code).phrase.lower().replace(" ", "_"),
     }
     return JSONResponse(
         status_code=exc.status_code,
-        content={"detail": [item]},
+        content={"detail": [detail]},
         headers=exc.headers,
     )
 
