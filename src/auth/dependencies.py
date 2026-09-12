@@ -21,6 +21,7 @@ async def get_current_user(db: DbSession, credentials: BearerToken) -> User:
     user = await service.get_user(db, user_id=int(claims["sub"]))
     if user is None:
         raise NotAuthenticated()
+
     return user
 
 

@@ -1,4 +1,5 @@
 from collections.abc import Sequence
+from typing import cast
 from uuid import uuid4
 
 from fastapi import UploadFile
@@ -74,13 +75,14 @@ async def create_attachments(
     for file in files:
         # No extension; the media type is a column, and the bucket is private.
         key = f"attachments/{user_id}/{uuid4().hex}"
+        media_type = cast(str, file.content_type)
 
         await run_in_threadpool(
             storage.put_object,
             Bucket=chat_settings.s3_private_bucket,
             Key=key,
             Body=file.file,
-            ContentType=file.content_type,
+            ContentType=media_type,
         )
 
         attachments.append(
@@ -89,7 +91,7 @@ async def create_attachments(
                 user_id=user_id,
                 key=key,
                 filename=(file.filename or "file")[:255],
-                media_type=str(file.content_type),
+                media_type=media_type,
             )
         )
 

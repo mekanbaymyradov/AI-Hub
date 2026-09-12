@@ -1,6 +1,14 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, File, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Response,
+    UploadFile,
+    status,
+)
 
 from src.auth import flows
 from src.auth.config import auth_settings
@@ -19,6 +27,7 @@ from src.auth.models import (
     UserUpdate,
 )
 from src.database import DbSession
+from src.rate_limit import ip_rate_limit
 from src.redis import RedisDep
 from src.storage import StorageDep
 
@@ -30,8 +39,13 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
     status_code=status.HTTP_202_ACCEPTED,
     summary="Email a sign-in code",
     description="Always accepted, whether or not the address is registered.",
+    dependencies=[Depends(ip_rate_limit(times=5, seconds=3600))],
 )
-async def request_otp(payload: OTPRequest, db: DbSession, redis: RedisDep) -> None:
+async def request_otp(
+    payload: OTPRequest, 
+    db: DbSession, 
+    redis: RedisDep
+) -> None:
     await flows.request_otp(db, redis, email=payload.email)
 
 
@@ -43,6 +57,7 @@ async def request_otp(payload: OTPRequest, db: DbSession, redis: RedisDep) -> No
         401: {"description": "Invalid or expired code"},
         429: {"description": "Too many attempts"},
     },
+    dependencies=[Depends(ip_rate_limit(times=10, seconds=900))],
 )
 async def verify_otp(
     payload: OTPVerify, db: DbSession, redis: RedisDep, response: Response
@@ -93,20 +108,19 @@ async def logout(
         await flows.logout(redis, raw_token=refresh_token)
     clear_refresh_cookie(response)
 
-
 @auth_router.get(
-    path="/me", 
+    path="/me",
     summary="Read the current user",
-    response_model=UserPublic
+    response_model=UserPublic,
 )
 async def read_me(user: CurrentUser):
     return user
 
 
 @auth_router.patch(
-    path="/me", 
+    path="/me",
     summary="Update the current user",
-    response_model=UserPublic
+    response_model=UserPublic,
 )
 async def update_me(
     payload: UserUpdate, db: DbSession, user: CurrentUser

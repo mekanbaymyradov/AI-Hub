@@ -7,6 +7,7 @@ class AppError(Exception):
     status = 500
     type = "internal_error"
     msg = "An unexpected error occurred."
+    headers: dict[str, str] | None = None
 
     def __init__(
         self,
@@ -35,3 +36,13 @@ class UnauthorizedError(AppError):
     status = 401
     type = "unauthorized"
     msg = "Not authenticated."
+    
+
+class RateLimitExceeded(AppError):
+    status = 429
+    type = "rate_limit"
+    msg = "Too many requests."
+
+    def __init__(self, retry_after: int):
+        super().__init__()
+        self.headers = {"Retry-After": str(retry_after)}

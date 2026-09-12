@@ -43,6 +43,10 @@ COPY --from=builder --chown=appuser:appgroup /app /app
 # Set the virtual environment at the front of the PATH
 ENV PATH="/app/.venv/bin:$PATH"
 
+# Trust proxy headers only from this address; override at deploy with the
+# real load balancer address
+ENV FORWARDED_ALLOW_IPS=127.0.0.1
+
 # Switch to the non-root user
 USER appuser
 
