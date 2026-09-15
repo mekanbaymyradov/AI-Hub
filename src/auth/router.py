@@ -35,22 +35,18 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @auth_router.post(
-    "/otp/request",
+    path="/otp/request",
     status_code=status.HTTP_202_ACCEPTED,
     summary="Email a sign-in code",
     description="Always accepted, whether or not the address is registered.",
     dependencies=[Depends(ip_rate_limit(times=5, seconds=3600))],
 )
-async def request_otp(
-    payload: OTPRequest, 
-    db: DbSession, 
-    redis: RedisDep
-) -> None:
+async def request_otp(payload: OTPRequest, db: DbSession, redis: RedisDep) -> None:
     await flows.request_otp(db, redis, email=payload.email)
 
 
 @auth_router.post(
-    "/otp/verify",
+    path="/otp/verify",
     summary="Exchange a code for tokens",
     description="Registers the user if this is their first sign-in.",
     responses={
@@ -70,7 +66,7 @@ async def verify_otp(
 
 
 @auth_router.post(
-    "/token/refresh",
+    path="/token/refresh",
     summary="Rotate the token pair",
     description="Reads the refresh token from the HttpOnly cookie.",
     responses={401: {"description": "Unknown, malformed or replayed refresh token"}},
@@ -91,7 +87,7 @@ async def refresh_tokens(
 
 
 @auth_router.post(
-    "/logout",
+    path="/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Close the current session",
     description=(
@@ -108,6 +104,7 @@ async def logout(
         await flows.logout(redis, raw_token=refresh_token)
     clear_refresh_cookie(response)
 
+
 @auth_router.get(
     path="/me",
     summary="Read the current user",
@@ -122,11 +119,9 @@ async def read_me(user: CurrentUser):
     summary="Update the current user",
     response_model=UserPublic,
 )
-async def update_me(
-    payload: UserUpdate, db: DbSession, user: CurrentUser
-):
+async def update_me(payload: UserUpdate, db: DbSession, user: CurrentUser):
     return await flows.update_profile(db, user=user, name=payload.name)
-    
+
 
 @auth_router.put(
     "/me/avatar",
@@ -147,7 +142,7 @@ async def set_avatar(
     user: CurrentUser,
     background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File()],
-) :
+):
     updated, old_key = await flows.set_avatar(db, storage, user=user, file=file)
     if old_key and old_key != updated.avatar_key:
         background_tasks.add_task(flows.delete_avatar_object, storage, key=old_key)

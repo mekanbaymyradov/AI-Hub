@@ -113,5 +113,6 @@ class MessagePublic(BaseModel):
     created_at: datetime
     attachments: list[AttachmentPublic] = []
 
+
 class ChatRename(BaseModel):
     name: str = Field(min_length=1, max_length=255)

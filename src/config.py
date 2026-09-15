@@ -53,6 +53,10 @@ class Settings(AppBaseSettings):
     resend_api_key: SecretStr
     email_from: str
 
+    rate_limit_user_limit: int = 10
+    rate_limit_ip_limit: int = 60
+    rate_limit_window_seconds: int = 60
+
     @property
     def database_uri(self) -> PostgresDsn:
         """
