@@ -26,6 +26,7 @@ async def get_model_spec(
         raise ModelNotFound(loc=["body", "model_id"])
     return spec
 
+
 ModelSpecDep = Annotated[ModelSpec, Depends(get_model_spec)]
 
 

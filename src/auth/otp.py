@@ -46,6 +46,7 @@ async def verify_otp(redis: Redis, *, email: str, code: str) -> None:
         return
 
     attempts = await redis.hincrby(key, "attempts", 1)
+    print(attempts)
     if attempts >= auth_settings.otp_max_attempts:
         await redis.delete(key)
         raise OTPAttemptsExceeded(loc=["body", "code"])

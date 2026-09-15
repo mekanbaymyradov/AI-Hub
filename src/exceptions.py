@@ -36,7 +36,7 @@ class UnauthorizedError(AppError):
     status = 401
     type = "unauthorized"
     msg = "Not authenticated."
-    
+
 
 class RateLimitExceeded(AppError):
     status = 429

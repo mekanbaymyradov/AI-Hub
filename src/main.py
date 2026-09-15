@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from typing import TypedDict
 
 import logfire
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from mypy_boto3_s3 import S3Client
 from redis.asyncio import Redis
 
@@ -16,6 +16,7 @@ from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
 from src.logging import setup_logging
 from src.middleware import AccessLogMiddleware
+from src.rate_limit import global_rate_limit
 from src.redis import create_redis_client
 from src.storage import create_storage_client
 
@@ -51,6 +52,7 @@ app = FastAPI(
     openapi_url="/openapi.json" if settings.environment == "local" else None,
     redoc_url="/redocs" if settings.environment == "local" else None,
     lifespan=lifespan,
+    dependencies=[Depends(global_rate_limit)],
 )
 
 logfire.configure()

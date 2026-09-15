@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterable
 from typing import Annotated
 
-from fastapi import APIRouter, File, UploadFile, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from src.auth.dependencies import CurrentUser
@@ -16,6 +16,7 @@ from src.chat.models import (
 )
 from src.database import DbSession
 from src.llm.agents import agent
+from src.rate_limit import user_rate_limit
 from src.storage import StorageDep
 
 chat_router = APIRouter(prefix="/chats", tags=["Chat"])
@@ -65,6 +66,7 @@ async def list_messages(
         415: {"description": "A file is neither an image nor a PDF"},
         422: {"description": "Too many files"},
     },
+    dependencies=[Depends(user_rate_limit(times=30, seconds=60))],
 )
 async def create_attachments(
     db: DbSession,
@@ -90,6 +92,7 @@ async def create_attachments(
         404: {"description": "No such chat, model or attachment"},
         422: {"description": "The model does not accept attachments"},
     },
+    dependencies=[Depends(user_rate_limit(times=20, seconds=60))],
 )
 async def send_message(
     message: MessageRequest,
@@ -131,9 +134,7 @@ async def send_message(
     path="/{chat_id}/rename",
     summary="Rename the chat name",
     responses={404: {"description": "No such chat"}},
-    response_model=ChatPublic
+    response_model=ChatPublic,
 )
-async def rename_chat(
-    payload: ChatRename, chat: ChatDep, db: DbSession
-):
+async def rename_chat(payload: ChatRename, chat: ChatDep, db: DbSession):
     return await flows.rename_chat(db, chat=chat, name=payload.name)
