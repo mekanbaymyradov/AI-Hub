@@ -29,4 +29,15 @@ entrypoint = "src.main:app"
 extend-select = ["FAST"]
 
 [dependency-groups]
-dev = []
+dev = [
+    "asgi-lifespan==2.*",
+    "pytest>=9.1.1",
+]
+
+[tool.pytest]
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning:google.genai.*"
+]
+
+

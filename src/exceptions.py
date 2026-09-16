@@ -38,6 +38,18 @@ class UnauthorizedError(AppError):
     msg = "Not authenticated."
 
 
+class ContentTooLargeError(AppError):
+    status = 413
+    type = "content_too_large"
+    msg = "Content too large."
+
+
+class UnsupportedMediaTypeError(AppError):
+    status = 415
+    type = "unsupported_media_type"
+    msg = "Unsupported media type."
+
+
 class RateLimitExceeded(AppError):
     status = 429
     type = "rate_limit"
