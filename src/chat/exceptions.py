@@ -1,4 +1,9 @@
-from src.exceptions import AppError, NotFoundError
+from src.exceptions import (
+    AppError,
+    ContentTooLargeError,
+    NotFoundError,
+    UnsupportedMediaTypeError,
+)
 
 
 class ChatNotFound(NotFoundError):
@@ -18,14 +23,12 @@ class AttachmentNotFound(NotFoundError):
     msg = "Attachment not found."
 
 
-class AttachmentTooLarge(AppError):
-    status = 413
+class AttachmentTooLarge(ContentTooLargeError):
     type = "chat.attachment_too_large"
     msg = "Attachment is too large."
 
 
-class UnsupportedAttachmentType(AppError):
-    status = 415
+class UnsupportedAttachmentType(UnsupportedMediaTypeError):
     type = "chat.unsupported_attachment_type"
     msg = "Attachment must be an image or a PDF."
 

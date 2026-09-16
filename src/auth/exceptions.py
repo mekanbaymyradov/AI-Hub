@@ -1,4 +1,9 @@
-from src.exceptions import AppError, UnauthorizedError
+from src.exceptions import (
+    AppError,
+    ContentTooLargeError,
+    UnauthorizedError,
+    UnsupportedMediaTypeError,
+)
 
 
 class InvalidOTP(UnauthorizedError):
@@ -22,13 +27,11 @@ class NotAuthenticated(UnauthorizedError):
     msg = "Not authenticated."
 
 
-class UnsupportedImageType(AppError):
-    status = 415
+class UnsupportedImageType(UnsupportedMediaTypeError):
     type = "auth.unsupported_image_type"
     msg = "Avatar must be a WebP image."
 
 
-class AvatarTooLarge(AppError):
-    status = 413
+class AvatarTooLarge(ContentTooLargeError):
     type = "auth.avatar_too_large"
     msg = "Avatar is too large."
