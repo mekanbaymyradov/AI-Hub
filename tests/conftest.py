@@ -1,8 +1,11 @@
-from collections.abc import AsyncGenerator
+from collections.abc import AsyncGenerator, Iterator
 
+import boto3
 import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
+from moto import mock_aws
+from mypy_boto3_s3 import S3Client
 from starlette.config import environ
 
 environ["POSTGRES_USER"] = "postgres"
@@ -15,6 +18,13 @@ environ["REDIS_INDEX"] = "15"
 # Backstop: if the outbox patch ever misses, Resend rejects the call instead of sending.
 environ["RESEND_API_KEY"] = "test"
 environ["LOGFIRE_SEND_TO_LOGFIRE"] = "false"
+
+# Backstop: if the storage override ever misses, uploads fail instead of reaching R2.
+environ["S3_ENDPOINT_URL"] = "http://localhost:1"
+environ["S3_ACCESS_KEY_ID"] = "test"
+environ["S3_SECRET_ACCESS_KEY"] = "test"
+environ["S3_PUBLIC_BUCKET"] = "test-public"
+environ["S3_PUBLIC_BASE_URL"] = "https://cdn.test"
 
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import (
@@ -30,6 +40,7 @@ from src.database import get_db
 from src.main import app
 from src.models import Base
 from src.redis import create_redis_client, get_redis
+from src.storage import get_storage
 
 
 @pytest.fixture(scope="session")
@@ -84,11 +95,21 @@ async def redis_client() -> AsyncGenerator[Redis]:
 
 
 @pytest.fixture
+def s3() -> Iterator[S3Client]:
+    """An in-memory S3 with the public bucket created."""
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="us-east-1")
+        s3.create_bucket(Bucket=settings.s3_public_bucket)
+        yield s3
+
+
+@pytest.fixture
 async def client(
-    db_session: AsyncSession, redis_client: Redis
+    db_session: AsyncSession, redis_client: Redis, s3: S3Client
 ) -> AsyncGenerator[AsyncClient]:
     app.dependency_overrides[get_db] = lambda: db_session
     app.dependency_overrides[get_redis] = lambda: redis_client
+    app.dependency_overrides[get_storage] = lambda: s3
 
     async with (
         LifespanManager(app) as manager,

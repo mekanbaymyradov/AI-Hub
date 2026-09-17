@@ -31,6 +31,7 @@ extend-select = ["FAST"]
 [dependency-groups]
 dev = [
     "asgi-lifespan==2.*",
+    "moto[s3]>=5.2.3",
     "pytest>=9.1.1",
 ]
 
