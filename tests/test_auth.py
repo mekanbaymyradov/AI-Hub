@@ -1,9 +1,19 @@
 import pytest
 from httpx import AsyncClient
+from mypy_boto3_s3 import S3Client
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth import otp, service
-from tests.utils import auth_header, request_code, sign_in, verify_code
+from src.auth.config import auth_settings
+from src.config import settings
+from tests.utils import (
+    auth_header,
+    request_code,
+    sign_in,
+    stored_avatar_keys,
+    upload_avatar,
+    verify_code,
+)
 
 pytestmark = pytest.mark.anyio
 
@@ -199,3 +209,76 @@ async def test_update_profile_changes_name(
 
     assert response.status_code == 200
     assert response.json()["name"] == "Alice"
+
+
+async def test_upload_avatar_stores_image(
+    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+
+    response = await upload_avatar(client, token)
+
+    assert response.status_code == 200
+    keys = stored_avatar_keys(s3)
+    assert len(keys) == 1
+    assert response.json()["avatar_url"].endswith(keys[0])
+    stored = s3.head_object(Bucket=settings.s3_public_bucket, Key=keys[0])
+    assert stored["ContentType"] == "image/webp"
+
+
+async def test_upload_avatar_rejects_non_webp(
+    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+
+    response = await upload_avatar(client, token, content_type="image/png")
+
+    assert response.status_code == 415
+    assert response.json()["detail"][0]["type"] == "auth.unsupported_image_type"
+    assert stored_avatar_keys(s3) == []
+
+
+async def test_upload_avatar_rejects_too_large(
+    client: AsyncClient,
+    s3: S3Client,
+    sent_codes: dict[str, str],
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(auth_settings, "avatar_max_bytes", 10)
+    token = await sign_in(client, sent_codes, "user@example.com")
+
+    response = await upload_avatar(client, token, content=b"x" * 11)
+
+    assert response.status_code == 413
+    assert response.json()["detail"][0]["type"] == "auth.avatar_too_large"
+    assert stored_avatar_keys(s3) == []
+
+
+async def test_replacing_avatar_keeps_only_new_image(
+    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+    first = await upload_avatar(client, token)
+    assert first.status_code == 200
+
+    response = await upload_avatar(client, token)
+
+    assert response.status_code == 200
+    keys = stored_avatar_keys(s3)
+    assert len(keys) == 1
+    assert response.json()["avatar_url"].endswith(keys[0])
+
+
+async def test_delete_avatar_removes_image(
+    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+    uploaded = await upload_avatar(client, token)
+    assert uploaded.status_code == 200
+
+    response = await client.delete("/auth/me/avatar", headers=auth_header(token))
+
+    assert response.status_code == 204
+    assert stored_avatar_keys(s3) == []
+    me = await client.get("/auth/me", headers=auth_header(token))
+    assert me.json()["avatar_url"] is None
