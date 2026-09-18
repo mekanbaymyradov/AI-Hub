@@ -1,11 +1,11 @@
 from collections.abc import Sequence
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, select, update
+from sqlalchemy import CursorResult, func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from src.chat.models import Attachment, Chat, Message
+from src.chat.models import Attachment, Chat, ChatCursor, Message, MessageCursor
 
 
 async def get_chat(db: AsyncSession, *, chat_id: int, user_id: int) -> Chat | None:
@@ -16,10 +16,18 @@ async def get_chat(db: AsyncSession, *, chat_id: int, user_id: int) -> Chat | No
     return result.scalar_one_or_none()
 
 
-async def list_chats(db: AsyncSession, *, user_id: int) -> Sequence[Chat]:
-    result = await db.execute(
-        select(Chat).where(Chat.user_id == user_id).order_by(Chat.updated_at.desc())
-    )
+async def list_chats(
+    db: AsyncSession, *, user_id: int, limit: int, cursor: ChatCursor | None
+) -> Sequence[Chat]:
+    """Return a page of the user's chats, most recently active first."""
+    query = select(Chat).where(Chat.user_id == user_id)
+    if cursor is not None:
+        query = query.where(
+            tuple_(Chat.updated_at, Chat.id) < (cursor.updated_at, cursor.id)
+        )
+    query = query.order_by(Chat.updated_at.desc(), Chat.id.desc()).limit(limit)
+
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -100,3 +108,38 @@ async def rename_chat(db: AsyncSession, *, chat: Chat, name: str) -> Chat:
     chat.name = name
     await db.flush()
     return chat
+
+
+async def rename_chat_if_unchanged(
+    db: AsyncSession, *, chat_id: int, old_name: str, new_name: str
+) -> bool:
+    """Rename the chat only if its name is still old_name, returning whether it was."""
+    result = await db.execute(
+        update(Chat)
+        .where(Chat.id == chat_id, Chat.name == old_name)
+        .values(name=new_name)
+    )
+    return cast(CursorResult[Any], result).rowcount == 1
+
+
+async def touch_chat(db: AsyncSession, *, chat_id: int) -> None:
+    await db.execute(
+        update(Chat).where(Chat.id == chat_id).values(updated_at=func.now())
+    )
+
+
+async def list_messages(
+    db: AsyncSession, *, chat_id: int, limit: int, cursor: MessageCursor | None
+) -> Sequence[Message]:
+    """Return a page of the chat's messages, newest first."""
+    query = (
+        select(Message)
+        .where(Message.chat_id == chat_id)
+        .options(selectinload(Message.attachments))
+    )
+    if cursor is not None:
+        query = query.where(Message.id < cursor.id)
+    query = query.order_by(Message.id.desc()).limit(limit)
+
+    result = await db.execute(query)
+    return result.scalars().all()

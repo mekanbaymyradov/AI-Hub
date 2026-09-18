@@ -29,7 +29,7 @@ class NotAuthenticated(UnauthorizedError):
 
 class UnsupportedImageType(UnsupportedMediaTypeError):
     type = "auth.unsupported_image_type"
-    msg = "Avatar must be a WebP image."
+    msg = "Unsupported image type."
 
 
 class AvatarTooLarge(ContentTooLargeError):

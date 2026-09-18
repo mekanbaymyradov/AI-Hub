@@ -1,0 +1,1 @@
+AVATAR_CONTENT_TYPE = "image/webp"
