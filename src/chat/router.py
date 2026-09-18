@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import AsyncIterable
 from typing import Annotated
 
@@ -16,6 +17,7 @@ from src.chat.models import (
 )
 from src.database import DbSession
 from src.llm.agents import agent
+from src.llm.dependencies import LLMRegistryDep
 from src.pagination import Page, PageParamsDep
 from src.rate_limit import user_rate_limit
 from src.storage import StorageDep
@@ -77,32 +79,49 @@ async def send_message(
     user: CurrentUser,
     db: DbSession,
     storage: StorageDep,
+    registry: LLMRegistryDep,
 ) -> AsyncIterable[ServerSentEvent]:
+    name_task = None
     if chat is None:
         chat = await flows.create_chat(db, user_id=user.id, prompt=message.prompt)
         history = []
+        name_task = asyncio.create_task(
+            flows.generate_chat_name(registry, prompt=message.prompt)
+        )
     else:
         history = await flows.get_history(db, storage, chat_id=chat.id)
 
-    yield ServerSentEvent(data={"chat_id": chat.id}, event="chat")
+    try:
+        yield ServerSentEvent(data={"id": chat.id}, event="chat_id")
 
-    user_prompt = [message.prompt, *flows.attachment_parts(attachments, storage)]
+        user_prompt = [message.prompt, *flows.attachment_parts(attachments, storage)]
 
-    async with agent.run_stream(
-        model=model, message_history=history, user_prompt=user_prompt
-    ) as result:
-        async for text in result.stream_text(delta=True):
-            yield ServerSentEvent(data=text)
+        async with agent.run_stream(
+            model=model, message_history=history, user_prompt=user_prompt
+        ) as result:
+            async for text in result.stream_text(delta=True):
+                yield ServerSentEvent(data=text)
 
-        # Only reached when the stream ran to completion.
-        await flows.create_message(
-            db,
-            chat_id=chat.id,
-            messages=result.new_messages(),
-            model_id=message.model_id,
-            prompt=message.prompt,
-            attachments=attachments,
-        )
+            # Only reached when the stream ran to completion.
+            await flows.create_message(
+                db,
+                chat_id=chat.id,
+                messages=result.new_messages(),
+                model_id=message.model_id,
+                prompt=message.prompt,
+                attachments=attachments,
+            )
+
+        if (
+            name_task is not None
+            and (name := await name_task)
+            and await flows.apply_chat_name(db, chat=chat, name=name)
+        ):
+            yield ServerSentEvent(data={"name": name}, event="chat_name")
+    finally:
+        # A client that disconnects ends the stream early; stop the title call too.
+        if name_task is not None:
+            name_task.cancel()
 
 
 @chat_router.patch(

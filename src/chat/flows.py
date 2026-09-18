@@ -33,6 +33,9 @@ from src.chat.models import (
     MessageCursor,
     MessagePublic,
 )
+from src.llm.agents import title_agent
+from src.llm.constants import TITLE_MODEL_ID
+from src.llm.registry import LLMRegistry
 from src.logging import get_logger
 from src.pagination import Page, PageParams
 from src.storage import presigned_url
@@ -46,6 +49,40 @@ async def create_chat(db: AsyncSession, *, user_id: int, prompt: str) -> Chat:
     )
     await db.commit()
     return chat
+
+
+async def generate_chat_name(registry: LLMRegistry, *, prompt: str) -> str | None:
+    """Ask a cheap model to title a new chat, or return None to keep its placeholder.
+
+    Runs alongside the reply, which is using the request's session, so this must
+    not touch the database; the caller saves the name once the reply is stored.
+    """
+    spec = registry.spec(TITLE_MODEL_ID)
+    if spec is None:
+        return None
+
+    try:
+        result = await title_agent.run(prompt, model=registry.model(spec))
+    except Exception:
+        logger.exception("chat_name_failed")
+        return None
+
+    name = result.output.strip().strip("\"'").rstrip(".").strip()
+    return name[:CHAT_NAME_LENGTH] or None
+
+
+async def apply_chat_name(db: AsyncSession, *, chat: Chat, name: str) -> bool:
+    """Give a new chat its generated name, unless the user renamed it meanwhile.
+
+    chat.name still holds the placeholder the chat was created with, since a
+    rename arrives through another request's session and this one never reloads
+    the chat.
+    """
+    applied = await service.rename_chat_if_unchanged(
+        db, chat_id=chat.id, old_name=chat.name, new_name=name
+    )
+    await db.commit()
+    return applied
 
 
 async def delete_chat(db: AsyncSession, *, chat: Chat) -> None:
