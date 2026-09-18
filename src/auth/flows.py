@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth import otp, service, sessions
 from src.auth.config import auth_settings
+from src.auth.constants import AVATAR_CONTENT_TYPE
 from src.auth.exceptions import AvatarTooLarge, UnsupportedImageType
 from src.auth.models import User
 from src.config import settings
@@ -15,12 +16,9 @@ from src.logging import get_logger
 
 logger = get_logger(__name__)
 
-AVATAR_CONTENT_TYPE = "image/webp"
-
 
 async def request_otp(db: AsyncSession, redis: Redis, *, email: str) -> None:
-    # Picks the template only; the response is identical either way, so whether
-    # the address is registered never reaches the caller.
+    # Picks the template only; the response is identical either way
     user = await service.get_user_by_email(db, email=email)
     code = await otp.issue_otp(redis, email=email)
     try:
@@ -65,7 +63,7 @@ async def set_avatar(
 ) -> tuple[User, str | None]:
     """Validate and store an avatar, returning the user and the replaced key."""
     if file.content_type != AVATAR_CONTENT_TYPE:
-        raise UnsupportedImageType()
+        raise UnsupportedImageType(msg=f"Avatar must be '{AVATAR_CONTENT_TYPE}'")
 
     if file.size is not None and file.size > auth_settings.avatar_max_bytes:
         raise AvatarTooLarge()
