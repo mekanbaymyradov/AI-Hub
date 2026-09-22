@@ -18,26 +18,29 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat import service
 from src.chat.config import chat_settings
+from src.chat.constants import ALLOWED_MEDIA_TYPES, CHAT_NAME_LENGTH
 from src.chat.exceptions import (
     AttachmentTooLarge,
     TooManyAttachments,
     UnsupportedAttachmentType,
 )
-from src.chat.models import Attachment, AttachmentPublic, Chat, MessagePublic
+from src.chat.models import (
+    Attachment,
+    AttachmentPublic,
+    Chat,
+    ChatCursor,
+    ChatPublic,
+    MessageCursor,
+    MessagePublic,
+)
 from src.logging import get_logger
+from src.pagination import Page, PageParams
 from src.storage import presigned_url
 
 logger = get_logger(__name__)
 
-CHAT_NAME_LENGTH = 60
-
-ALLOWED_MEDIA_TYPES = frozenset(
-    {"image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"}
-)
-
 
 async def create_chat(db: AsyncSession, *, user_id: int, prompt: str) -> Chat:
-    """Open a chat named after the prompt that started it."""
     chat = await service.create_chat(
         db, user_id=user_id, name=prompt[:CHAT_NAME_LENGTH]
     )
@@ -50,9 +53,22 @@ async def delete_chat(db: AsyncSession, *, chat: Chat) -> None:
     await db.commit()
 
 
-async def list_chats(db: AsyncSession, *, user_id: int) -> Sequence[Chat]:
-    chats = await service.list_chats(db, user_id=user_id)
-    return chats
+async def list_chats(
+    db: AsyncSession, *, user_id: int, params: PageParams
+) -> Page[ChatPublic]:
+    cursor = ChatCursor.decode(params.cursor) if params.cursor else None
+
+    chats = await service.list_chats(
+        db, user_id=user_id, limit=params.limit, cursor=cursor
+    )
+
+    next_cursor = None
+    if len(chats) == params.limit:
+        last = chats[-1]
+        next_cursor = ChatCursor(updated_at=last.updated_at, id=last.id).encode()
+
+    items = [ChatPublic.model_validate(chat) for chat in chats]
+    return Page[ChatPublic](items=items, next_cursor=next_cursor)
 
 
 async def create_attachments(
@@ -168,10 +184,23 @@ async def get_history(
 
 
 async def get_messages(
-    db: AsyncSession, storage: S3Client, *, chat_id: int
-) -> list[MessagePublic]:
-    """Return the chat so far as plain text, oldest first."""
-    rows = await service.get_messages(db, chat_id=chat_id)
+    db: AsyncSession, storage: S3Client, *, chat_id: int, params: PageParams
+) -> Page[MessagePublic]:
+    """Return a page of the chat as plain text.
+
+    The first page holds the newest messages; each page reads oldest first.
+    """
+    cursor = MessageCursor.decode(params.cursor) if params.cursor else None
+
+    rows = await service.list_messages(
+        db, chat_id=chat_id, limit=params.limit, cursor=cursor
+    )
+
+    next_cursor = None
+    if len(rows) == params.limit:
+        next_cursor = MessageCursor(id=rows[-1].id).encode()
+
+    rows = rows[::-1]
     messages = ModelMessagesTypeAdapter.validate_python([row.content for row in rows])
 
     transcript = []
@@ -201,7 +230,7 @@ async def get_messages(
                 ],
             )
         )
-    return transcript
+    return Page[MessagePublic](items=transcript, next_cursor=next_cursor)
 
 
 def _without_files(content: dict, *, prompt: str) -> dict:
@@ -253,6 +282,7 @@ async def create_message(
                     expected=len(attachments),
                     claimed=claimed,
                 )
+    await service.touch_chat(db, chat_id=chat_id)
     await db.commit()
 
 

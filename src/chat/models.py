@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -11,6 +11,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from src.chat.config import chat_settings
 from src.database import Base
 from src.mixins import TimestampMixin
+from src.pagination import Cursor
 
 if TYPE_CHECKING:
     from src.auth.models import User
@@ -90,6 +91,8 @@ class MessageRequest(BaseModel):
 
 
 class ChatPublic(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     created_at: datetime
@@ -116,3 +119,12 @@ class MessagePublic(BaseModel):
 
 class ChatRename(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+
+
+class ChatCursor(Cursor):
+    updated_at: datetime
+    id: int
+
+
+class MessageCursor(Cursor):
+    id: int

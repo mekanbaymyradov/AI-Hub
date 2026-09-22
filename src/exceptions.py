@@ -58,3 +58,9 @@ class RateLimitExceeded(AppError):
     def __init__(self, retry_after: int):
         super().__init__()
         self.headers = {"Retry-After": str(retry_after)}
+
+
+class InvalidCursor(AppError):
+    status = 422
+    type = "invalid_cursor"
+    msg = "Invalid cursor."

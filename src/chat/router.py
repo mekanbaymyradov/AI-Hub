@@ -16,27 +16,23 @@ from src.chat.models import (
 )
 from src.database import DbSession
 from src.llm.agents import agent
+from src.pagination import Page, PageParamsDep
 from src.rate_limit import user_rate_limit
 from src.storage import StorageDep
 
 chat_router = APIRouter(prefix="/chats", tags=["Chat"])
 
 
-@chat_router.get(
-    path="",
-    summary="List the current user's chats",
-    description="Most recently active first.",
-    response_model=list[ChatPublic],
-)
-async def list_chats(db: DbSession, user: CurrentUser):
-    return await flows.list_chats(db, user_id=user.id)
+@chat_router.get("")
+async def list_chats(
+    db: DbSession, user: CurrentUser, params: PageParamsDep
+) -> Page[ChatPublic]:
+    return await flows.list_chats(db, user_id=user.id, params=params)
 
 
 @chat_router.delete(
     path="/{chat_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a chat",
-    responses={404: {"description": "No such chat"}},
 )
 async def delete_chat(chat: ChatDep, db: DbSession) -> None:
     await flows.delete_chat(db, chat=chat)
@@ -44,28 +40,16 @@ async def delete_chat(chat: ChatDep, db: DbSession) -> None:
 
 @chat_router.get(
     path="/{chat_id}/messages",
-    summary="Read a chat's messages",
-    responses={404: {"description": "No such chat"}},
 )
 async def list_messages(
-    chat: ChatDep, db: DbSession, storage: StorageDep
-) -> list[MessagePublic]:
-    return await flows.get_messages(db, storage, chat_id=chat.id)
+    chat: ChatDep, db: DbSession, storage: StorageDep, params: PageParamsDep
+) -> Page[MessagePublic]:
+    return await flows.get_messages(db, storage, chat_id=chat.id, params=params)
 
 
 @chat_router.post(
     path="/attachments",
     status_code=status.HTTP_201_CREATED,
-    summary="Upload attachments for a message",
-    description=(
-        "Upload before sending, then pass the returned ids as `attachment_ids`. "
-        "The URLs are signed and expire; read them again from the chat's messages."
-    ),
-    responses={
-        413: {"description": "A file exceeds the size limit"},
-        415: {"description": "A file is neither an image nor a PDF"},
-        422: {"description": "Too many files"},
-    },
     dependencies=[Depends(user_rate_limit(times=30, seconds=60))],
 )
 async def create_attachments(
@@ -83,15 +67,6 @@ async def create_attachments(
 @chat_router.post(
     path="/messages",
     response_class=EventSourceResponse,
-    summary="Stream a model reply",
-    description=(
-        "Send `chat_id: null` to open a new chat. The first event is a `chat` "
-        "event carrying the id the reply belongs to; the rest are text deltas."
-    ),
-    responses={
-        404: {"description": "No such chat, model or attachment"},
-        422: {"description": "The model does not accept attachments"},
-    },
     dependencies=[Depends(user_rate_limit(times=20, seconds=60))],
 )
 async def send_message(
@@ -132,8 +107,6 @@ async def send_message(
 
 @chat_router.patch(
     path="/{chat_id}/rename",
-    summary="Rename the chat name",
-    responses={404: {"description": "No such chat"}},
     response_model=ChatPublic,
 )
 async def rename_chat(payload: ChatRename, chat: ChatDep, db: DbSession):
