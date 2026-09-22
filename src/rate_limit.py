@@ -7,7 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
-from src.auth.dependencies import BearerToken, CurrentUser
+from src.auth.dependencies import CurrentUser, bearer_scheme
 from src.auth.exceptions import NotAuthenticated
 from src.auth.sessions import decode_access_token
 from src.config import settings
@@ -49,14 +49,12 @@ def _identity(
     return f"ip:{host}", settings.rate_limit_ip_limit
 
 
-async def global_rate_limit(
-    request: Request, credentials: BearerToken, redis: RedisDep
-) -> None:
+async def global_rate_limit(request: Request, redis: RedisDep) -> None:
     """App-wide ceiling: per user when signed in, per client IP otherwise."""
     if request.url.path == "/healthz":
         return
 
-    identity, times = _identity(request, credentials)
+    identity, times = _identity(request, await bearer_scheme(request))
     await _check(
         redis,
         key=f"ratelimit:global:{identity}",

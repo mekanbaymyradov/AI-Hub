@@ -112,14 +112,13 @@ async def rename_chat(db: AsyncSession, *, chat: Chat, name: str) -> Chat:
 
 async def rename_chat_if_unchanged(
     db: AsyncSession, *, chat_id: int, old_name: str, new_name: str
-) -> bool:
+) -> None:
     """Rename the chat only if its name is still old_name, returning whether it was."""
-    result = await db.execute(
+    await db.execute(
         update(Chat)
         .where(Chat.id == chat_id, Chat.name == old_name)
         .values(name=new_name)
     )
-    return cast(CursorResult[Any], result).rowcount == 1
 
 
 async def touch_chat(db: AsyncSession, *, chat_id: int) -> None:
