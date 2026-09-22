@@ -15,7 +15,7 @@ from src.chat.models import (
     MessageRequest,
 )
 from src.database import DbSession
-from src.llm.agents import agent
+from src.llm.dependencies import LLMRegistryDep
 from src.pagination import Page, PageParamsDep
 from src.rate_limit import user_rate_limit
 from src.storage import StorageDep
@@ -77,32 +77,19 @@ async def send_message(
     user: CurrentUser,
     db: DbSession,
     storage: StorageDep,
+    registry: LLMRegistryDep,
 ) -> AsyncIterable[ServerSentEvent]:
-    if chat is None:
-        chat = await flows.create_chat(db, user_id=user.id, prompt=message.prompt)
-        history = []
-    else:
-        history = await flows.get_history(db, storage, chat_id=chat.id)
-
-    yield ServerSentEvent(data={"chat_id": chat.id}, event="chat")
-
-    user_prompt = [message.prompt, *flows.attachment_parts(attachments, storage)]
-
-    async with agent.run_stream(
-        model=model, message_history=history, user_prompt=user_prompt
-    ) as result:
-        async for text in result.stream_text(delta=True):
-            yield ServerSentEvent(data=text)
-
-        # Only reached when the stream ran to completion.
-        await flows.create_message(
-            db,
-            chat_id=chat.id,
-            messages=result.new_messages(),
-            model_id=message.model_id,
-            prompt=message.prompt,
-            attachments=attachments,
-        )
+    async for event in flows.send_message(
+        db,
+        storage,
+        registry,
+        user_id=user.id,
+        chat=chat,
+        message=message,
+        model=model,
+        attachments=attachments,
+    ):
+        yield event
 
 
 @chat_router.patch(

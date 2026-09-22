@@ -1,10 +1,13 @@
-from collections.abc import Sequence
+import asyncio
+from collections.abc import AsyncIterator, Sequence
 from typing import cast
 from uuid import uuid4
 
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
+from fastapi.sse import ServerSentEvent
 from mypy_boto3_s3 import S3Client
+from pydantic_ai.exceptions import AgentRunError
 from pydantic_ai.messages import (
     DocumentUrl,
     ImageUrl,
@@ -14,6 +17,7 @@ from pydantic_ai.messages import (
     UserContent,
     UserPromptPart,
 )
+from pydantic_ai.models import Model
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.chat import service
@@ -32,7 +36,13 @@ from src.chat.models import (
     ChatPublic,
     MessageCursor,
     MessagePublic,
+    MessageRequest,
 )
+from src.exceptions import AppError
+from src.llm.agents import agent, title_agent
+from src.llm.constants import TITLE_MODEL_ID
+from src.llm.exceptions import ModelError
+from src.llm.registry import LLMRegistry
 from src.logging import get_logger
 from src.pagination import Page, PageParams
 from src.storage import presigned_url
@@ -40,12 +50,89 @@ from src.storage import presigned_url
 logger = get_logger(__name__)
 
 
-async def create_chat(db: AsyncSession, *, user_id: int, prompt: str) -> Chat:
+async def _add_prompt(
+    db: AsyncSession, *, chat: Chat, prompt: str, attachments: Sequence[Attachment]
+) -> None:
+    """Store the user's prompt ahead of the run, so a failed reply cannot lose it.
+
+    Only the text is stored. The prompt claims the attachments, which have been
+    waiting unattached since they were uploaded, and get_history adds them back.
+    """
+    request = ModelRequest(parts=[UserPromptPart(content=prompt)])
+    message = await service.create_message(
+        db,
+        chat_id=chat.id,
+        content=ModelMessagesTypeAdapter.dump_python([request], mode="json")[0],
+        model_id=None,
+    )
+
+    if attachments:
+        claimed = await service.attach_to_message(
+            db,
+            attachment_ids=[attachment.id for attachment in attachments],
+            message_id=message.id,
+        )
+        if claimed != len(attachments):
+            logger.warning(
+                "Attachments were claimed by another message",
+                chat_id=chat.id,
+                expected=len(attachments),
+                claimed=claimed,
+            )
+
+    await service.touch_chat(db, chat_id=chat.id)
+
+
+async def create_chat(
+    db: AsyncSession, *, user_id: int, prompt: str, attachments: Sequence[Attachment]
+) -> Chat:
+    """Start a chat with its first prompt, named after the prompt until titled."""
     chat = await service.create_chat(
         db, user_id=user_id, name=prompt[:CHAT_NAME_LENGTH]
     )
+    await _add_prompt(db, chat=chat, prompt=prompt, attachments=attachments)
     await db.commit()
     return chat
+
+
+async def create_prompt(
+    db: AsyncSession, *, chat: Chat, prompt: str, attachments: Sequence[Attachment]
+) -> None:
+    await _add_prompt(db, chat=chat, prompt=prompt, attachments=attachments)
+    await db.commit()
+
+
+async def generate_chat_name(registry: LLMRegistry, *, prompt: str) -> str | None:
+    """Ask a cheap model to title a new chat, or return None to keep its placeholder.
+
+    Runs alongside the reply, which is using the request's session, so this must
+    not touch the database; the caller saves the name once the reply is stored.
+    """
+    spec = registry.spec(TITLE_MODEL_ID)
+    if spec is None:
+        return None
+
+    try:
+        result = await title_agent.run(prompt, model=registry.model(spec))
+    except Exception:
+        logger.exception("chat_name_failed")
+        return None
+
+    name = result.output
+    return name[:CHAT_NAME_LENGTH] or None
+
+
+async def apply_chat_name(db: AsyncSession, *, chat: Chat, name: str) -> None:
+    """Give a new chat its generated name, unless the user renamed it meanwhile.
+
+    chat.name still holds the placeholder the chat was created with, since a
+    rename arrives through another request's session and this one never reloads
+    the chat.
+    """
+    await service.rename_chat_if_unchanged(
+        db, chat_id=chat.id, old_name=chat.name, new_name=name
+    )
+    await db.commit()
 
 
 async def delete_chat(db: AsyncSession, *, chat: Chat) -> None:
@@ -135,7 +222,7 @@ def attachment_public(attachment: Attachment, storage: S3Client) -> AttachmentPu
     )
 
 
-def attachment_parts(
+def _attachment_parts(
     attachments: Sequence[Attachment], storage: S3Client
 ) -> list[UserContent]:
     """Render attachments as prompt content the model can fetch.
@@ -163,7 +250,8 @@ async def get_history(
     """Return the chat so far, in the form an agent run takes as its history.
 
     Attachments are added back from their own rows, with freshly signed URLs,
-    since the stored message holds the prompt text alone.
+    since the stored message holds the prompt text alone. The prompt being
+    answered is already stored, so the history ends with it.
     """
     rows = await service.get_messages(db, chat_id=chat_id)
     history = ModelMessagesTypeAdapter.validate_python([row.content for row in rows])
@@ -172,7 +260,7 @@ async def get_history(
         if not row.attachments:
             continue
 
-        parts = attachment_parts(row.attachments, storage)
+        parts = _attachment_parts(row.attachments, storage)
         for part in message.parts:
             if isinstance(part, UserPromptPart) and isinstance(part.content, str):
                 part.content = [part.content, *parts]
@@ -233,57 +321,84 @@ async def get_messages(
     return Page[MessagePublic](items=transcript, next_cursor=next_cursor)
 
 
-def _without_files(content: dict, *, prompt: str) -> dict:
-    """Reduce a stored prompt to its text.
-
-    The run was handed signed URLs that expire, and the files are already
-    recorded as attachment rows, so neither belongs in the message itself.
-    """
-    for part in content["parts"]:
-        if part["part_kind"] == "user-prompt":
-            part["content"] = prompt
-    return content
-
-
-async def create_message(
-    db: AsyncSession,
-    *,
-    chat_id: int,
-    messages: list[ModelMessage],
-    model_id: str,
-    prompt: str,
-    attachments: Sequence[Attachment],
+async def create_reply(
+    db: AsyncSession, *, chat_id: int, messages: list[ModelMessage], model_id: str
 ) -> None:
-    """Store the messages a single run produced, one row each.
+    """Store the messages a run produced after its prompt, one row each.
 
     Only the reply records the model, so a chat continued with a different one
-    stays accurate about which model said what. The prompt claims the
-    attachments, which have been waiting unattached since they were uploaded.
+    stays accurate about which model said what.
     """
     for content in ModelMessagesTypeAdapter.dump_python(messages, mode="json"):
-        is_reply = content["kind"] == "response"
-        message = await service.create_message(
+        await service.create_message(
             db,
             chat_id=chat_id,
-            content=_without_files(content, prompt=prompt),
-            model_id=model_id if is_reply else None,
+            content=content,
+            model_id=model_id if content["kind"] == "response" else None,
         )
-
-        if not is_reply and attachments:
-            claimed = await service.attach_to_message(
-                db,
-                attachment_ids=[attachment.id for attachment in attachments],
-                message_id=message.id,
-            )
-            if claimed != len(attachments):
-                logger.warning(
-                    "Attachments were claimed by another message",
-                    chat_id=chat_id,
-                    expected=len(attachments),
-                    claimed=claimed,
-                )
-    await service.touch_chat(db, chat_id=chat_id)
     await db.commit()
+
+
+async def send_message(
+    db: AsyncSession,
+    storage: S3Client,
+    registry: LLMRegistry,
+    *,
+    user_id: int,
+    chat: Chat | None,
+    message: MessageRequest,
+    model: Model,
+    attachments: Sequence[Attachment],
+) -> AsyncIterator[ServerSentEvent]:
+    """Store the prompt, then stream the reply to it and store that too.
+
+    The prompt is stored before the run, so a reply that fails or is cut off
+    still leaves it in the chat. The response has already started by the time
+    anything here can fail, so a failure ends the stream with an error event
+    instead of an error response.
+    """
+    name_task = None
+    try:
+        if chat is None:
+            chat = await create_chat(
+                db, user_id=user_id, prompt=message.prompt, attachments=attachments
+            )
+            name_task = asyncio.create_task(
+                generate_chat_name(registry, prompt=message.prompt)
+            )
+        else:
+            await create_prompt(
+                db, chat=chat, prompt=message.prompt, attachments=attachments
+            )
+
+        yield ServerSentEvent(data={"id": chat.id}, event="chat")
+
+        # With no user prompt given, the run resumes from the stored prompt that
+        # ends the history, and leaves it out of new_messages().
+        history = await get_history(db, storage, chat_id=chat.id)
+
+        async with agent.run_stream(model=model, message_history=history) as result:
+            async for text in result.stream_text(delta=True):
+                yield ServerSentEvent(data=text)
+
+            # Only reached when the stream ran to completion.
+            await create_reply(
+                db,
+                chat_id=chat.id,
+                messages=result.new_messages(),
+                model_id=message.model_id,
+            )
+
+        if name_task is not None and (name := await name_task):
+            await apply_chat_name(db, chat=chat, name=name)
+
+    except Exception as exc:
+        error = ModelError() if isinstance(exc, AgentRunError) else AppError()
+        logger.exception("reply_failed", model_id=message.model_id)
+        yield ServerSentEvent(data={"detail": [error.serialize()]}, event="error")
+    finally:
+        if name_task is not None:
+            name_task.cancel()
 
 
 async def rename_chat(db: AsyncSession, *, chat: Chat, name: str) -> Chat:
