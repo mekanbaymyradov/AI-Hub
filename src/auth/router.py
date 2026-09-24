@@ -120,7 +120,9 @@ async def read_me(user: CurrentUser):
     response_model=UserPublic,
 )
 async def update_me(payload: UserUpdate, db: DbSession, user: CurrentUser):
-    return await flows.update_profile(db, user=user, name=payload.name)
+    return await flows.update_profile(
+        db, user=user, changes=payload.model_dump(exclude_unset=True)
+    )
 
 
 @auth_router.put(

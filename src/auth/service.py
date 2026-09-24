@@ -1,3 +1,5 @@
+from typing import Any
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,8 +22,9 @@ async def create_user(db: AsyncSession, *, email: str) -> User:
     return user
 
 
-async def update_user(db: AsyncSession, *, user: User, name: str) -> User:
-    user.name = name
+async def update_user(db: AsyncSession, *, user: User, changes: dict[str, Any]) -> User:
+    for field, value in changes.items():
+        setattr(user, field, value)
     await db.flush()
     return user
 

@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from pydantic import BaseModel, EmailStr, Field, computed_field
-from sqlalchemy import String
+from pydantic import BaseModel, EmailStr, Field, computed_field, field_validator
+from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from src.auth.constants import INSTRUCTIONS_MAX_LENGTH
 from src.database import Base
 from src.mixins import TimestampMixin
 from src.storage import public_url
@@ -19,6 +20,8 @@ class User(Base, TimestampMixin):
     name: Mapped[str | None] = mapped_column(String(50))
     email: Mapped[str] = mapped_column(unique=True)
     avatar_key: Mapped[str | None] = mapped_column(String(255))
+    # Text, since the length limit lives in UserUpdate and may change.
+    instructions: Mapped[str | None] = mapped_column(Text)
 
     # relationships
     chats: Mapped[list[Chat]] = relationship(
@@ -49,6 +52,7 @@ class UserPublic(BaseModel):
     id: int
     email: str
     name: str | None
+    instructions: str | None
     # Read from the ORM object but never serialized; avatar_url is what clients get.
     avatar_key: str | None = Field(exclude=True)
 
@@ -64,4 +68,12 @@ class UserPublic(BaseModel):
 
 
 class UserUpdate(BaseModel):
-    name: str = Field(min_length=1, max_length=50)
+    """A partial update: omitted fields are left alone, null clears a field."""
+
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    instructions: str | None = Field(default=None, max_length=INSTRUCTIONS_MAX_LENGTH)
+
+    @field_validator("instructions")
+    @classmethod
+    def blank_to_none(cls, value: str | None) -> str | None:
+        return (value.strip() or None) if value else None
