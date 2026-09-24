@@ -1,7 +1,30 @@
-from pydantic_ai import Agent
+from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.groq import GroqModelSettings
 
-agent = Agent(instructions="You are helpful assistant. Be concise.")
+from src.llm.models import UserContext
+
+agent = Agent(
+    deps_type=UserContext, instructions="You are helpful assistant. Be concise."
+)
+
+
+@agent.instructions
+def user_profile(ctx: RunContext[UserContext]) -> str | None:
+    """Facts about the user; the run skips it when there are none."""
+    if ctx.deps.name:
+        return f"The user's name is {ctx.deps.name}."
+    return None
+
+
+@agent.instructions
+def custom_instructions(ctx: RunContext[UserContext]) -> str | None:
+    """How the user asked to be answered, from their profile settings."""
+    if ctx.deps.instructions:
+        return (
+            "The user has set these custom instructions for how you respond:\n"
+            f"{ctx.deps.instructions}"
+        )
+    return None
 
 
 title_agent = Agent(

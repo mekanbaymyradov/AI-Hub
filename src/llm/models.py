@@ -1,6 +1,16 @@
+from dataclasses import dataclass
+
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from src.llm.enums import Provider
+
+
+@dataclass
+class UserContext:
+    """What the chat agent is told about the user it is talking to."""
+
+    name: str | None
+    instructions: str | None
 
 
 class ModelSpec(BaseModel):
@@ -67,3 +77,4 @@ class ModelPublic(BaseModel):
 
     id: str
     display_name: str
+    supports_files: bool

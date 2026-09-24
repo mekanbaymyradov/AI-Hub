@@ -45,6 +45,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
         storage.close()
     # app stops here
 
+
 app = FastAPI(
     title=settings.project_title,
     version=settings.app_version,

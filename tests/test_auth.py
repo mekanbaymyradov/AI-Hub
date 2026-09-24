@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth import otp, service
 from src.auth.config import auth_settings
+from src.auth.constants import INSTRUCTIONS_MAX_LENGTH
 from src.config import settings
 from tests.utils import (
     auth_header,
@@ -209,6 +210,67 @@ async def test_update_profile_changes_name(
 
     assert response.status_code == 200
     assert response.json()["name"] == "Alice"
+
+
+async def test_update_profile_sets_instructions(
+    client: AsyncClient, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+    await client.patch("/auth/me", json={"name": "Alice"}, headers=auth_header(token))
+
+    response = await client.patch(
+        "/auth/me",
+        json={"instructions": "Answer in Turkmen."},
+        headers=auth_header(token),
+    )
+
+    assert response.status_code == 200
+    me = await client.get("/auth/me", headers=auth_header(token))
+    assert me.json()["instructions"] == "Answer in Turkmen."
+    assert me.json()["name"] == "Alice"
+
+
+async def test_update_profile_clears_instructions(
+    client: AsyncClient, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+    await client.patch(
+        "/auth/me", json={"instructions": "Be brief."}, headers=auth_header(token)
+    )
+
+    response = await client.patch(
+        "/auth/me", json={"instructions": None}, headers=auth_header(token)
+    )
+
+    assert response.status_code == 200
+    assert response.json()["instructions"] is None
+
+
+async def test_update_profile_stores_blank_instructions_as_null(
+    client: AsyncClient, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+
+    response = await client.patch(
+        "/auth/me", json={"instructions": "   \n "}, headers=auth_header(token)
+    )
+
+    assert response.status_code == 200
+    assert response.json()["instructions"] is None
+
+
+async def test_update_profile_rejects_too_long_instructions(
+    client: AsyncClient, sent_codes: dict[str, str]
+):
+    token = await sign_in(client, sent_codes, "user@example.com")
+
+    response = await client.patch(
+        "/auth/me",
+        json={"instructions": "a" * (INSTRUCTIONS_MAX_LENGTH + 1)},
+        headers=auth_header(token),
+    )
+
+    assert response.status_code == 422
 
 
 async def test_upload_avatar_stores_image(

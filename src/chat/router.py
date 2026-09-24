@@ -83,7 +83,7 @@ async def send_message(
         db,
         storage,
         registry,
-        user_id=user.id,
+        user=user,
         chat=chat,
         message=message,
         model=model,

@@ -20,6 +20,7 @@ from pydantic_ai.messages import (
 from pydantic_ai.models import Model
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from src.auth.models import User
 from src.chat import service
 from src.chat.config import chat_settings
 from src.chat.constants import ALLOWED_MEDIA_TYPES, CHAT_NAME_LENGTH
@@ -42,6 +43,7 @@ from src.exceptions import AppError
 from src.llm.agents import agent, title_agent
 from src.llm.constants import TITLE_MODEL_ID
 from src.llm.exceptions import ModelError
+from src.llm.models import UserContext
 from src.llm.registry import LLMRegistry
 from src.logging import get_logger
 from src.pagination import Page, PageParams
@@ -344,7 +346,7 @@ async def send_message(
     storage: S3Client,
     registry: LLMRegistry,
     *,
-    user_id: int,
+    user: User,
     chat: Chat | None,
     message: MessageRequest,
     model: Model,
@@ -361,7 +363,7 @@ async def send_message(
     try:
         if chat is None:
             chat = await create_chat(
-                db, user_id=user_id, prompt=message.prompt, attachments=attachments
+                db, user_id=user.id, prompt=message.prompt, attachments=attachments
             )
             name_task = asyncio.create_task(
                 generate_chat_name(registry, prompt=message.prompt)
@@ -377,7 +379,11 @@ async def send_message(
         # ends the history, and leaves it out of new_messages().
         history = await get_history(db, storage, chat_id=chat.id)
 
-        async with agent.run_stream(model=model, message_history=history) as result:
+        async with agent.run_stream(
+            model=model,
+            message_history=history,
+            deps=UserContext(name=user.name, instructions=user.instructions),
+        ) as result:
             async for text in result.stream_text(delta=True):
                 yield ServerSentEvent(data=text)
 

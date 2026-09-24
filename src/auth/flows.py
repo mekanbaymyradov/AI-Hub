@@ -1,3 +1,4 @@
+from typing import Any
 from uuid import uuid4
 
 from fastapi import UploadFile
@@ -52,8 +53,10 @@ async def logout(redis: Redis, *, raw_token: str) -> None:
     await sessions.revoke_session(redis, raw_token=raw_token)
 
 
-async def update_profile(db: AsyncSession, *, user: User, name: str) -> User:
-    user = await service.update_user(db, user=user, name=name)
+async def update_profile(
+    db: AsyncSession, *, user: User, changes: dict[str, Any]
+) -> User:
+    user = await service.update_user(db, user=user, changes=changes)
     await db.commit()
     return user
 
