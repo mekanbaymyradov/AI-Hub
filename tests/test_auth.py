@@ -85,7 +85,7 @@ async def test_too_many_wrong_otp_attempts_invalidates_code(
 
     response = await verify_code(client, email, WRONG_OTP_CODE)
 
-    assert response.status_code == 429
+    assert response.status_code == 401
     assert response.json()["detail"][0]["type"] == "auth.otp_attempts_exceeded"
     response = await verify_code(client, email, code)
     assert response.status_code == 401

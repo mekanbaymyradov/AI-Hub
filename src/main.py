@@ -11,6 +11,7 @@ from src.auth.router import auth_router
 from src.chat.router import chat_router
 from src.config import settings
 from src.error_handlers import register_error_handlers
+from src.exceptions import RateLimitExceeded, error_responses
 from src.llm.config import llm_settings
 from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
@@ -54,6 +55,7 @@ app = FastAPI(
     redoc_url="/redocs" if settings.environment == "local" else None,
     lifespan=lifespan,
     dependencies=[Depends(global_rate_limit)],
+    responses=error_responses(RateLimitExceeded),
 )
 
 logfire.configure()

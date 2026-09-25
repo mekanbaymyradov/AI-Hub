@@ -11,7 +11,10 @@ class PageParams(BaseModel):
     """The ?limit=&cursor= query parameters of a paginated list."""
 
     limit: int = Field(20, ge=1, le=100)
-    cursor: str | None = None
+    cursor: str | None = Field(
+        None,
+        description="next_cursor from the previous page; omit for the first page.",
+    )
 
 
 PageParamsDep = Annotated[PageParams, Query()]

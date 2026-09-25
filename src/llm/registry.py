@@ -27,11 +27,7 @@ class LLMRegistry:
         self._specs = specs
 
     def model(self, spec: ModelSpec) -> Model:
-        """Return the model built for this spec.
-
-        Both are written together by build_registry, so a spec in hand means the
-        model exists.
-        """
+        """Return the model built for `spec`, which must come from this registry."""
         return self._models[spec.id]
 
     def spec(self, model_id: str) -> ModelSpec | None:
@@ -39,11 +35,9 @@ class LLMRegistry:
         return self._specs.get(model_id)
 
     def available(self) -> list[ModelSpec]:
-        """Return the spec of every available model."""
         return list(self._specs.values())
 
     def models(self) -> Iterable[Model]:
-        """Return every available model."""
         return self._models.values()
 
 

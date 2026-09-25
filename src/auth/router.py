@@ -18,7 +18,14 @@ from src.auth.cookies import (
     set_refresh_cookie,
 )
 from src.auth.dependencies import CurrentUser
-from src.auth.exceptions import InvalidRefreshToken
+from src.auth.exceptions import (
+    AvatarTooLarge,
+    InvalidOTP,
+    InvalidRefreshToken,
+    NotAuthenticated,
+    OTPAttemptsExceeded,
+    UnsupportedImageType,
+)
 from src.auth.models import (
     OTPRequest,
     OTPVerify,
@@ -27,6 +34,7 @@ from src.auth.models import (
     UserUpdate,
 )
 from src.database import DbSession
+from src.exceptions import error_responses
 from src.rate_limit import ip_rate_limit
 from src.redis import RedisDep
 from src.storage import StorageDep
@@ -49,10 +57,7 @@ async def request_otp(payload: OTPRequest, db: DbSession, redis: RedisDep) -> No
     path="/otp/verify",
     summary="Exchange a code for tokens",
     description="Registers the user if this is their first sign-in.",
-    responses={
-        401: {"description": "Invalid or expired code"},
-        429: {"description": "Too many attempts"},
-    },
+    responses=error_responses(InvalidOTP, OTPAttemptsExceeded),
     dependencies=[Depends(ip_rate_limit(times=10, seconds=900))],
 )
 async def verify_otp(
@@ -69,7 +74,7 @@ async def verify_otp(
     path="/token/refresh",
     summary="Rotate the token pair",
     description="Reads the refresh token from the HttpOnly cookie.",
-    responses={401: {"description": "Unknown, malformed or replayed refresh token"}},
+    responses=error_responses(InvalidRefreshToken),
 )
 async def refresh_tokens(
     redis: RedisDep,
@@ -90,10 +95,7 @@ async def refresh_tokens(
     path="/logout",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Close the current session",
-    description=(
-        "Revokes the refresh token. Outstanding access tokens keep working until "
-        "they expire."
-    ),
+    description="Revokes the refresh token",
 )
 async def logout(
     redis: RedisDep,
@@ -109,6 +111,7 @@ async def logout(
     path="/me",
     summary="Read the current user",
     response_model=UserPublic,
+    responses=error_responses(NotAuthenticated),
 )
 async def read_me(user: CurrentUser):
     return user
@@ -118,6 +121,7 @@ async def read_me(user: CurrentUser):
     path="/me",
     summary="Update the current user",
     response_model=UserPublic,
+    responses=error_responses(NotAuthenticated),
 )
 async def update_me(payload: UserUpdate, db: DbSession, user: CurrentUser):
     return await flows.update_profile(
@@ -129,14 +133,8 @@ async def update_me(payload: UserUpdate, db: DbSession, user: CurrentUser):
     "/me/avatar",
     summary="Replace the current user's avatar",
     response_model=UserPublic,
-    description=(
-        "Expects a WebP image the client has already resized and compressed. "
-        "The previous avatar is deleted once the response is sent."
-    ),
-    responses={
-        413: {"description": "Image exceeds the size limit"},
-        415: {"description": "Image is not a WebP"},
-    },
+    description="Expects a WebP image the client has already resized and compressed.",
+    responses=error_responses(NotAuthenticated, AvatarTooLarge, UnsupportedImageType),
 )
 async def set_avatar(
     db: DbSession,
@@ -156,6 +154,7 @@ async def set_avatar(
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Remove the current user's avatar",
     description="Clients fall back to `avatar_initial` once the avatar is gone.",
+    responses=error_responses(NotAuthenticated),
 )
 async def delete_avatar(
     db: DbSession,

@@ -113,7 +113,7 @@ async def rename_chat(db: AsyncSession, *, chat: Chat, name: str) -> Chat:
 async def rename_chat_if_unchanged(
     db: AsyncSession, *, chat_id: int, old_name: str, new_name: str
 ) -> None:
-    """Rename the chat only if its name is still old_name, returning whether it was."""
+    """Rename the chat only if its name is still `old_name`."""
     await db.execute(
         update(Chat)
         .where(Chat.id == chat_id, Chat.name == old_name)

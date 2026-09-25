@@ -1,5 +1,3 @@
-"""Request logging middleware."""
-
 import time
 import uuid
 
@@ -16,7 +14,6 @@ class AccessLogMiddleware:
         self.app = app
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        """Bind a request_id, run the request, and log how it finished."""
         if scope["type"] != "http" or scope["path"] == "/healthz":
             await self.app(scope, receive, send)
             return

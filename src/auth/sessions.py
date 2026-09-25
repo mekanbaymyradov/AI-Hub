@@ -20,6 +20,7 @@ def hash_token(raw_token: str) -> str:
 
 
 def split_token(raw_token: str) -> str:
+    """Return the session id from a "sid.secret" refresh token."""
     sid, separator, secret = raw_token.partition(".")
     if not separator or not sid or not secret:
         raise InvalidRefreshToken()
@@ -76,6 +77,7 @@ async def _write_session(
 
 
 async def create_session(redis: Redis, *, user_id: int) -> tuple[str, str]:
+    """Start a session and return its access and refresh tokens, in that order."""
     sid = uuid4().hex
     raw_token = await _write_session(
         redis, sid=sid, user_id=user_id, created_at=datetime.now(UTC).isoformat()
@@ -84,6 +86,11 @@ async def create_session(redis: Redis, *, user_id: int) -> tuple[str, str]:
 
 
 async def rotate_session(redis: Redis, *, raw_token: str) -> tuple[str, str]:
+    """Swap a refresh token for new access and refresh tokens, in that order.
+
+    Reusing an already rotated token revokes the whole session, since reuse
+    suggests it was stolen.
+    """
     sid = split_token(raw_token)
     stored = await redis.hgetall(session_key(sid))
     if not stored:

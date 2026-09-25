@@ -205,7 +205,6 @@ async def create_attachments(
 
 
 def _attachment_url(attachment: Attachment, storage: S3Client) -> str:
-    """Sign a URL the attachment can be read from for a short while."""
     return presigned_url(
         storage,
         bucket=chat_settings.s3_private_bucket,
@@ -215,7 +214,6 @@ def _attachment_url(attachment: Attachment, storage: S3Client) -> str:
 
 
 def attachment_public(attachment: Attachment, storage: S3Client) -> AttachmentPublic:
-    """Return the attachment as the API serves it, with a freshly signed URL."""
     return AttachmentPublic(
         id=attachment.id,
         filename=attachment.filename,
@@ -227,21 +225,18 @@ def attachment_public(attachment: Attachment, storage: S3Client) -> AttachmentPu
 def _attachment_parts(
     attachments: Sequence[Attachment], storage: S3Client
 ) -> list[UserContent]:
-    """Render attachments as prompt content the model can fetch.
-
-    Each file is named in a text part of its own, because a `FileUrl`'s own
-    identifier only reaches the model when a tool returns it.
-
-    The media type is passed explicitly: a signed URL carries a query string,
-    so Pydantic AI cannot infer the type from it.
-    """
+    """Render attachments as prompt content the model can fetch."""
     parts: list[UserContent] = []
     for attachment in attachments:
         url = _attachment_url(attachment, storage)
         content = (
             ImageUrl if attachment.media_type.startswith("image/") else DocumentUrl
         )
+        # Named in a text part of its own, because a `FileUrl`'s own identifier
+        # only reaches the model when a tool returns it.
         parts.append(f'File "{attachment.filename}":')
+        # A signed URL carries a query string, so Pydantic AI cannot infer the
+        # media type from it.
         parts.append(content(url=url, media_type=attachment.media_type))
     return parts
 
@@ -354,10 +349,10 @@ async def send_message(
 ) -> AsyncIterator[ServerSentEvent]:
     """Store the prompt, then stream the reply to it and store that too.
 
-    The prompt is stored before the run, so a reply that fails or is cut off
-    still leaves it in the chat. The response has already started by the time
-    anything here can fail, so a failure ends the stream with an error event
-    instead of an error response.
+    A `chat` of None starts a new one. The prompt is stored before the run, so a
+    reply that fails or is cut off still leaves it in the chat. The response has
+    already started by the time anything here can fail, so a failure ends the
+    stream with an error event instead of an error response.
     """
     name_task = None
     try:
