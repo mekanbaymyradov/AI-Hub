@@ -92,6 +92,16 @@ async def get_attachments(
     return result.scalars().all()
 
 
+async def get_attachment_keys(db: AsyncSession, *, chat_id: int) -> Sequence[str]:
+    """Return the storage keys of every attachment in a chat."""
+    result = await db.execute(
+        select(Attachment.key)
+        .join(Attachment.message)
+        .where(Message.chat_id == chat_id)
+    )
+    return result.scalars().all()
+
+
 async def attach_to_message(
     db: AsyncSession, *, attachment_ids: Sequence[int], message_id: int
 ) -> int:
