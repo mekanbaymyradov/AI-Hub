@@ -15,7 +15,6 @@ async def send_email(
     The subject comes from the template's defaults, so it is not sent here.
 
     Args:
-        to: Recipient address
         template: Id or published alias of a Resend template
         variables: Values substituted into the template. The project title is
             added here, so templates can name the product. Omitted keys fall

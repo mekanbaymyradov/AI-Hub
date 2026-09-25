@@ -9,7 +9,10 @@ from src.config import settings
 
 
 def create_storage_client() -> S3Client:
-    """Create the S3 client shared by every request."""
+    """Create the S3 client shared by every request.
+
+    boto3 is synchronous, so run calls that reach S3 in a threadpool.
+    """
     return boto3.client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
@@ -22,7 +25,6 @@ def create_storage_client() -> S3Client:
 
 
 async def get_storage(request: Request) -> S3Client:
-    """Return the client built during the app's lifespan."""
     return request.state.storage
 
 
@@ -30,12 +32,11 @@ StorageDep = Annotated[S3Client, Depends(get_storage)]
 
 
 def public_url(key: str) -> str:
-    """Build the publicly served URL of a stored object."""
     return f"{settings.s3_public_base_url.rstrip('/')}/{key}"
 
 
 def presigned_url(client: S3Client, *, bucket: str, key: str, expires_in: int) -> str:
-    """Sign a time-limited GET URL for an object in a private bucket.
+    """Sign a GET URL for a private object, valid for `expires_in` seconds.
 
     Unlike the calls that reach S3, signing is local HMAC, so it needs no threadpool.
     """

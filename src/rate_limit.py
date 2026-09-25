@@ -1,5 +1,3 @@
-"""Rate limiting backed by the app's Redis client."""
-
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request
@@ -37,7 +35,7 @@ async def _check(redis: Redis, *, key: str, times: int, seconds: int) -> None:
 def _identity(
     request: Request, credentials: HTTPAuthorizationCredentials | None
 ) -> tuple[str, int]:
-    """The bucket this request counts against, and its ceiling."""
+    """Return the bucket this request counts against and its request limit."""
     if credentials is not None:
         try:
             claims = decode_access_token(credentials.credentials)
@@ -64,7 +62,12 @@ async def global_rate_limit(request: Request, redis: RedisDep) -> None:
 
 
 def user_rate_limit(times: int, seconds: int) -> Callable[..., Awaitable[None]]:
-    """Limit one route by user id, for routes with authenticated user."""
+    """Limit one route by user id, for routes with an authenticated user.
+
+    Args:
+        times: Requests allowed per window.
+        seconds: Length of the window.
+    """
 
     async def dependency(request: Request, user: CurrentUser, redis: RedisDep) -> None:
         path = request.scope["route"].path
@@ -79,7 +82,12 @@ def user_rate_limit(times: int, seconds: int) -> Callable[..., Awaitable[None]]:
 
 
 def ip_rate_limit(times: int, seconds: int) -> Callable[..., Awaitable[None]]:
-    """Limit one route by client address, for routes with no authenticated user."""
+    """Limit one route by client address, for routes with no authenticated user.
+
+    Args:
+        times: Requests allowed per window.
+        seconds: Length of the window.
+    """
 
     async def dependency(request: Request, redis: RedisDep) -> None:
         path = request.scope["route"].path

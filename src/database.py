@@ -17,11 +17,6 @@ from src.config import settings
 
 
 def create_db_engine(connection_str: str) -> AsyncEngine:
-    """Create a database engine with proper timeout settings.
-
-    Args:
-        connection_str: Database connection string
-    """
     url = make_url(connection_str)
 
     db_kwargs = {
@@ -65,13 +60,13 @@ POSTGRES_INDEXES_NAMING_CONVENTION = {
 
 
 def resolve_table_name(name):
-    """Resolves table names to their mapped names."""
+    """Turn a CamelCase class name into a snake_case table name."""
     names = re.split("(?=[A-Z])", name)
     return "_".join([x.lower() for x in names if x])
 
 
 class Base(DeclarativeBase):
-    """Base class for all SQLAlchemy models."""
+    """Base for ORM models; each table is named after its class in snake_case."""
 
     metadata = MetaData(naming_convention=POSTGRES_INDEXES_NAMING_CONVENTION)
 

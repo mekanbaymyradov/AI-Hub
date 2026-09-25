@@ -14,6 +14,8 @@ def otp_key(email: str) -> str:
 
 
 def hash_code(code: str) -> str:
+    # Keyed, unlike sessions.hash_token: a short numeric code has so few values
+    # that a plain hash could be reversed by hashing every one of them.
     return hmac.new(
         auth_settings.jwt_secret.get_secret_value().encode(),
         code.encode(),
@@ -36,6 +38,7 @@ async def issue_otp(redis: Redis, *, email: str) -> str:
 
 
 async def verify_otp(redis: Redis, *, email: str, code: str) -> None:
+    """Consume the code if it matches. Too many wrong tries delete it."""
     key = otp_key(email)
     stored = await redis.hget(key, "code_hash")
     if stored is None:

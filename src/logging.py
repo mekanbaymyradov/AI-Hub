@@ -1,5 +1,3 @@
-"""Structured logging configuration using structlog."""
-
 import logging
 import sys
 
@@ -7,8 +5,10 @@ import structlog
 
 
 def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
-    """Setup structlog with JSON rendering for production."""
+    """Send all logs through structlog.
 
+    Logs are JSON when `environment` is "production", console text otherwise.
+    """
     shared_processors = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
@@ -62,5 +62,4 @@ def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
 
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
-    """Return a bound structured logger."""
     return structlog.get_logger(name)

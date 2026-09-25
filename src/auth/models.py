@@ -45,7 +45,7 @@ class OTPVerify(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
-    expires_in: int
+    expires_in: int = Field(description="Seconds until the access token expires.")
 
 
 class UserPublic(BaseModel):

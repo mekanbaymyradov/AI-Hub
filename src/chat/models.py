@@ -42,7 +42,9 @@ class Message(Base, TimestampMixin):
     chat_id: Mapped[int] = mapped_column(
         ForeignKey("chat.id", ondelete="cascade"), index=True
     )
+    # One pydantic-ai ModelMessage, as dumped by ModelMessagesTypeAdapter.
     content: Mapped[dict] = mapped_column(JSONB)
+    # The model that wrote a response; null on the user's prompts.
     model_id: Mapped[str | None] = mapped_column(String(100))
 
     # relationships
@@ -82,11 +84,15 @@ class Attachment(Base, TimestampMixin):
 class MessageRequest(BaseModel):
     """A prompt sent to a model, in an existing chat or a new one."""
 
-    chat_id: int | None = None
-    model_id: str
+    chat_id: int | None = Field(
+        None, description="Chat to continue; omit to start a new one."
+    )
+    model_id: str = Field(description="An id from GET /llms/models.")
     prompt: str = Field(min_length=1)
     attachment_ids: list[int] = Field(
-        default_factory=list, max_length=chat_settings.attachment_max_count
+        default_factory=list,
+        max_length=chat_settings.attachment_max_count,
+        description="Ids from POST /chats/attachments that no message has used yet.",
     )
 
 
@@ -105,14 +111,21 @@ class AttachmentPublic(BaseModel):
     id: int
     filename: str
     media_type: str
-    url: str
+    url: str = Field(
+        description=f"Signed URL, valid for {chat_settings.attachment_url_ttl // 60} "
+        "minutes."
+    )
 
 
 class MessagePublic(BaseModel):
     id: int
-    kind: Literal["request", "response"]
+    kind: Literal["request", "response"] = Field(
+        description="request: the user's message; response: the model's reply."
+    )
     content: str
-    model_id: str | None
+    model_id: str | None = Field(
+        description="Model that wrote the reply; null on the user's messages."
+    )
     created_at: datetime
     attachments: list[AttachmentPublic] = []
 

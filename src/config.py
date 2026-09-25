@@ -6,8 +6,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AppBaseSettings(BaseSettings):
-    """Base settings every settings class inherits, loaded from .env."""
-
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -17,8 +15,6 @@ class AppBaseSettings(BaseSettings):
 
 
 class Settings(AppBaseSettings):
-    """Application settings."""
-
     project_title: str = "AI-Hub"
     app_version: str = "1.0"
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
@@ -59,9 +55,6 @@ class Settings(AppBaseSettings):
 
     @property
     def database_uri(self) -> PostgresDsn:
-        """
-        Build database uri.
-        """
         return PostgresDsn.build(
             scheme="postgresql+psycopg",
             username=self.postgres_user,
@@ -73,9 +66,6 @@ class Settings(AppBaseSettings):
 
     @property
     def redis_uri(self) -> RedisDsn:
-        """
-        Build redis uri.
-        """
         password = (
             self.redis_password.get_secret_value() if self.redis_password else None
         )

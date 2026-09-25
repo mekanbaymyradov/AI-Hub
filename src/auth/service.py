@@ -23,6 +23,10 @@ async def create_user(db: AsyncSession, *, email: str) -> User:
 
 
 async def update_user(db: AsyncSession, *, user: User, changes: dict[str, Any]) -> User:
+    """Set each field in `changes` on the user.
+
+    Keys are set as-is, so pass only fields a schema has validated, never raw input.
+    """
     for field, value in changes.items():
         setattr(user, field, value)
     await db.flush()

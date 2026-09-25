@@ -73,8 +73,7 @@ CATALOG: tuple[ModelSpec, ...] = (
 
 
 class ModelPublic(BaseModel):
-    """A model as returned by the API."""
-
     id: str
+    provider: Provider
     display_name: str
     supports_files: bool

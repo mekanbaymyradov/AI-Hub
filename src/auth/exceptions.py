@@ -1,5 +1,4 @@
 from src.exceptions import (
-    AppError,
     ContentTooLargeError,
     UnauthorizedError,
     UnsupportedMediaTypeError,
@@ -11,8 +10,7 @@ class InvalidOTP(UnauthorizedError):
     msg = "Invalid or expired code."
 
 
-class OTPAttemptsExceeded(AppError):
-    status = 429
+class OTPAttemptsExceeded(UnauthorizedError):
     type = "auth.otp_attempts_exceeded"
     msg = "Too many attempts. Request a new code."
 
