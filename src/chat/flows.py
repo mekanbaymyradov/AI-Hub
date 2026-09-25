@@ -137,9 +137,29 @@ async def apply_chat_name(db: AsyncSession, *, chat: Chat, name: str) -> None:
     await db.commit()
 
 
-async def delete_chat(db: AsyncSession, *, chat: Chat) -> None:
+async def delete_chat(db: AsyncSession, *, chat: Chat) -> Sequence[str]:
+    """Delete the chat, returning the attachment keys the caller should drop from storage."""
+    keys = await service.get_attachment_keys(db, chat_id=chat.id)
     await service.delete_chat(db, chat=chat)
     await db.commit()
+    return keys
+
+
+async def delete_attachment_objects(storage: S3Client, *, keys: Sequence[str]) -> None:
+    """Drop a deleted chat's files. Best effort — the rows are already gone."""
+    try:
+        result = await run_in_threadpool(
+            storage.delete_objects,
+            Bucket=chat_settings.s3_private_bucket,
+            Delete={"Objects": [{"Key": key} for key in keys]},
+        )
+    except Exception:
+        logger.exception("attachments_delete_failed", count=len(keys))
+        return
+
+    # Individual keys fail in the response body, not as an exception.
+    if errors := result.get("Errors"):
+        logger.error("attachments_delete_partial", errors=errors)
 
 
 async def list_chats(

@@ -1,7 +1,7 @@
 from collections.abc import AsyncIterable
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, status
 from fastapi.sse import EventSourceResponse, ServerSentEvent
 
 from src.auth.dependencies import CurrentUser
@@ -51,10 +51,18 @@ async def list_chats(
     path="/{chat_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Delete a chat",
+    description="Its attachments are deleted from storage once the response is sent.",
     responses=error_responses(NotAuthenticated, ChatNotFound),
 )
-async def delete_chat(chat: ChatDep, db: DbSession) -> None:
-    await flows.delete_chat(db, chat=chat)
+async def delete_chat(
+    chat: ChatDep,
+    db: DbSession,
+    storage: StorageDep,
+    background_tasks: BackgroundTasks,
+) -> None:
+    keys = await flows.delete_chat(db, chat=chat)
+    if keys:
+        background_tasks.add_task(flows.delete_attachment_objects, storage, keys=keys)
 
 
 @chat_router.get(
