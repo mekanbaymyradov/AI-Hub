@@ -47,6 +47,18 @@ services:
           initial_sync: true
         - action: rebuild
           path: pyproject.toml
+  scheduler:
+    build:
+      context: ./
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    restart: unless-stopped
+    command: ["supercronic", "-passthrough-logs", "/app/crontab"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   
 volumes:
   postgres_data:

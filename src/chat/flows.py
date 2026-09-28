@@ -146,7 +146,7 @@ async def delete_chat(db: AsyncSession, *, chat: Chat) -> Sequence[str]:
 
 
 async def delete_attachment_objects(storage: S3Client, *, keys: Sequence[str]) -> None:
-    """Drop a deleted chat's files. Best effort — the rows are already gone."""
+    """Drop files whose attachment rows are gone. Failures are only logged."""
     try:
         result = await run_in_threadpool(
             storage.delete_objects,

@@ -1,7 +1,8 @@
 from collections.abc import Sequence
+from datetime import timedelta
 from typing import Any, cast
 
-from sqlalchemy import CursorResult, func, select, tuple_, update
+from sqlalchemy import CursorResult, delete, func, select, tuple_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -152,3 +153,30 @@ async def list_messages(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+async def delete_unclaimed_attachments(
+    db: AsyncSession, *, older_than: timedelta, limit: int
+) -> Sequence[str]:
+    """Delete unclaimed attachments older than `older_than`, returning their storage keys."""
+    unclaimed = Attachment.message_id.is_(None)
+    ids = (
+        select(Attachment.id)
+        .where(unclaimed, Attachment.created_at < func.now() - older_than)
+        .order_by(Attachment.id)
+        .limit(limit)
+    )
+    result = await db.execute(
+        delete(Attachment)
+        # Repeated outside the subquery: a claim that commits while this waits on
+        # the row lock is only rechecked against the outer condition.
+        .where(Attachment.id.in_(ids), unclaimed)
+        .returning(Attachment.key)
+    )
+    return result.scalars().all()
+
+
+async def get_attachment_keys_by_keys(db: AsyncSession, *, keys: list[str]) -> set[str]:
+    """Return the keys that still have an attachment row."""
+    result = await db.execute(select(Attachment.key).where(Attachment.key.in_(keys)))
+    return set(result.scalars())
