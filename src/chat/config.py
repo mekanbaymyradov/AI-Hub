@@ -13,6 +13,7 @@ class ChatSettings(AppBaseSettings):
     attachment_max_bytes: int = 10_485_760  # 10 MiB
     attachment_max_count: int = 5
     attachment_url_ttl: int = 900  # 15 minutes
+    attachment_unclaimed_ttl: int = 86_400  # 24 hours
 
 
 chat_settings = ChatSettings()

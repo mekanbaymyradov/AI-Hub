@@ -1,0 +1,3 @@
+# Read by supercronic in the scheduler service. The container clock is UTC.
+# To add a job: create src/<domain>/schedule.py, then add a line here.
+0 * * * * python -m src.chat.schedule

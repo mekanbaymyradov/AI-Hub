@@ -72,7 +72,7 @@ class Attachment(Base, TimestampMixin):
     message_id: Mapped[int | None] = mapped_column(
         ForeignKey("message.id", ondelete="cascade"), index=True
     )
-    key: Mapped[str] = mapped_column(String(255))
+    key: Mapped[str] = mapped_column(String(255), unique=True)
     filename: Mapped[str] = mapped_column(String(255))
     media_type: Mapped[str] = mapped_column(String(100))
 

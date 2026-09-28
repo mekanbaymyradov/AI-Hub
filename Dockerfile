@@ -31,6 +31,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 # Stage 2: Runner
 FROM python:3.14-slim
 
+# Install supercronic
+ARG TARGETARCH
+ARG SUPERCRONIC_VERSION=v0.2.49
+ADD --chmod=755 https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${TARGETARCH} /usr/local/bin/supercronic
+
+# Create non root user
 RUN groupadd -g 10001 appgroup && \
     useradd -u 10001 -g appgroup -m appuser
 
