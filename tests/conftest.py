@@ -8,10 +8,12 @@ from moto import mock_aws
 from mypy_boto3_s3 import S3Client
 from starlette.config import environ
 
+environ["POSTGRES_HOST"] = "localhost"
 environ["POSTGRES_USER"] = "postgres"
 environ["POSTGRES_PASSWORD"] = "postgres"
 environ["POSTGRES_DB"] = "ai-hub-test"
 
+environ["REDIS_HOST"] = "localhost"
 environ["REDIS_PASSWORD"] = "redis"
 environ["REDIS_INDEX"] = "15"
 
@@ -26,6 +28,12 @@ environ["S3_SECRET_ACCESS_KEY"] = "test"
 environ["S3_PUBLIC_BUCKET"] = "test-public"
 environ["S3_PUBLIC_BASE_URL"] = "https://cdn.test"
 
+environ["ANTHROPIC_API_KEY"] = "test"
+environ["OPENAI_API_KEY"] = "test"
+environ["GOOGLE_API_KEY"] = "test"
+environ["GROQ_API_KEY"] = "test"
+
+from pydantic_ai.models.test import TestModel
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -37,6 +45,10 @@ from sqlalchemy.pool import NullPool
 
 from src.config import settings
 from src.database import get_db
+from src.llm.dependencies import get_llm_registry
+from src.llm.enums import Provider
+from src.llm.models import ModelSpec
+from src.llm.registry import LLMRegistry
 from src.main import app
 from src.models import Base
 from src.redis import create_redis_client, get_redis
@@ -104,12 +116,25 @@ def s3() -> Iterator[S3Client]:
 
 
 @pytest.fixture
+def llm_registry() -> LLMRegistry:
+    """A registry of fake models, so no test reaches a real provider."""
+    spec = ModelSpec(
+        provider=Provider.GROQ, model_name="test-model", display_name="Test Model"
+    )
+    return LLMRegistry(models={spec.id: TestModel()}, specs={spec.id: spec})
+
+
+@pytest.fixture
 async def client(
-    db_session: AsyncSession, redis_client: Redis, s3: S3Client
+    db_session: AsyncSession,
+    redis_client: Redis,
+    s3: S3Client,
+    llm_registry: LLMRegistry,
 ) -> AsyncGenerator[AsyncClient]:
     app.dependency_overrides[get_db] = lambda: db_session
     app.dependency_overrides[get_redis] = lambda: redis_client
     app.dependency_overrides[get_storage] = lambda: s3
+    app.dependency_overrides[get_llm_registry] = lambda: llm_registry
 
     async with (
         LifespanManager(app) as manager,
