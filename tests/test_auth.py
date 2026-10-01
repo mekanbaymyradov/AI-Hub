@@ -1,16 +1,18 @@
 import pytest
-from httpx import AsyncClient
+from httpx2 import AsyncClient
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.auth import otp, service
+from src.auth import service
 from src.auth.config import auth_settings
 from src.auth.constants import INSTRUCTIONS_MAX_LENGTH
+from src.auth.models import User
 from src.config import settings
 from tests.utils import (
     auth_header,
     request_code,
     sign_in,
+    store_avatar,
     stored_avatar_keys,
     upload_avatar,
     verify_code,
@@ -21,19 +23,6 @@ pytestmark = pytest.mark.anyio
 WRONG_OTP_CODE = "wrong-code"
 WRONG_ACCESS_TOKEN = "wrong-jwt"
 REFRESH_COOKIE = "refresh_token"
-
-
-@pytest.fixture(autouse=True)
-def sent_codes(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
-    """Sign-in codes the app tried to email, keyed by address."""
-    codes: dict[str, str] = {}
-
-    async def fake_send_otp_email(email, code, **kwargs):
-        codes[email] = code
-
-    monkeypatch.setattr(otp, "send_otp_email", fake_send_otp_email)
-    return codes
-
 
 # Sign-in
 
@@ -52,13 +41,11 @@ async def test_new_user_is_created(
 
 
 async def test_existing_user_logs_in(
-    client: AsyncClient, db_session: AsyncSession, sent_codes: dict[str, str]
+    client: AsyncClient, sent_codes: dict[str, str], user: User
 ):
-    email = "user@example.com"
-    await service.create_user(db_session, email=email)
-    code = await request_code(client, sent_codes, email)
+    code = await request_code(client, sent_codes, user.email)
 
-    response = await verify_code(client, email, code)
+    response = await verify_code(client, user.email, code)
 
     assert response.status_code == 200
     assert response.json()["access_token"]
@@ -172,16 +159,11 @@ async def test_logout_revokes_session(client: AsyncClient, sent_codes: dict[str,
 # Current user
 
 
-async def test_me_returns_signed_in_user(
-    client: AsyncClient, sent_codes: dict[str, str]
-):
-    email = "user@example.com"
-    token = await sign_in(client, sent_codes, email)
-
+async def test_me_returns_signed_in_user(client: AsyncClient, user: User, token: str):
     response = await client.get("/auth/me", headers=auth_header(token))
 
     assert response.status_code == 200
-    assert response.json()["email"] == email
+    assert response.json()["email"] == user.email
     assert response.json()["avatar_initial"] == "U"
 
 
@@ -199,11 +181,7 @@ async def test_me_with_invalid_token_is_rejected(client: AsyncClient):
     assert response.json()["detail"][0]["type"] == "auth.not_authenticated"
 
 
-async def test_update_profile_changes_name(
-    client: AsyncClient, sent_codes: dict[str, str]
-):
-    token = await sign_in(client, sent_codes, "user@example.com")
-
+async def test_update_profile_changes_name(client: AsyncClient, token: str):
     response = await client.patch(
         "/auth/me", json={"name": "Alice"}, headers=auth_header(token)
     )
@@ -213,10 +191,9 @@ async def test_update_profile_changes_name(
 
 
 async def test_update_profile_sets_instructions(
-    client: AsyncClient, sent_codes: dict[str, str]
+    client: AsyncClient, db_session: AsyncSession, user: User, token: str
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-    await client.patch("/auth/me", json={"name": "Alice"}, headers=auth_header(token))
+    await service.update_user(db_session, user=user, changes={"name": "Alice"})
 
     response = await client.patch(
         "/auth/me",
@@ -225,17 +202,15 @@ async def test_update_profile_sets_instructions(
     )
 
     assert response.status_code == 200
-    me = await client.get("/auth/me", headers=auth_header(token))
-    assert me.json()["instructions"] == "Answer in Turkmen."
-    assert me.json()["name"] == "Alice"
+    assert response.json()["instructions"] == "Answer in Turkmen."
+    assert response.json()["name"] == "Alice"
 
 
 async def test_update_profile_clears_instructions(
-    client: AsyncClient, sent_codes: dict[str, str]
+    client: AsyncClient, db_session: AsyncSession, user: User, token: str
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-    await client.patch(
-        "/auth/me", json={"instructions": "Be brief."}, headers=auth_header(token)
+    await service.update_user(
+        db_session, user=user, changes={"instructions": "Be brief."}
     )
 
     response = await client.patch(
@@ -247,10 +222,8 @@ async def test_update_profile_clears_instructions(
 
 
 async def test_update_profile_stores_blank_instructions_as_null(
-    client: AsyncClient, sent_codes: dict[str, str]
+    client: AsyncClient, token: str
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-
     response = await client.patch(
         "/auth/me", json={"instructions": "   \n "}, headers=auth_header(token)
     )
@@ -260,10 +233,8 @@ async def test_update_profile_stores_blank_instructions_as_null(
 
 
 async def test_update_profile_rejects_too_long_instructions(
-    client: AsyncClient, sent_codes: dict[str, str]
+    client: AsyncClient, token: str
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-
     response = await client.patch(
         "/auth/me",
         json={"instructions": "a" * (INSTRUCTIONS_MAX_LENGTH + 1)},
@@ -274,10 +245,8 @@ async def test_update_profile_rejects_too_long_instructions(
 
 
 async def test_upload_avatar_stores_image(
-    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+    client: AsyncClient, s3: S3Client, token: str
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-
     response = await upload_avatar(client, token)
 
     assert response.status_code == 200
@@ -289,10 +258,8 @@ async def test_upload_avatar_stores_image(
 
 
 async def test_upload_avatar_rejects_non_webp(
-    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+    client: AsyncClient, s3: S3Client, token: str
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-
     response = await upload_avatar(client, token, content_type="image/png")
 
     assert response.status_code == 415
@@ -303,11 +270,10 @@ async def test_upload_avatar_rejects_non_webp(
 async def test_upload_avatar_rejects_too_large(
     client: AsyncClient,
     s3: S3Client,
-    sent_codes: dict[str, str],
+    token: str,
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(auth_settings, "avatar_max_bytes", 10)
-    token = await sign_in(client, sent_codes, "user@example.com")
 
     response = await upload_avatar(client, token, content=b"x" * 11)
 
@@ -317,11 +283,13 @@ async def test_upload_avatar_rejects_too_large(
 
 
 async def test_replacing_avatar_keeps_only_new_image(
-    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+    client: AsyncClient,
+    s3: S3Client,
+    db_session: AsyncSession,
+    user: User,
+    token: str,
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-    first = await upload_avatar(client, token)
-    assert first.status_code == 200
+    await store_avatar(s3, db_session, user)
 
     response = await upload_avatar(client, token)
 
@@ -332,11 +300,13 @@ async def test_replacing_avatar_keeps_only_new_image(
 
 
 async def test_delete_avatar_removes_image(
-    client: AsyncClient, s3: S3Client, sent_codes: dict[str, str]
+    client: AsyncClient,
+    s3: S3Client,
+    db_session: AsyncSession,
+    user: User,
+    token: str,
 ):
-    token = await sign_in(client, sent_codes, "user@example.com")
-    uploaded = await upload_avatar(client, token)
-    assert uploaded.status_code == 200
+    await store_avatar(s3, db_session, user)
 
     response = await client.delete("/auth/me/avatar", headers=auth_header(token))
 

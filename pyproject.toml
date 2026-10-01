@@ -39,6 +39,7 @@ convention = "pep257"
 [dependency-groups]
 dev = [
     "asgi-lifespan==2.*",
+    "httpx2>=2.13.1",
     "moto[s3]>=5.2.3",
     "pytest>=9.1.1",
     "ruff>=0.16.9",
