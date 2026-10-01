@@ -44,6 +44,7 @@ class Settings(AppBaseSettings):
     s3_secret_access_key: SecretStr
     s3_region: str = "auto"
     s3_public_bucket: str
+    s3_private_bucket: str
     s3_public_base_url: str
 
     resend_api_key: SecretStr

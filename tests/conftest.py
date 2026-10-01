@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator, Iterator
 import boto3
 import pytest
 from asgi_lifespan import LifespanManager
-from httpx import ASGITransport, AsyncClient
+from httpx2 import ASGITransport, AsyncClient
 from moto import mock_aws
 from mypy_boto3_s3 import S3Client
 from starlette.config import environ
@@ -26,6 +26,7 @@ environ["S3_ENDPOINT_URL"] = "http://localhost:1"
 environ["S3_ACCESS_KEY_ID"] = "test"
 environ["S3_SECRET_ACCESS_KEY"] = "test"
 environ["S3_PUBLIC_BUCKET"] = "test-public"
+environ["S3_PRIVATE_BUCKET"] = "test-private"
 environ["S3_PUBLIC_BASE_URL"] = "https://cdn.test"
 
 environ["ANTHROPIC_API_KEY"] = "test"
@@ -33,6 +34,11 @@ environ["OPENAI_API_KEY"] = "test"
 environ["GOOGLE_API_KEY"] = "test"
 environ["GROQ_API_KEY"] = "test"
 
+# Pytest only explains failed asserts in test modules; this covers the helpers too.
+# Registered before anything imports tests.utils, or the rewrite is skipped.
+pytest.register_assert_rewrite("tests.utils")
+
+from pydantic_ai import models
 from pydantic_ai.models.test import TestModel
 from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import (
@@ -43,6 +49,8 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import NullPool
 
+from src.auth import otp, service, sessions
+from src.auth.models import User
 from src.config import settings
 from src.database import get_db
 from src.llm.dependencies import get_llm_registry
@@ -53,6 +61,11 @@ from src.main import app
 from src.models import Base
 from src.redis import create_redis_client, get_redis
 from src.storage import get_storage
+from tests.utils import REPLY
+
+# Backstop: if a real model ever slips past the fakes, its request fails before
+# leaving the machine.
+models.ALLOW_MODEL_REQUESTS = False
 
 
 @pytest.fixture(scope="session")
@@ -108,20 +121,61 @@ async def redis_client() -> AsyncGenerator[Redis]:
 
 @pytest.fixture
 def s3() -> Iterator[S3Client]:
-    """An in-memory S3 with the public bucket created."""
+    """An in-memory S3 with the public and private buckets created."""
     with mock_aws():
         s3 = boto3.client("s3", region_name="us-east-1")
         s3.create_bucket(Bucket=settings.s3_public_bucket)
+        s3.create_bucket(Bucket=settings.s3_private_bucket, ACL="private")
         yield s3
 
 
 @pytest.fixture
 def llm_registry() -> LLMRegistry:
     """A registry of fake models, so no test reaches a real provider."""
-    spec = ModelSpec(
-        provider=Provider.GROQ, model_name="test-model", display_name="Test Model"
+    specs = [
+        ModelSpec(
+            provider=Provider.GROQ, model_name="test-model", display_name="Test Model"
+        ),
+        ModelSpec(
+            provider=Provider.GROQ,
+            model_name="text-only-model",
+            display_name="Text Only Model",
+            supports_files=False,
+        ),
+    ]
+    return LLMRegistry(
+        models={s.id: TestModel(custom_output_text=REPLY) for s in specs},
+        specs={s.id: s for s in specs},
     )
-    return LLMRegistry(models={spec.id: TestModel()}, specs={spec.id: spec})
+
+
+@pytest.fixture(autouse=True)
+def sent_codes(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    """Sign-in codes the app tried to email, keyed by address."""
+    codes: dict[str, str] = {}
+
+    async def fake_send_otp_email(email, code, **kwargs):
+        codes[email] = code
+
+    monkeypatch.setattr(otp, "send_otp_email", fake_send_otp_email)
+    return codes
+
+
+@pytest.fixture
+async def user(db_session: AsyncSession) -> User:
+    return await service.create_user(db_session, email="user@example.com")
+
+
+@pytest.fixture
+async def other_user(db_session: AsyncSession) -> User:
+    return await service.create_user(db_session, email="other@example.com")
+
+
+@pytest.fixture
+async def token(redis_client: Redis, user: User) -> str:
+    """An access token for `user`, from a real session but without signing in."""
+    access_token, _ = await sessions.create_session(redis_client, user_id=user.id)
+    return access_token
 
 
 @pytest.fixture
