@@ -14,11 +14,14 @@ environ["POSTGRES_PASSWORD"] = "postgres"
 environ["POSTGRES_DB"] = "ai-hub-test"
 
 environ["REDIS_HOST"] = "localhost"
-environ["REDIS_PASSWORD"] = "redis"
 environ["REDIS_INDEX"] = "15"
+
+# PyJWT warns on HMAC keys shorter than 32 bytes.
+environ["JWT_SECRET"] = "test-secret-at-least-32-bytes-long"
 
 # Backstop: if the outbox patch ever misses, Resend rejects the call instead of sending.
 environ["RESEND_API_KEY"] = "test"
+environ["EMAIL_FROM"] = "test@example.com"
 environ["LOGFIRE_SEND_TO_LOGFIRE"] = "false"
 
 # Backstop: if the storage override ever misses, uploads fail instead of reaching R2.
@@ -41,6 +44,7 @@ pytest.register_assert_rewrite("tests.utils")
 from pydantic_ai import models
 from pydantic_ai.models.test import TestModel
 from redis.asyncio import Redis
+from sqlalchemy import make_url, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -75,8 +79,21 @@ def anyio_backend() -> str:
 
 @pytest.fixture(scope="session")
 async def db_engine() -> AsyncGenerator[AsyncEngine]:
-    # drop_all below would wipe whatever database this points at.
     assert settings.postgres_db.endswith("test"), settings.postgres_db
+
+    url = make_url(str(settings.database_uri))
+    # CREATE DATABASE can't run inside a transaction.
+    admin = create_async_engine(
+        url.set(database="postgres"), isolation_level="AUTOCOMMIT"
+    )
+    async with admin.connect() as conn:
+        exists = await conn.scalar(
+            text("SELECT 1 FROM pg_database WHERE datname = :name"),
+            {"name": url.database},
+        )
+        if not exists:
+            await conn.execute(text(f'CREATE DATABASE "{url.database}"'))
+    await admin.dispose()
 
     engine = create_async_engine(str(settings.database_uri), poolclass=NullPool)
     async with engine.begin() as conn:
