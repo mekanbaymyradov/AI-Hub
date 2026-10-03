@@ -4,6 +4,7 @@ from typing import TypedDict
 
 import logfire
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from mypy_boto3_s3 import S3Client
 from redis.asyncio import Redis
 
@@ -62,6 +63,15 @@ logfire.configure()
 logfire.instrument_fastapi(app)
 logfire.instrument_pydantic_ai()
 app.add_middleware(AccessLogMiddleware)
+# Added last, so it wraps everything and error responses get CORS headers too.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,  # the refresh token travels as a cookie
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Retry-After"],  # not readable cross-origin otherwise
+)
 
 register_error_handlers(app)
 
