@@ -26,5 +26,4 @@ Swagger and the schema only exist when `ENVIRONMENT=local`.
   `http://localhost:8000` in dev and `https://api.<domain>` in production.
 - **CORS:** the API only accepts browser requests from origins listed in its
   `CORS_ORIGINS`. The default allows Vite's dev server,
-  `http://localhost:5173`. In production, set
-  `CORS_ORIGINS=["https://<domain>"]` on the API server.
+  `http://localhost:5173`.
