@@ -1,3 +1,7 @@
+# Ideas
+
+Candidates for later, in no particular order. None of these are commitments.
+
 1. Voice input/output
 2. File uploads
 3. Usage tracking
@@ -13,3 +17,4 @@
 13. Google and Github authentication
 14. Subscription
 15. RAG
+16. Fallback model

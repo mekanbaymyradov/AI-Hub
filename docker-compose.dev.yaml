@@ -33,6 +33,10 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
+    # .env says localhost, which is for commands run on your machine.
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
     ports:
       - "8000:8000"
     command: ["fastapi", "dev", "src/main.py", "--host", "0.0.0.0"]
@@ -55,6 +59,9 @@ services:
       dockerfile: Dockerfile
     env_file:
       - .env
+    environment:
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
     restart: unless-stopped
     command: ["supercronic", "-passthrough-logs", "/app/crontab"]
     depends_on:
