@@ -1,0 +1,121 @@
+# Production stack. The release workflow copies this file to the server as
+# /opt/ai-hub/docker-compose.yaml, next to its .env. See docs/deployment.md.
+name: ai-hub
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:8-alpine
+    restart: unless-stopped
+    # AOF persistence, because sign-in sessions live in Redis.
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD}  # lets the healthcheck's redis-cli authenticate
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  app:
+    image: ghcr.io/mekanbaymyradov/ai-hub:${IMAGE_TAG:?set by the release workflow}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+      # Trust X-Forwarded-For only from this network, which means Caddy. Safe
+      # because the app publishes no port.
+      FORWARDED_ALLOW_IPS: 172.30.0.0/24
+    # Each worker holds up to 20 DB connections; Postgres allows 100 in total.
+    command: ["fastapi", "run", "--workers", "2", "src/main.py"]
+    healthcheck:
+      # The slim image has no curl.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    # Lets in-flight SSE streams finish when a deploy replaces the container.
+    stop_grace_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  scheduler:
+    image: ghcr.io/mekanbaymyradov/ai-hub:${IMAGE_TAG:?set by the release workflow}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ENVIRONMENT: production
+      POSTGRES_HOST: postgres
+      REDIS_HOST: redis
+    command: ["supercronic", "-passthrough-logs", "/app/crontab"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    # IPv4 only: Docker would proxy IPv6 clients in from the gateway address,
+    # putting them all in one rate-limit bucket.
+    ports:
+      - "0.0.0.0:80:80"
+      - "0.0.0.0:443:443"
+      - "0.0.0.0:443:443/udp"
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+configs:
+  # Compose doesn't recreate caddy when only this changes. See "Change the
+  # Caddy config" in docs/deployment.md.
+  caddyfile:
+    content: |
+      ${API_DOMAIN:?} {
+      	# Hold requests while a deploy restarts the app, instead of returning 502.
+      	reverse_proxy app:8000 {
+      		lb_try_duration 30s
+      	}
+      	# 5 attachments of 10 MiB, plus multipart overhead.
+      	request_body {
+      		max_size 60MB
+      	}
+      	header Strict-Transport-Security "max-age=31536000"
+      }
+
+networks:
+  default:
+    ipam:
+      config:
+        # Fixed, so FORWARDED_ALLOW_IPS can name it.
+        - subnet: 172.30.0.0/24
+
+volumes:
+  postgres_data:
+  redis_data:
+  caddy_data:
+  caddy_config:

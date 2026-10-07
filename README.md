@@ -47,6 +47,7 @@ Open the API docs at http://localhost:8000/docs. Run the tests with `uv run pyte
 ## Docs
 
 - [Development guide](docs/development.md): configuration, migrations, jobs, tests
+- [Deployment guide](docs/deployment.md): the production server, releases and rollback
 - [Architecture](docs/architecture.md): how auth, streaming, attachments and the infrastructure work
 - [Frontend guide](docs/frontend.md): where the frontend lives and how to run it against the API
 - [Ideas](docs/ideas.md): possible features, not planned
