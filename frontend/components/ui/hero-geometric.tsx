@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame, ThreeElements } from "@react-three/fiber";
 import * as THREE from "three";
 import { motion } from "framer-motion";
@@ -27,6 +27,7 @@ void main() {
 `;
 
 const fragmentShader = `
+precision mediump float;
 uniform float uTime;
 uniform vec2 uResolution;
 uniform vec3 uColor1;
@@ -207,6 +208,8 @@ export default function HeroGeometric({
     className,
     ...props
 }: HeroGeometricProps) {
+    const [canvasReady, setCanvasReady] = useState(false);
+
     return (
         <div
             className={cn("relative w-full min-h-screen flex flex-col items-center overflow-hidden bg-white text-black", className)}
@@ -221,10 +224,15 @@ export default function HeroGeometric({
                 <WebGLErrorBoundary>
                     <Canvas
                         camera={{ position: [0, 0, 1] }}
-                        dpr={[1, 1]}
+                        dpr={[0.5, 1]}
                         gl={{
                             antialias: false,
                             alpha: true,
+                            powerPreference: "high-performance",
+                        }}
+                        onCreated={() => {
+                            // Add a tiny timeout to ensure the main thread has fully painted the canvas
+                            setTimeout(() => setCanvasReady(true), 100);
                         }}
                     >
                         <GradientPlane color1={color1} color2={color2} speed={speed} />
@@ -242,7 +250,7 @@ export default function HeroGeometric({
                                 <div className="overflow-hidden">
                                     <motion.h1
                                         initial={{ y: "100%", opacity: 0 }}
-                                        animate={{ y: "0%", opacity: 1 }}
+                                        animate={canvasReady ? { y: "0%", opacity: 1 } : { y: "100%", opacity: 0 }}
                                         transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
                                         className={HERO_HEADLINE_CLASS}
                                     >
@@ -254,7 +262,7 @@ export default function HeroGeometric({
                                 <div className="overflow-hidden">
                                     <motion.h1
                                         initial={{ y: "100%", opacity: 0 }}
-                                        animate={{ y: "0%", opacity: 1 }}
+                                        animate={canvasReady ? { y: "0%", opacity: 1 } : { y: "100%", opacity: 0 }}
                                         transition={{ duration: 1, ease: [0.16, 1, 0.3, 1], delay: 0.35 }}
                                         className={HERO_HEADLINE_CLASS}
                                     >
@@ -269,7 +277,7 @@ export default function HeroGeometric({
                             <div className="max-w-[480px] text-center mb-8">
                                 <motion.p
                                     initial={{ opacity: 0, y: 20 }}
-                                    animate={{ opacity: 1, y: 0 }}
+                                    animate={canvasReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                                     transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
                                     className="text-lg md:text-[1.35rem] leading-relaxed text-neutral-600 font-normal"
                                 >
@@ -277,6 +285,8 @@ export default function HeroGeometric({
                                 </motion.p>
                             </div>
                         )}
+                        {/* Custom Children (Buttons, etc) */}
+                        {props.children}
                     </div>
                 </div>
             )}
