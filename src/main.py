@@ -22,7 +22,7 @@ from src.rate_limit import global_rate_limit
 from src.redis import create_redis_client
 from src.storage import create_storage_client
 
-setup_logging(settings.log_level, settings.environment)
+setup_logging(settings.log_level, settings.environment, settings.project_title)
 
 
 class State(TypedDict):
@@ -59,10 +59,10 @@ app = FastAPI(
     responses=error_responses(RateLimitExceeded),
 )
 
-logfire.configure()
-logfire.instrument_fastapi(app)
+logfire.instrument_fastapi(app, excluded_urls="/healthz")
 logfire.instrument_pydantic_ai()
 app.add_middleware(AccessLogMiddleware)
+
 # Added last, so it wraps everything and error responses get CORS headers too.
 app.add_middleware(
     CORSMiddleware,

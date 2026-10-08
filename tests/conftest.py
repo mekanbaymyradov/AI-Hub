@@ -22,6 +22,8 @@ environ["JWT_SECRET"] = "test-secret-at-least-32-bytes-long"
 # Backstop: if the outbox patch ever misses, Resend rejects the call instead of sending.
 environ["RESEND_API_KEY"] = "test"
 environ["EMAIL_FROM"] = "test@example.com"
+
+# Overrides send_to_logfire in pyproject.toml, so tests never send spans.
 environ["LOGFIRE_SEND_TO_LOGFIRE"] = "false"
 
 # Backstop: if the storage override ever misses, uploads fail instead of reaching R2.

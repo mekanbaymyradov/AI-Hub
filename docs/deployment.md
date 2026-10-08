@@ -85,7 +85,7 @@ The server holds only `/opt/ai-hub/docker-compose.yaml` and `/opt/ai-hub/.env`.
    | `CORS_ORIGINS` | `["https://ai-hub.example.com"]` |
    | `API_DOMAIN` | `api.example.com` |
    | `IMAGE_TAG` | Leave empty. The release workflow sets it. |
-   | `LOGFIRE_TOKEN`, `LOGFIRE_ENVIRONMENT` | Your write token, `production` |
+   | `LOGFIRE_TOKEN` | Your write token. Without it the app still runs, but sends nothing to Logfire. |
    | `RESEND_API_KEY`, `EMAIL_FROM`, `S3_*`, LLM keys | The production values from [Before you start](#before-you-start) |
 
    Leave `ENVIRONMENT`, `POSTGRES_HOST` and `REDIS_HOST` alone: the compose

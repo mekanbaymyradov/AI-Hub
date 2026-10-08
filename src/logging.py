@@ -1,14 +1,17 @@
 import logging
 import sys
 
+import logfire
 import structlog
 
 
-def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
-    """Send all logs through structlog.
+def setup_logging(log_level: str, environment: str, service_name: str) -> None:
+    """Configure Logfire, and send all logs through structlog and on to Logfire.
 
     Logs are JSON when `environment` is "production", console text otherwise.
     """
+    logfire.configure(service_name=service_name, environment=environment, console=False)
+
     shared_processors = [
         structlog.contextvars.merge_contextvars,
         structlog.stdlib.add_logger_name,
@@ -22,6 +25,7 @@ def setup_logging(log_level: str = "INFO", environment: str = "local") -> None:
         processors=[
             structlog.stdlib.filter_by_level,
             *shared_processors,
+            logfire.StructlogProcessor(),
             structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
         ],
         logger_factory=structlog.stdlib.LoggerFactory(),

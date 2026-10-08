@@ -39,4 +39,5 @@ class AccessLogMiddleware:
                 path=scope["path"],
                 status=status,
                 duration_ms=round((time.perf_counter() - start) * 1000, 2),
+                client_ip=scope["client"][0] if scope.get("client") else None,
             )
