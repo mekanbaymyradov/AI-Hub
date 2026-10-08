@@ -23,6 +23,11 @@ dependencies = [
 [tool.fastapi]
 entrypoint = "src.main:app"
 
+[tool.logfire]
+# A missing token disables sending instead of crashing startup. Set here, not
+# in logfire.configure(), so the env var in tests/conftest.py still overrides it.
+send_to_logfire = "if-token-present"
+
 [tool.ruff]
 
 [tool.ruff.lint]

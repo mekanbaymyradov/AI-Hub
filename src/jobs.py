@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 async def run_job(name: str, job: Callable[[AsyncSession], Awaitable[None]]) -> None:
     """Run one cron job, exiting non-zero if it fails."""
-    setup_logging(settings.log_level, settings.environment)
+    setup_logging(settings.log_level, settings.environment, settings.project_title)
     started = perf_counter()
 
     try:
