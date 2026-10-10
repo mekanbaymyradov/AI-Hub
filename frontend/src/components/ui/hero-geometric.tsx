@@ -1,23 +1,23 @@
 "use client";
 
-import { useRef, useMemo, useState, useEffect } from "react";
-import { Canvas, useFrame, ThreeElements } from "@react-three/fiber";
+import { useRef, useMemo, useState } from "react";
+import { Canvas, useFrame, type ThreeElements } from "@react-three/fiber";
 import * as THREE from "three";
 import { motion } from "framer-motion";
 
-import { cn } from "../../lib/utils";
+import { cn } from "../../../lib/utils";
 import { WebGLErrorBoundary } from "./webgl-error-boundary";
 
-/* eslint-disable @typescript-eslint/no-namespace */
+
 declare module "react" {
     namespace JSX {
-        // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+        
         interface IntrinsicElements extends ThreeElements { }
     }
 }
-/* eslint-enable @typescript-eslint/no-namespace */
 
-// --- Shader Code ---
+
+
 const vertexShader = `
 varying vec2 vUv;
 void main() {
@@ -79,22 +79,22 @@ void main() {
     vec2 uv = vUv;
     vec2 coord = gl_FragCoord.xy;
     
-    // Enhanced noise with time
+    
     float noise = snoise(uv * 1.5 + vec2(uTime * 0.05, uTime * 0.03)) * 0.25;
     
-    // Diagonal gradient from bottom-left to top-right
+    
     float diagonal = (uv.x + uv.y) * 0.5;
     
-    // Combine for gradient - emphasize corners
+    
     float gradient = diagonal * 1.2 + noise;
     
-    // Interpolate colors based on gradient
+    
     vec3 deepBlue = uColor1;
     vec3 paleBlue = uColor2;
     vec3 softBlue = mix(deepBlue, paleBlue, 0.33);
     vec3 lightBlue = mix(deepBlue, paleBlue, 0.66);
     
-    // Map to colors with more distinct steps
+    
     vec3 color;
     if (gradient < 0.3) {
         color = deepBlue;
@@ -106,7 +106,7 @@ void main() {
         color = paleBlue;
     }
     
-    // Enhanced dithering at boundaries
+    
     float dither = bayerDither4x4(coord);
     float threshold = fract(gradient * 4.0);
     
@@ -118,12 +118,12 @@ void main() {
         color = paleBlue;
     }
     
-    // Softer fade to white - only at extreme bottom-left
+    
     vec2 cornerDist = vec2(uv.x, uv.y);
     float fadeMask = smoothstep(0.0, 0.25, length(cornerDist));
     color = mix(vec3(1.0), color, fadeMask);
     
-    // Add subtle vignette to emphasize corners
+    
     float vignette = smoothstep(1.2, 0.3, length(uv - 0.5));
     color = mix(color, color * 0.95, (1.0 - vignette) * 0.3);
     
@@ -184,7 +184,7 @@ const GradientPlane = ({
     );
 };
 
-// --- Main Component ---
+
 
 interface HeroGeometricProps extends React.ComponentPropsWithoutRef<"div"> {
     title1?: string;
@@ -202,8 +202,8 @@ export default function HeroGeometric({
     title1,
     title2,
     description,
-    color1 = "#3B82F6", // Default soft blue
-    color2 = "#F0F9FF", // Default pale blue
+    color1 = "#3B82F6", 
+    color2 = "#F0F9FF", 
     speed = 1,
     className,
     ...props
@@ -219,7 +219,7 @@ export default function HeroGeometric({
             }}
             {...props}
         >
-            {/* Background Shader */}
+            {}
             <div className="absolute top-0 left-0 w-full h-full z-0 pointer-events-none">
                 <WebGLErrorBoundary>
                     <Canvas
@@ -231,7 +231,7 @@ export default function HeroGeometric({
                             powerPreference: "high-performance",
                         }}
                         onCreated={() => {
-                            // Add a tiny timeout to ensure the main thread has fully painted the canvas
+                            
                             setTimeout(() => setCanvasReady(true), 100);
                         }}
                     >
@@ -240,11 +240,11 @@ export default function HeroGeometric({
                 </WebGLErrorBoundary>
             </div>
 
-            {/* Content */}
+            {}
             {(title1 || title2 || description) && (
                 <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center pt-8 pb-8 md:pt-20 md:pb-20">
                     <div className="w-full max-w-[1200px] px-6 flex flex-col items-center">
-                        {/* Headline */}
+                        {}
                         <div className="flex flex-col items-center text-center gap-2 md:gap-4 mb-8 md:mb-12">
                             {title1 && (
                                 <div className="overflow-hidden">
@@ -272,7 +272,7 @@ export default function HeroGeometric({
                             )}
                         </div>
 
-                        {/* Subheadline */}
+                        {}
                         {description && (
                             <div className="max-w-[480px] text-center mb-8">
                                 <motion.p
@@ -285,7 +285,7 @@ export default function HeroGeometric({
                                 </motion.p>
                             </div>
                         )}
-                        {/* Custom Children (Buttons, etc) */}
+                        {}
                         {props.children}
                     </div>
                 </div>

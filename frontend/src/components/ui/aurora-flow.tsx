@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { cn } from "../../lib/utils";
+import { cn } from "../../../lib/utils";
 import { WebGLErrorBoundary } from "./webgl-error-boundary";
 
 const VERTEX_SHADER = `

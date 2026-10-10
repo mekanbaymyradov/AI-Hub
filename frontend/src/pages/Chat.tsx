@@ -6,7 +6,7 @@ export default function Chat() {
   const handleSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim()) return;
-    // TODO: Handle sending message and streaming response
+    
     console.log('Sending message:', message);
     setMessage('');
   };
@@ -23,7 +23,7 @@ export default function Chat() {
 
       <main className="flex-1 overflow-y-auto p-6">
         <div className="max-w-3xl mx-auto space-y-6">
-          {/* Placeholder messages */}
+          {}
           <div className="flex gap-4">
             <div className="w-8 h-8 bg-blue-100 rounded-full flex-shrink-0"></div>
             <div className="prose text-gray-800">

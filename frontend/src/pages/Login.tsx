@@ -9,14 +9,14 @@ export default function Login() {
 
   const handleRequestOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Call API POST /auth/otp/request
+    
     setStep('verify');
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Call API POST /auth/otp/verify
-    // On success:
+    
+    
     navigate('/chat');
   };
 
