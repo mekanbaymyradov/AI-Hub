@@ -1,5 +1,5 @@
 import { apiClient } from './axiosInstance';
-import { ModelPublic } from './types';
+import { type ModelPublic } from './types';
 
 export const llmApi = {
   getModels: async (): Promise<ModelPublic[]> => {

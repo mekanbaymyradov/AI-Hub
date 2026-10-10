@@ -32,8 +32,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     const initAuth = async () => {
       try {
-        const { access_token } = await authApi.refreshToken();
-        setAccessToken(access_token);
         await fetchUser();
       } catch (error) {
         setIsLoading(false); 

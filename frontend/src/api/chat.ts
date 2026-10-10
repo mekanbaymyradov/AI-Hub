@@ -1,11 +1,11 @@
 import { apiClient, getAccessToken } from './axiosInstance';
 import { 
-  PageChatPublic, 
-  ChatRename, 
-  ChatPublic, 
-  PageMessagePublic, 
-  AttachmentPublic,
-  MessageRequest
+  type PageChatPublic, 
+  type ChatRename, 
+  type ChatPublic, 
+  type PageMessagePublic, 
+  type AttachmentPublic,
+  type MessageRequest
 } from './types';
 
 export const chatApi = {
@@ -64,15 +64,39 @@ export const chatApi = {
 
       const baseURL = apiClient.defaults.baseURL || 'http://localhost:8000';
 
-      const response = await fetch(`${baseURL}/chats/messages`, {
+      let response = await fetch(`${baseURL}/chats/messages`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
       });
 
+      if (response.status === 401) {
+        try {
+          const axios = (await import('axios')).default;
+          const { data: tokenData } = await axios.post('/auth/token/refresh', {}, {
+            baseURL: apiClient.defaults.baseURL,
+            withCredentials: true
+          });
+          const newToken = tokenData.access_token;
+          const { setAccessToken } = await import('./axiosInstance');
+          setAccessToken(newToken);
+          
+          headers['Authorization'] = `Bearer ${newToken}`;
+          response = await fetch(`${baseURL}/chats/messages`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(data),
+          });
+        } catch (refreshErr) {
+          const { setAccessToken } = await import('./axiosInstance');
+          setAccessToken(null);
+          throw new Error('Authentication expired. Please log in again.');
+        }
+      }
+
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail?.[0]?.msg || 'Failed to start stream');
+        throw new Error(errorData.detail?.[0]?.msg || errorData.detail || 'Failed to start stream');
       }
 
       if (!response.body) {
