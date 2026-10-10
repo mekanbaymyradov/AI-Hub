@@ -2,7 +2,8 @@
 
 Production runs on one Hetzner server (Ubuntu LTS, x86) with Docker Compose.
 Caddy serves HTTPS in front of the API. The scheduler, Postgres and Redis run
-next to it, reachable only inside Docker's network. Replace `example.com` with
+next to it, reachable only inside Docker's network, along with an OpenTelemetry
+Collector that sends container metrics to Logfire. Replace `example.com` with
 your domain throughout.
 
 ## How a release works
@@ -184,18 +185,18 @@ Run these in `/opt/ai-hub`:
 The Postgres image is pinned to major version 18. Moving to a new major
 version needs a dump and restore, not just a tag change.
 
-### Change the Caddy config
+### Change the Caddy or collector config
 
-The Caddy config lives inside `docker-compose.prod.yaml`. Compose doesn't
-recreate Caddy when only that config changes, so after the release that
-changes it, run:
+The Caddy and OpenTelemetry Collector configs live inside
+`docker-compose.prod.yaml`. Compose doesn't recreate a service when only its
+config changes, so after the release that changes one, run:
 
 ```bash
-docker compose up -d --force-recreate caddy
+docker compose up -d --force-recreate caddy   # or otel-collector
 ```
 
-This drops open connections for a moment, which is why deploys don't do it
-every time.
+Recreating Caddy drops open connections for a moment, which is why deploys
+don't do it every time.
 
 ## Known gaps
 

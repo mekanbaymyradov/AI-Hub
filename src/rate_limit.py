@@ -1,5 +1,6 @@
 from collections.abc import Awaitable, Callable
 
+import logfire
 from fastapi import Request
 from fastapi.security import HTTPAuthorizationCredentials
 from redis.asyncio import Redis
@@ -10,10 +11,7 @@ from src.auth.exceptions import NotAuthenticated
 from src.auth.sessions import decode_access_token
 from src.config import settings
 from src.exceptions import RateLimitExceeded
-from src.logging import get_logger
 from src.redis import RedisDep
-
-logger = get_logger(__name__)
 
 
 async def _check(redis: Redis, *, key: str, times: int, seconds: int) -> None:
@@ -25,7 +23,7 @@ async def _check(redis: Redis, *, key: str, times: int, seconds: int) -> None:
             pipe.ttl(key)
             count, _, ttl = await pipe.execute()
     except RedisError:
-        logger.warning("rate_limit_unavailable", key=key)
+        logfire.warn("Rate limit unavailable", key=key)
         return
 
     if count > times:

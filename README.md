@@ -17,8 +17,8 @@ A production-grade, multi-provider LLM chat API built with FastAPI and the Pydan
 - File attachments in private storage, with signed URLs and automatic cleanup
 - Custom instructions, profile avatars, and paginated chat history
 
-Under the hood: rate limiting, cursor pagination, structured JSON logs, Logfire
-tracing, scheduled jobs and CI. See [Architecture](docs/architecture.md).
+Under the hood: rate limiting, cursor pagination, Logfire tracing and logs,
+scheduled jobs and CI. See [Architecture](docs/architecture.md).
 
 ## Tech stack
 
@@ -27,7 +27,7 @@ tracing, scheduled jobs and CI. See [Architecture](docs/architecture.md).
 - **Data:** PostgreSQL, SQLAlchemy (async), Alembic, Redis
 - **Storage:** Cloudflare R2 (S3 API)
 - **Email:** Resend
-- **Observability:** Logfire, structlog
+- **Observability:** Logfire
 - **Tooling:** uv, Docker Compose, supercronic, GitHub Actions
 
 ## Getting started

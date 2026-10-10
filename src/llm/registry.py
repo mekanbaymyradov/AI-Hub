@@ -1,6 +1,7 @@
 from collections.abc import AsyncIterator, Iterable
 from contextlib import AsyncExitStack, asynccontextmanager
 
+import logfire
 from pydantic_ai.models import Model
 from pydantic_ai.models.anthropic import AnthropicModel
 from pydantic_ai.models.google import GoogleModel
@@ -14,9 +15,6 @@ from pydantic_ai.providers.openai import OpenAIProvider
 from src.llm.config import LLMSettings
 from src.llm.enums import Provider
 from src.llm.models import CATALOG, ModelSpec
-from src.logging import get_logger
-
-logger = get_logger(__name__)
 
 
 class LLMRegistry:
@@ -71,9 +69,7 @@ def build_model(spec: ModelSpec, settings: LLMSettings) -> Model | None:
                 provider=GroqProvider(api_key=settings.groq_api_key.get_secret_value()),
             )
         case _:
-            logger.warning(
-                "Skipping model, no API key configured", provider=spec.provider
-            )
+            logfire.info("Model API key missing for {provider}", provider=spec.provider)
             return None
 
 

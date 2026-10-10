@@ -25,6 +25,8 @@ environ["EMAIL_FROM"] = "test@example.com"
 
 # Overrides send_to_logfire in pyproject.toml, so tests never send spans.
 environ["LOGFIRE_SEND_TO_LOGFIRE"] = "false"
+# Keeps span output out of failing tests' captured stdout.
+environ["LOGFIRE_CONSOLE"] = "false"
 
 # Backstop: if the storage override ever misses, uploads fail instead of reaching R2.
 environ["S3_ENDPOINT_URL"] = "http://localhost:1"

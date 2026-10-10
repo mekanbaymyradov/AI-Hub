@@ -1,6 +1,7 @@
 from typing import Any
 from uuid import uuid4
 
+import logfire
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
 from mypy_boto3_s3 import S3Client
@@ -13,21 +14,26 @@ from src.auth.constants import AVATAR_CONTENT_TYPE
 from src.auth.exceptions import AvatarTooLarge, UnsupportedImageType
 from src.auth.models import User
 from src.config import settings
-from src.logging import get_logger
-
-logger = get_logger(__name__)
 
 
-async def request_otp(db: AsyncSession, redis: Redis, *, email: str) -> None:
+async def request_otp(
+    db: AsyncSession, redis: Redis, *, email: str
+) -> tuple[str, User | None]:
+    """Issue a sign-in code, returning it and the user it signs in, if registered."""
     # Picks the template only; the response is identical either way
     user = await service.get_user_by_email(db, email=email)
     code = await otp.issue_otp(redis, email=email)
+    return code, user
+
+
+async def deliver_otp(email: str, code: str, *, user: User | None) -> None:
+    """Email a sign-in code. Failures are only logged: the response has already gone."""
     try:
         await otp.send_otp_email(
             email, code, name=user.name if user else None, is_new_user=user is None
         )
     except Exception:
-        logger.exception("otp_delivery_failed", email=email)
+        logfire.exception("OTP delivery failed", user_id=user.id if user else None)
 
 
 async def verify_otp(
@@ -103,4 +109,4 @@ async def delete_avatar_object(storage: S3Client, *, key: str) -> None:
             storage.delete_object, Bucket=settings.s3_public_bucket, Key=key
         )
     except Exception:
-        logger.exception("avatar_delete_failed", key=key)
+        logfire.exception("Avatar delete failed", key=key)

@@ -1,5 +1,3 @@
-# Production stack. The release workflow copies this file to the server as
-# /opt/ai-hub/docker-compose.yaml, next to its .env. See docs/deployment.md.
 name: ai-hub
 
 services:
@@ -38,12 +36,15 @@ services:
       - .env
     environment:
       ENVIRONMENT: production
+      # Docker logs show only problems; Logfire has everything.
+      LOGFIRE_CONSOLE_MIN_LOG_LEVEL: warn
+      # Tags every span with the deployed version.
+      LOGFIRE_SERVICE_VERSION: ${IMAGE_TAG}
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
       # Trust X-Forwarded-For only from this network, which means Caddy. Safe
       # because the app publishes no port.
       FORWARDED_ALLOW_IPS: 172.30.0.0/24
-    # Each worker holds up to 20 DB connections; Postgres allows 100 in total.
     command: ["fastapi", "run", "--workers", "2", "src/main.py"]
     healthcheck:
       # The slim image has no curl.
@@ -66,6 +67,8 @@ services:
       - .env
     environment:
       ENVIRONMENT: production
+      LOGFIRE_CONSOLE_MIN_LOG_LEVEL: warn
+      LOGFIRE_SERVICE_VERSION: ${IMAGE_TAG}
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
     command: ["supercronic", "-passthrough-logs", "/app/crontab"]
@@ -89,10 +92,22 @@ services:
     volumes:
       - caddy_data:/data
       - caddy_config:/config
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.162.0
+    user: 0:0 # root, to read the Docker socket
+    restart: unless-stopped
+    # Only the token, not .env: the collector needs none of the app's secrets.
+    environment:
+      LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
+    configs:
+      - source: otel_collector
+        target: /etc/otelcol-contrib/config.yaml  # the image's default config path
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
 configs:
-  # Compose doesn't recreate caddy when only this changes. See "Change the
-  # Caddy config" in docs/deployment.md.
+  # Compose doesn't recreate a service when only its config here changes. See
+  # "Change the Caddy or collector config" in docs/deployment.md.
   caddyfile:
     content: |
       ${API_DOMAIN:?} {
@@ -106,6 +121,40 @@ configs:
       	}
       	header Strict-Transport-Security "max-age=31536000"
       }
+  otel_collector:
+    content: |
+      receivers:
+        docker_stats:
+          collection_interval: 60s
+          container_labels_to_metric_labels:   # so the Compose projects tab can group containers
+            com.docker.compose.project: compose.project
+            com.docker.compose.service: compose.service
+          metrics:
+            container.uptime: {enabled: true}
+            container.restarts: {enabled: true}
+
+      processors:
+        resource_detection:
+          detectors: [docker]   # names the host from the Docker daemon
+        resource:
+          attributes:
+            # What Logfire reads as `environment`.
+            - {key: deployment.environment.name, value: production, action: upsert}
+
+      exporters:
+        otlp_http/logfire:
+          endpoint: https://logfire-eu.pydantic.dev
+          headers:
+            # Doubled dollar sign: Compose leaves the reference for the
+            # collector to expand, instead of failing to parse it.
+            Authorization: $${env:LOGFIRE_TOKEN}
+
+      service:
+        pipelines:
+          metrics:
+            receivers: [docker_stats]
+            processors: [resource_detection, resource]
+            exporters: [otlp_http/logfire]
 
 networks:
   default:

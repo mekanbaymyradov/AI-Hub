@@ -1,6 +1,7 @@
 import asyncio
 from datetime import UTC, datetime, timedelta
 
+import logfire
 from fastapi.concurrency import iterate_in_threadpool
 from mypy_boto3_s3 import S3Client
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,10 +10,7 @@ from src.chat import flows, service
 from src.chat.config import chat_settings
 from src.chat.constants import ATTACHMENT_MAX_BATCH_SIZE
 from src.jobs import run_job
-from src.logging import get_logger
 from src.storage import create_storage_client
-
-logger = get_logger(__name__)
 
 
 async def delete_unclaimed_attachments(
@@ -75,7 +73,11 @@ async def cleanup_attachments(db: AsyncSession) -> None:
     finally:
         storage.close()
 
-    logger.info("attachments_cleanup_done", unclaimed=unclaimed, stray=stray)
+    logfire.info(
+        "Attachment cleanup done: {unclaimed} unclaimed, {stray} stray",
+        unclaimed=unclaimed,
+        stray=stray,
+    )
 
 
 if __name__ == "__main__":

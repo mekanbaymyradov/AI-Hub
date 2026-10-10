@@ -1,8 +1,6 @@
 # Stage 1: Builder
 FROM python:3.14-slim AS builder
 
-ENV PYTHONUNBUFFERED=1
-
 # Install uv
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
 COPY --from=ghcr.io/astral-sh/uv:0.12.1 /uv /uvx /bin/
@@ -48,6 +46,10 @@ COPY --from=builder --chown=appuser:appgroup /app /app
 
 # Set the virtual environment at the front of the PATH
 ENV PATH="/app/.venv/bin:$PATH"
+
+# Write output straight to docker logs, so console lines arrive on time and a
+# killed process doesn't lose what it buffered
+ENV PYTHONUNBUFFERED=1
 
 # Trust proxy headers only from this address; override at deploy with the
 # real load balancer address
