@@ -9,7 +9,8 @@ dependencies = [
     "boto3-stubs[s3]>=1.35",
     "boto3>=1.35",
     "fastapi[standard]>=0.141.1",
-    "logfire[fastapi]>=4.41.0",
+    "logfire[fastapi,httpx,sqlalchemy,redis]>=4.41.0",
+    "opentelemetry-instrumentation-botocore>=0.65b0",
     "psycopg[binary]>=3.3.5",
     "pydantic-ai[groq]>=2.33.0",
     "pydantic-settings>=2.15.0",
@@ -17,7 +18,6 @@ dependencies = [
     "pyjwt>=2.9",
     "redis>=5.2",
     "sqlalchemy[asyncio]>=2.0",
-    "structlog>=26.1.0",
 ]
 
 [tool.fastapi]
@@ -32,7 +32,10 @@ send_to_logfire = "if-token-present"
 
 [tool.ruff.lint]
 extend-select = ["FAST", "D"]
-ignore = ["D1"]  # check the docstrings we write, never require one
+ignore = [
+    "D1",  # check the docstrings we write, never require one
+    "BLE001",  # blind excepts log via logfire.exception(), which ruff cannot recognize
+]
 
 [tool.ruff.lint.pydocstyle]
 convention = "pep257"

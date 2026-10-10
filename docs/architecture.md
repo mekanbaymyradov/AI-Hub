@@ -81,10 +81,32 @@ Deleting a chat also deletes its files.
 
 ## Logging and observability
 
-- **Format:** structlog writes JSON lines in production and readable console
-  output locally (`src/logging.py`).
-- **Access log:** one line per request, with a `request_id` bound to every log
-  inside it (`src/middleware.py`).
-- **Tracing:** Logfire traces FastAPI requests and Pydantic AI calls
-  (`src/main.py`).
-- **Noise:** `/healthz` is left out of the access log.
+Logfire is the only logging API: code calls `logfire.info()`,
+`logfire.exception()` and so on, never `logging` (`src/observability.py`).
+
+- **Traces:** each request is one trace, with its SQL, Redis, R2, outgoing HTTP
+  and Pydantic AI calls as child spans. Redis is traced because the rate limiter
+  calls it on every request, so a slow Redis shows up as a span instead of an
+  unexplained gap. Each cron job is one `Job run` trace
+  (`src/jobs.py`). `/healthz` is left out. Signed-in requests carry `user_id` on
+  the request span (`get_current_user` in `src/auth/dependencies.py`), so one
+  filter finds a user's requests and logs.
+- **Logs:** attach to the span they are emitted in, so there is no request ID.
+  Library warnings and errors from `logging` reach Logfire too.
+- **Naming:** every log and span message is a fixed `"<Subject> <outcome>"`
+  template in sentence case, such as `"Reply failed"`. Values go in as
+  `{placeholders}` or keyword arguments; both become queryable attributes. Never
+  use f-strings: each message would be unique, which breaks grouping and any
+  alert that matches on the template.
+- **Console:** locally, every log and span start prints. In production, docker
+  logs show only warning and error logs (`LOGFIRE_CONSOLE_MIN_LOG_LEVEL` in the
+  compose file), plus the tracebacks uvicorn and failed jobs print themselves.
+  A span that ends in an error never prints; look it up in Logfire.
+- **Containers:** in production, an OpenTelemetry Collector sends each
+  container's CPU, memory and restarts to Logfire (`otel-collector` in
+  `docker-compose.prod.yaml`). It doesn't run locally.
+- **Privacy:** production traces carry no chat text, only model, tokens and
+  timing. Request spans record the client's
+  input locally, but in production only validation errors, without the rejected
+  input (`request_attributes_mapper` in `src/observability.py`), plus the signed-in
+  user's ID. Logs and spans identify users by ID, never by email.

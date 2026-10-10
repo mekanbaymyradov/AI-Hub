@@ -37,6 +37,8 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      LOGFIRE_CONSOLE_VERBOSE: true
+      LOGFIRE_CONSOLE_COLORS: always
     ports:
       - "8000:8000"
     command: ["fastapi", "dev", "src/main.py", "--host", "0.0.0.0"]
@@ -62,6 +64,8 @@ services:
     environment:
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
+      LOGFIRE_CONSOLE_VERBOSE: true
+      LOGFIRE_CONSOLE_COLORS: always
     restart: unless-stopped
     command: ["supercronic", "-passthrough-logs", "/app/crontab"]
     depends_on:

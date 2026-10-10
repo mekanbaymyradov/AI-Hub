@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from opentelemetry import trace
 
 from src.auth import service, sessions
 from src.auth.exceptions import NotAuthenticated
@@ -22,6 +23,9 @@ async def get_current_user(db: DbSession, credentials: BearerToken) -> User:
     if user is None:
         raise NotAuthenticated()
 
+    # Dependencies run while the request span is current, so every signed-in
+    # request can be found by user.
+    trace.get_current_span().set_attribute("user_id", user.id)
     return user
 
 

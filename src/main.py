@@ -1,3 +1,4 @@
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TypedDict
@@ -16,13 +17,12 @@ from src.exceptions import RateLimitExceeded, error_responses
 from src.llm.config import llm_settings
 from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
-from src.logging import setup_logging
-from src.middleware import AccessLogMiddleware
+from src.observability import request_attributes_mapper, setup_observability
 from src.rate_limit import global_rate_limit
 from src.redis import create_redis_client
 from src.storage import create_storage_client
 
-setup_logging(settings.log_level, settings.environment, settings.project_title)
+setup_observability()
 
 
 class State(TypedDict):
@@ -36,6 +36,7 @@ class State(TypedDict):
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[State]:
     # app starts here
+    logging.getLogger("uvicorn.access").disabled = True
     redis = create_redis_client(str(settings.redis_uri))
     storage = create_storage_client()
     try:
@@ -59,9 +60,9 @@ app = FastAPI(
     responses=error_responses(RateLimitExceeded),
 )
 
-logfire.instrument_fastapi(app, excluded_urls="/healthz")
-logfire.instrument_pydantic_ai()
-app.add_middleware(AccessLogMiddleware)
+logfire.instrument_fastapi(
+    app, excluded_urls="/healthz", request_attributes_mapper=request_attributes_mapper
+)
 
 # Added last, so it wraps everything and error responses get CORS headers too.
 app.add_middleware(
