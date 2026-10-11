@@ -2,6 +2,7 @@ name: Release
 
 on:
   push:
+    # Exactly vX.Y.Z: the tag reaches a shell on the server.
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
 
 permissions:
@@ -15,13 +16,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0  # the main check below needs history
-      - name: Check the tag
+      - name: Check the tag is on main
         run: |
-          # The tag reaches a shell on the server, so allow only vX.Y.Z.
-          if [[ ! "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME is not vX.Y.Z"
-            exit 1
-          fi
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::Tag $GITHUB_REF_NAME points to a commit that is not on main"
             exit 1
@@ -67,5 +63,5 @@ jobs:
           scp deploy/* "$TARGET:/opt/ai-hub/incoming/"
       - name: Deploy
         run: |
-          # shellcheck disable=SC2029  # TAG expands here on purpose; check-tag allows only vX.Y.Z
+          # shellcheck disable=SC2029  # TAG expands here on purpose; the tag trigger allows only vX.Y.Z
           ssh "$TARGET" "bash /opt/ai-hub/incoming/deploy.sh $TAG"
