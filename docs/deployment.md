@@ -10,23 +10,27 @@ your domain throughout.
 
 Pushing a `vX.Y.Z` tag runs [`release.yml`](../.github/workflows/release.yml):
 
-1. **ci**: [`ci.yml`](../.github/workflows/ci.yml) for the tagged commit, the
+1. **check-tag**: checks that the tag is `vX.Y.Z` on a commit in `main`.
+2. **ci**: [`ci.yml`](../.github/workflows/ci.yml) for the tagged commit, the
    same checks every pull request gets. Lint and tests, then the `image` job
    builds the image and rehearses a deploy with it: it starts the prod compose
    stack with placeholder settings ([`.github/ci.env`](../.github/ci.env)),
    runs the migrations, fails if the models need a migration that doesn't
    exist, waits for the app to report healthy (which reaches Postgres and
-   Redis), calls `/healthz` through Caddy and checks the crontab.
-2. **publish**: checks that the tag is `vX.Y.Z` on a commit in `main`, then
-   pushes `ghcr.io/mekanbaymyradov/ai-hub:<tag>`.
+   Redis), calls `/healthz` through Caddy and checks the crontab. Only on a
+   release does it then push that same image as
+   `ghcr.io/mekanbaymyradov/ai-hub:<tag>`, so production runs the exact image
+   that passed. Pull requests and `main` push nothing.
 3. **deploy**: uploads [`deploy/`](../deploy) to `/opt/ai-hub/incoming/` and
-   runs migrations with the new image. Only when they pass does it copy the
-   files into place, restart the app and scheduler on the new image, reload
-   Caddy and, if its config changed, restart the collector. A failed migration
-   leaves the live files untouched.
+   runs [`deploy.sh`](../deploy/deploy.sh) from there. It runs migrations with
+   the new image, and only when they pass copies the files into place,
+   restarts the app and scheduler on the new image, reloads Caddy and, if its
+   config changed, restarts the collector. A failed migration leaves the live
+   files untouched.
 
-`/opt/ai-hub` mirrors [`deploy/`](../deploy): the compose file, `Caddyfile` and
-`otel-collector.yaml`, plus `.env` and `incoming/`, the last release's upload.
+`/opt/ai-hub` holds the compose file, `Caddyfile` and `otel-collector.yaml`
+from [`deploy/`](../deploy), plus `.env` and `incoming/`, the last release's
+upload, where `deploy.sh` runs from.
 
 ## Before you start
 
@@ -189,6 +193,7 @@ Run these in `/opt/ai-hub`:
 | Logs | `docker compose logs -f app` |
 | Run a job by hand | `docker compose exec scheduler python -m src.chat.schedule` |
 | Database shell | `docker compose exec postgres psql -U <POSTGRES_USER> <POSTGRES_DB>` |
+| Resume a deploy, e.g. after the job lost its connection | `bash incoming/deploy.sh <tag>` |
 | Update Caddy, Postgres and Redis | `docker compose pull caddy postgres redis && docker compose up -d` |
 
 The Postgres image is pinned to major version 18. Moving to a new major
