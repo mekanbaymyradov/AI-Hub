@@ -15,7 +15,7 @@ dependencies = [
     "pydantic-ai[groq]>=2.33.0",
     "pydantic-settings>=2.15.0",
     "pydantic[email]>=2.13.4",
-    "pyjwt>=2.9",
+    "pyjwt>=2.15.0",
     "redis>=5.2",
     "sqlalchemy[asyncio]>=2.0",
 ]
