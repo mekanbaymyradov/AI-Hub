@@ -13,11 +13,14 @@ Pushing a `vX.Y.Z` tag runs [`release.yml`](../.github/workflows/release.yml):
 1. **ci**: lint and tests from [`ci.yml`](../.github/workflows/ci.yml), for the tagged commit.
 2. **publish**: checks that the tag is `vX.Y.Z` on a commit in `main`, then
    pushes `ghcr.io/mekanbaymyradov/ai-hub:<tag>`.
-3. **deploy**: copies [`docker-compose.prod.yaml`](../docker-compose.prod.yaml)
-   to the server, runs migrations with the new image, then restarts the app
-   and scheduler on it.
+3. **deploy**: uploads [`deploy/`](../deploy) to `/opt/ai-hub/incoming/` and
+   runs migrations with the new image. Only when they pass does it copy the
+   files into place, restart the app and scheduler on the new image, reload
+   Caddy and, if its config changed, restart the collector. A failed migration
+   leaves the live files untouched.
 
-The server holds only `/opt/ai-hub/docker-compose.yaml` and `/opt/ai-hub/.env`.
+`/opt/ai-hub` mirrors [`deploy/`](../deploy): the compose file, `Caddyfile` and
+`otel-collector.yaml`, plus `.env` and `incoming/`, the last release's upload.
 
 ## Before you start
 
@@ -187,16 +190,14 @@ version needs a dump and restore, not just a tag change.
 
 ### Change the Caddy or collector config
 
-The Caddy and OpenTelemetry Collector configs live inside
-`docker-compose.prod.yaml`. Compose doesn't recreate a service when only its
-config changes, so after the release that changes one, run:
+Edit [`deploy/Caddyfile`](../deploy/Caddyfile) or
+[`deploy/otel-collector.yaml`](../deploy/otel-collector.yaml) and release. The
+deploy reloads Caddy gracefully, without dropping connections, and restarts the
+collector when its file changed. CI validates both files on every pull request.
 
-```bash
-docker compose up -d --force-recreate caddy   # or otel-collector
-```
-
-Recreating Caddy drops open connections for a moment, which is why deploys
-don't do it every time.
+Running the prod compose file on your laptop needs `-p <other-name>`: it is
+named `ai-hub`, like the dev stack, and would otherwise act on the dev
+containers, network and volumes.
 
 ## Known gaps
 

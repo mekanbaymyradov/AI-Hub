@@ -70,9 +70,12 @@ jobs:
           printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
           # Pinned host key, so the job refuses to talk to an impostor.
           printf '%s\n' "$SSH_KNOWN_HOSTS" > ~/.ssh/known_hosts
-      - name: Copy the compose file
-        run: scp docker-compose.prod.yaml "$TARGET:/opt/ai-hub/docker-compose.yaml"
-      - name: Migrate and restart
+      - name: Upload the deploy files
+        # To a staging directory, so a failed migration leaves the live files alone.
+        run: |
+          ssh "$TARGET" 'rm -rf /opt/ai-hub/incoming && mkdir /opt/ai-hub/incoming'
+          scp deploy/* "$TARGET:/opt/ai-hub/incoming/"
+      - name: Migrate and switch
         run: |
           # shellcheck disable=SC2029  # TAG expands here on purpose; publish allows only vX.Y.Z
           ssh "$TARGET" "TAG=$TAG bash -s" <<'EOF'
@@ -83,11 +86,24 @@ jobs:
           # Overrides .env until the migration succeeds, so a failed one leaves
           # .env naming the version that is still running.
           export IMAGE_TAG="$TAG"
-          docker compose pull app scheduler
+          # The new compose file, with relative paths like .env still resolving here.
+          incoming=(--project-directory . -f incoming/docker-compose.yaml)
+          docker compose "${incoming[@]}" pull app scheduler
           # </dev/null: otherwise `run` reads the rest of this script from stdin.
-          docker compose run --rm app alembic upgrade head </dev/null
+          docker compose "${incoming[@]}" run --rm app alembic upgrade head </dev/null
+
+          collector_changed=false
+          cmp -s incoming/otel-collector.yaml otel-collector.yaml || collector_changed=true
+          # cp, not mv: containers mount these files, and after a mv they'd keep
+          # reading the old ones.
+          cp incoming/* .
           sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$TAG/" .env
 
           docker compose up -d --wait --wait-timeout 120 --remove-orphans
+          # Graceful, and a no-op when the Caddyfile hasn't changed.
+          docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile </dev/null
+          if [ "$collector_changed" = true ]; then
+            docker compose restart otel-collector
+          fi
           docker image prune -af
           EOF
