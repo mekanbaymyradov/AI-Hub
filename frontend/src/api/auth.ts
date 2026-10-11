@@ -33,9 +33,9 @@ export const authApi = {
     return response.data;
   },
 
-  setAvatar: async (file: File): Promise<UserPublic> => {
+  setAvatar: async (file: File | Blob): Promise<UserPublic> => {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', file, 'avatar.webp');
 
     const response = await apiClient.put<UserPublic>('/auth/me/avatar', formData, {
       headers: {
