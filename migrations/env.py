@@ -56,6 +56,10 @@ def run_migrations_online() -> None:
     """
 
     def process_revision_directives(context, revision, directives):
+        # Only for `revision --autogenerate`: `alembic check` expects the
+        # directive to stay, and crashes on an empty list.
+        if not getattr(config.cmd_opts, "autogenerate", False):
+            return
         script = directives[0]
         if script.upgrade_ops.is_empty():
             directives[:] = []

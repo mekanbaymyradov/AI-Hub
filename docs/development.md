@@ -52,6 +52,9 @@ uv run alembic upgrade head
 
 # create, after changing models
 uv run alembic revision --autogenerate -m "add something"
+
+# check that the models and migrations agree; CI fails otherwise
+uv run alembic check
 ```
 
 Read each generated revision before applying it, because autogenerate misses
@@ -84,8 +87,10 @@ uv run pytest
 
 ## Checks
 
-CI ([`ci.yml`](../.github/workflows/ci.yml)) runs these on every push to `main`.
-Run them locally before you push:
+CI ([`ci.yml`](../.github/workflows/ci.yml)) runs these on every pull request
+and push to `main`. Then its `image` job builds the Docker image and rehearses a
+deploy with it, see [How a release works](deployment.md#how-a-release-works).
+Run the checks locally before you push:
 
 ```bash
 uv run ruff check
