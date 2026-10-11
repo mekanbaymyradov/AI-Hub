@@ -10,14 +10,18 @@ on:
 permissions:
   contents: read
 
+# A new push to a PR cancels its stale run; runs on main and tags always finish.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10.2.0
-        with:
-          python-version: "3.14"  # match the Dockerfile; requires-python >=3.14 would let uv pick 3.15
+      - uses: astral-sh/setup-uv@v10.2.0  # Python comes from .python-version
       - run: uv sync --locked
       - run: uv run ruff check
       - run: uv run ruff format --check
@@ -25,6 +29,7 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     services:
       postgres:
         image: postgres:18-alpine
@@ -49,25 +54,40 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
-        with:
-          python-version: "3.14"
       - run: uv sync --locked
       - run: uv run pytest
 
-  deploy-config:
+  # Rehearses the deploy: the prod compose stack, run with the image built here.
+  image:
+    needs: [lint, test]
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     defaults:
       run:
         working-directory: deploy
-    # Placeholders for the variables the compose file requires.
-    env:
-      IMAGE_TAG: ci
-      API_DOMAIN: example.com
-      REDIS_PASSWORD: ci
     steps:
       - uses: actions/checkout@v7
-      - run: touch .env  # app and scheduler load it, and Compose fails without it
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: ghcr.io/${{ github.repository_owner }}/ai-hub:ci
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: cp ../.github/ci.env .env
       - run: docker compose config --quiet
-      # Through Compose, so the checks use the images the server runs.
       - run: docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - run: docker compose run --rm --no-deps otel-collector validate --config=/etc/otelcol-contrib/config.yaml
+      - run: docker compose run --rm app alembic upgrade head
+      # Fails when the models changed without a migration.
+      - run: docker compose run --rm app alembic check
+      - run: docker compose up -d --wait --wait-timeout 120 app caddy
+      # Through Caddy, which may still be issuing its local certificate.
+      - run: curl -skf --retry 10 --retry-all-errors --retry-delay 1 https://localhost/healthz
+      - run: docker compose run --rm --no-deps scheduler supercronic -test /app/crontab
+      - if: failure()
+        run: docker compose logs

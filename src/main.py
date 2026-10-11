@@ -8,10 +8,12 @@ from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from mypy_boto3_s3 import S3Client
 from redis.asyncio import Redis
+from sqlalchemy import text
 
 from src.auth.router import auth_router
 from src.chat.router import chat_router
 from src.config import settings
+from src.database import DbSession
 from src.error_handlers import register_error_handlers
 from src.exceptions import RateLimitExceeded, error_responses
 from src.llm.config import llm_settings
@@ -19,7 +21,7 @@ from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
 from src.observability import request_attributes_mapper, setup_observability
 from src.rate_limit import global_rate_limit
-from src.redis import create_redis_client
+from src.redis import RedisDep, create_redis_client
 from src.storage import create_storage_client
 
 setup_observability()
@@ -78,7 +80,11 @@ register_error_handlers(app)
 
 
 @app.get("/healthz", include_in_schema=False)
-async def healthz() -> dict:
+async def healthz(db: DbSession, redis: RedisDep) -> dict:
+    # Touches Postgres and Redis, so the deploy's health wait fails when the app
+    # can't serve real requests, not only when the process is down.
+    await db.execute(text("SELECT 1"))
+    await redis.ping()
     return {"status": "ok"}
 
 

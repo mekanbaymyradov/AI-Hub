@@ -10,7 +10,13 @@ your domain throughout.
 
 Pushing a `vX.Y.Z` tag runs [`release.yml`](../.github/workflows/release.yml):
 
-1. **ci**: lint and tests from [`ci.yml`](../.github/workflows/ci.yml), for the tagged commit.
+1. **ci**: [`ci.yml`](../.github/workflows/ci.yml) for the tagged commit, the
+   same checks every pull request gets. Lint and tests, then the `image` job
+   builds the image and rehearses a deploy with it: it starts the prod compose
+   stack with placeholder settings ([`.github/ci.env`](../.github/ci.env)),
+   runs the migrations, fails if the models need a migration that doesn't
+   exist, waits for the app to report healthy (which reaches Postgres and
+   Redis), calls `/healthz` through Caddy and checks the crontab.
 2. **publish**: checks that the tag is `vX.Y.Z` on a commit in `main`, then
    pushes `ghcr.io/mekanbaymyradov/ai-hub:<tag>`.
 3. **deploy**: uploads [`deploy/`](../deploy) to `/opt/ai-hub/incoming/` and
