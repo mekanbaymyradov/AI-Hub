@@ -194,10 +194,14 @@ Run these in `/opt/ai-hub`:
 | Run a job by hand | `docker compose exec scheduler python -m src.chat.schedule` |
 | Database shell | `docker compose exec postgres psql -U <POSTGRES_USER> <POSTGRES_DB>` |
 | Resume a deploy, e.g. after the job lost its connection | `bash incoming/deploy.sh <tag>` |
-| Update Caddy, Postgres and Redis | `docker compose pull caddy postgres redis && docker compose up -d` |
 
-The Postgres image is pinned to major version 18. Moving to a new major
-version needs a dump and restore, not just a tag change.
+Every image, action and Python package is pinned to an exact version, so
+nothing changes on the server between releases. Dependabot
+([`.github/dependabot.yml`](../.github/dependabot.yml)) opens weekly pull
+requests to bump them; merge one once CI passes, and the next release ships it.
+
+Dependabot never proposes a new Postgres major version, because moving to one
+needs a dump and restore, not just a tag change.
 
 ### Change the Caddy or collector config
 
