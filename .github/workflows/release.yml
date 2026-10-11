@@ -2,21 +2,15 @@ name: Release
 
 on:
   push:
-    tags: ["v*.*.*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
 
 permissions:
   contents: read
 
 jobs:
-  ci:
-    uses: ./.github/workflows/ci.yml
-
-  publish:
-    needs: ci
+  check-tag:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v7
         with:
@@ -32,25 +26,21 @@ jobs:
             echo "::error::Tag $GITHUB_REF_NAME points to a commit that is not on main"
             exit 1
           fi
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v7
-        with:
-          context: .
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/ai-hub:${{ github.ref_name }}
-          # Links the package to this repo on GitHub.
-          labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+
+  ci:
+    needs: check-tag
+    uses: ./.github/workflows/ci.yml
+    with:
+      tag: ${{ github.ref_name }}  # its image job pushes the image it tested
+    # A called workflow gets no more than its caller grants.
+    permissions:
+      contents: read
+      packages: write
 
   deploy:
-    needs: publish
+    needs: ci
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment: production
     concurrency:
       group: production
@@ -75,35 +65,7 @@ jobs:
         run: |
           ssh "$TARGET" 'rm -rf /opt/ai-hub/incoming && mkdir /opt/ai-hub/incoming'
           scp deploy/* "$TARGET:/opt/ai-hub/incoming/"
-      - name: Migrate and switch
+      - name: Deploy
         run: |
-          # shellcheck disable=SC2029  # TAG expands here on purpose; publish allows only vX.Y.Z
-          ssh "$TARGET" "TAG=$TAG bash -s" <<'EOF'
-          set -euo pipefail
-          cd /opt/ai-hub
-          grep -q '^IMAGE_TAG=' .env || { echo "IMAGE_TAG= line missing from .env" >&2; exit 1; }
-
-          # Overrides .env until the migration succeeds, so a failed one leaves
-          # .env naming the version that is still running.
-          export IMAGE_TAG="$TAG"
-          # The new compose file, with relative paths like .env still resolving here.
-          incoming=(--project-directory . -f incoming/docker-compose.yaml)
-          docker compose "${incoming[@]}" pull app scheduler
-          # </dev/null: otherwise `run` reads the rest of this script from stdin.
-          docker compose "${incoming[@]}" run --rm app alembic upgrade head </dev/null
-
-          collector_changed=false
-          cmp -s incoming/otel-collector.yaml otel-collector.yaml || collector_changed=true
-          # cp, not mv: containers mount these files, and after a mv they'd keep
-          # reading the old ones.
-          cp incoming/* .
-          sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=$TAG/" .env
-
-          docker compose up -d --wait --wait-timeout 120 --remove-orphans
-          # Graceful, and a no-op when the Caddyfile hasn't changed.
-          docker compose exec caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile </dev/null
-          if [ "$collector_changed" = true ]; then
-            docker compose restart otel-collector
-          fi
-          docker image prune -af
-          EOF
+          # shellcheck disable=SC2029  # TAG expands here on purpose; check-tag allows only vX.Y.Z
+          ssh "$TARGET" "bash /opt/ai-hub/incoming/deploy.sh $TAG"
