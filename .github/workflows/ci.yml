@@ -53,3 +53,21 @@ jobs:
           python-version: "3.14"
       - run: uv sync --locked
       - run: uv run pytest
+
+  deploy-config:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: deploy
+    # Placeholders for the variables the compose file requires.
+    env:
+      IMAGE_TAG: ci
+      API_DOMAIN: example.com
+      REDIS_PASSWORD: ci
+    steps:
+      - uses: actions/checkout@v7
+      - run: touch .env  # app and scheduler load it, and Compose fails without it
+      - run: docker compose config --quiet
+      # Through Compose, so the checks use the images the server runs.
+      - run: docker compose run --rm --no-deps caddy caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+      - run: docker compose run --rm --no-deps otel-collector validate --config=/etc/otelcol-contrib/config.yaml

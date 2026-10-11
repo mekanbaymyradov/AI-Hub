@@ -40,3 +40,4 @@
     .env
     .logfire
     frontend/
+    deploy/

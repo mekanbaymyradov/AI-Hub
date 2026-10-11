@@ -86,6 +86,8 @@ services:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
       - "0.0.0.0:443:443/udp"
+    environment:
+      API_DOMAIN: ${API_DOMAIN:?}  # the Caddyfile reads it as {$API_DOMAIN}
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
@@ -106,55 +108,12 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
 
 configs:
-  # Compose doesn't recreate a service when only its config here changes. See
-  # "Change the Caddy or collector config" in docs/deployment.md.
+  # Mounted live, so the release workflow applies a change by reloading Caddy
+  # and restarting the collector, without recreating either.
   caddyfile:
-    content: |
-      ${API_DOMAIN:?} {
-      	# Hold requests while a deploy restarts the app, instead of returning 502.
-      	reverse_proxy app:8000 {
-      		lb_try_duration 30s
-      	}
-      	# 5 attachments of 10 MiB, plus multipart overhead.
-      	request_body {
-      		max_size 60MB
-      	}
-      	header Strict-Transport-Security "max-age=31536000"
-      }
+    file: ./Caddyfile
   otel_collector:
-    content: |
-      receivers:
-        docker_stats:
-          collection_interval: 60s
-          container_labels_to_metric_labels:   # so the Compose projects tab can group containers
-            com.docker.compose.project: compose.project
-            com.docker.compose.service: compose.service
-          metrics:
-            container.uptime: {enabled: true}
-            container.restarts: {enabled: true}
-
-      processors:
-        resource_detection:
-          detectors: [docker]   # names the host from the Docker daemon
-        resource:
-          attributes:
-            # What Logfire reads as `environment`.
-            - {key: deployment.environment.name, value: production, action: upsert}
-
-      exporters:
-        otlp_http/logfire:
-          endpoint: https://logfire-eu.pydantic.dev
-          headers:
-            # Doubled dollar sign: Compose leaves the reference for the
-            # collector to expand, instead of failing to parse it.
-            Authorization: $${env:LOGFIRE_TOKEN}
-
-      service:
-        pipelines:
-          metrics:
-            receivers: [docker_stats]
-            processors: [resource_detection, resource]
-            exporters: [otlp_http/logfire]
+    file: ./otel-collector.yaml
 
 networks:
   default:

@@ -103,8 +103,9 @@ Logfire is the only logging API: code calls `logfire.info()`,
   compose file), plus the tracebacks uvicorn and failed jobs print themselves.
   A span that ends in an error never prints; look it up in Logfire.
 - **Containers:** in production, an OpenTelemetry Collector sends each
-  container's CPU, memory and restarts to Logfire (`otel-collector` in
-  `docker-compose.prod.yaml`). It doesn't run locally.
+  container's CPU, memory and restarts to Logfire
+  ([`deploy/otel-collector.yaml`](../deploy/otel-collector.yaml)). It doesn't
+  run locally.
 - **Privacy:** production traces carry no chat text, only model, tokens and
   timing. Request spans record the client's
   input locally, but in production only validation errors, without the rejected

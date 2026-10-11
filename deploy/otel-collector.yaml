@@ -1,0 +1,30 @@
+receivers:
+  docker_stats:
+    collection_interval: 60s
+    container_labels_to_metric_labels:   # so the Compose projects tab can group containers
+      com.docker.compose.project: compose.project
+      com.docker.compose.service: compose.service
+    metrics:
+      container.uptime: {enabled: true}
+      container.restarts: {enabled: true}
+
+processors:
+  resource_detection:
+    detectors: [docker]   # names the host from the Docker daemon
+  resource:
+    attributes:
+      # What Logfire reads as `environment`.
+      - {key: deployment.environment.name, value: production, action: upsert}
+
+exporters:
+  otlp_http/logfire:
+    endpoint: https://logfire-eu.pydantic.dev
+    headers:
+      Authorization: ${env:LOGFIRE_TOKEN}
+
+service:
+  pipelines:
+    metrics:
+      receivers: [docker_stats]
+      processors: [resource_detection, resource]
+      exporters: [otlp_http/logfire]
