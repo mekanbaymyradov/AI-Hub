@@ -10,12 +10,13 @@ your domain throughout.
 
 Pushing a `vX.Y.Z` tag runs [`release.yml`](../.github/workflows/release.yml):
 
-1. **check-tag**: checks that the tag is `vX.Y.Z` on a commit in `main`.
+1. **check-tag**: checks that the tagged commit is on `main`. The workflow only
+   runs for `vX.Y.Z` tags.
 2. **ci**: [`ci.yml`](../.github/workflows/ci.yml) for the tagged commit, the
    same checks every pull request gets. Lint and tests, then the `image` job
    builds the image and rehearses a deploy with it: it starts the prod compose
-   stack with placeholder settings ([`.github/ci.env`](../.github/ci.env)),
-   runs the migrations, fails if the models need a migration that doesn't
+   stack with placeholder settings the job writes to `.env`, runs the
+   migrations, fails if the models need a migration that doesn't
    exist, waits for the app to report healthy (which reaches Postgres and
    Redis), calls `/healthz` through Caddy and checks the crontab. Only on a
    release does it then push that same image as
@@ -24,9 +25,8 @@ Pushing a `vX.Y.Z` tag runs [`release.yml`](../.github/workflows/release.yml):
 3. **deploy**: uploads [`deploy/`](../deploy) to `/opt/ai-hub/incoming/` and
    runs [`deploy.sh`](../deploy/deploy.sh) from there. It runs migrations with
    the new image, and only when they pass copies the files into place,
-   restarts the app and scheduler on the new image, reloads Caddy and, if its
-   config changed, restarts the collector. A failed migration leaves the live
-   files untouched.
+   restarts the app and scheduler on the new image, reloads Caddy and restarts
+   the collector. A failed migration leaves the live files untouched.
 
 `/opt/ai-hub` holds the compose file, `Caddyfile` and `otel-collector.yaml`
 from [`deploy/`](../deploy), plus `.env` and `incoming/`, the last release's
@@ -208,7 +208,8 @@ needs a dump and restore, not just a tag change.
 Edit [`deploy/Caddyfile`](../deploy/Caddyfile) or
 [`deploy/otel-collector.yaml`](../deploy/otel-collector.yaml) and release. The
 deploy reloads Caddy gracefully, without dropping connections, and restarts the
-collector when its file changed. CI validates both files on every pull request.
+collector. On every pull request, CI validates the collector config and serves
+a request through Caddy.
 
 Running the prod compose file on your laptop needs `-p <other-name>`: it is
 named `ai-hub`, like the dev stack, and would otherwise act on the dev
