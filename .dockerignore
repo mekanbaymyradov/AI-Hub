@@ -1,43 +1,11 @@
-    __pycache__
-    .git
-    .dockerignore
-    .gitignore
+# Only what the image needs. Everything else stays out, since the image is
+# public; CI's image job fails if something needed is missing.
+*
+!src/
+!migrations/
+!alembic.ini
+!crontab
+!pyproject.toml
+!uv.lock
 
-    .cache/
-    .coverage
-    .storybook-out/
-    .DS_Store
-    .venv
-    *.egg-info
-    *.pyc
-    *.log
-    *.egg
-    *.db
-    *.pid
-    *.md
-    MANIFEST
-    test.conf
-    pip-log.txt
-    package.json
-    /.artifacts
-    /coverage/
-    /cover
-    /build
-    /env
-    /tmp
-    node_modules
-    /wheelhouse
-    /test_cli/
-    .idea/
-    *.iml
-    .pytest_cache/
-    .vscode/tags
-    coverage.xml
-    junit.xml
-    *.codestyle.xml
-    package-lock.json
-
-    .env
-    .logfire
-    frontend/
-    deploy/
+**/__pycache__

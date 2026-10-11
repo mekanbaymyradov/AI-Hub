@@ -1,0 +1,50 @@
+version: 2
+
+# Weekly. Minor and patch updates come as one PR per ecosystem; each major
+# update gets its own PR, since that's where things break. The cooldown waits a
+# week after a release before proposing it, so a bad or hijacked release has
+# time to be caught; security updates skip the wait.
+updates:
+  - package-ecosystem: uv
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      python:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      dockerfile:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker-compose
+    directory: /deploy
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    ignore:
+      # A new Postgres major version needs a dump and restore, not a tag bump.
+      - dependency-name: postgres
+        update-types: ["version-update:semver-major"]
+    groups:
+      compose:
+        update-types: [minor, patch]
