@@ -165,7 +165,10 @@ def llm_registry() -> LLMRegistry:
         ),
     ]
     return LLMRegistry(
-        models={s.id: TestModel(custom_output_text=REPLY) for s in specs},
+        # TestModel calls every tool unless told not to; tool tests opt in.
+        models={
+            s.id: TestModel(custom_output_text=REPLY, call_tools=[]) for s in specs
+        },
         specs={s.id: s for s in specs},
     )
 
@@ -175,7 +178,7 @@ def sent_codes(monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
     """Sign-in codes the app tried to email, keyed by address."""
     codes: dict[str, str] = {}
 
-    async def fake_send_otp_email(email, code, **kwargs):
+    async def fake_send_otp_email(_http, email, code, **kwargs):
         codes[email] = code
 
     monkeypatch.setattr(otp, "send_otp_email", fake_send_otp_email)

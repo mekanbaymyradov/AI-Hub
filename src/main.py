@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import TypedDict
 
+import httpx2
 import logfire
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +32,7 @@ class State(TypedDict):
     """Objects shared by every request for the app's lifetime."""
 
     registry: LLMRegistry
+    http: httpx2.AsyncClient
     redis: Redis
     storage: S3Client
 
@@ -42,9 +44,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
     redis = create_redis_client(str(settings.redis_uri))
     storage = create_storage_client()
     try:
-        async with llm_lifespan(llm_settings) as registry:
+        async with (
+            # One connection pool for every call to an outside API, like agent
+            # tools and email.
+            httpx2.AsyncClient(timeout=10) as http,
+            llm_lifespan(llm_settings) as registry,
+        ):
             # app runs here
-            yield {"registry": registry, "redis": redis, "storage": storage}
+            yield {
+                "registry": registry,
+                "http": http,
+                "redis": redis,
+                "storage": storage,
+            }
     finally:
         await redis.aclose()
         storage.close()
@@ -81,10 +93,9 @@ register_error_handlers(app)
 
 @app.get("/healthz", include_in_schema=False)
 async def healthz(db: DbSession, redis: RedisDep) -> dict:
-    # Touches Postgres and Redis, so the deploy's health wait fails when the app
-    # can't serve real requests, not only when the process is down.
-    await db.execute(text("SELECT 1"))
-    await redis.ping()
+    with logfire.suppress_instrumentation():
+        await db.execute(text("SELECT 1"))
+        await redis.ping()
     return {"status": "ok"}
 
 

@@ -1,16 +1,18 @@
 from dataclasses import dataclass
 
+import httpx2
 from pydantic import BaseModel, ConfigDict, computed_field
 
 from src.llm.enums import Provider
 
 
 @dataclass
-class UserContext:
-    """What the chat agent is told about the user it is talking to."""
+class AgentDeps:
+    """What the chat agent's instructions and tools get for one run."""
 
     name: str | None
     instructions: str | None
+    http: httpx2.AsyncClient
 
 
 class ModelSpec(BaseModel):

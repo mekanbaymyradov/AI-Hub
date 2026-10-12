@@ -35,6 +35,7 @@ from src.auth.models import (
 )
 from src.database import DbSession
 from src.exceptions import error_responses
+from src.http_client import HttpClientDep
 from src.rate_limit import ip_rate_limit
 from src.redis import RedisDep
 from src.storage import StorageDep
@@ -53,10 +54,11 @@ async def request_otp(
     payload: OTPRequest,
     db: DbSession,
     redis: RedisDep,
+    http: HttpClientDep,
     background_tasks: BackgroundTasks,
 ) -> None:
     code, user = await flows.request_otp(db, redis, email=payload.email)
-    background_tasks.add_task(flows.deliver_otp, payload.email, code, user=user)
+    background_tasks.add_task(flows.deliver_otp, http, payload.email, code, user=user)
 
 
 @auth_router.post(
