@@ -44,8 +44,7 @@ To run the frontend too, on http://localhost:5173, add its profile:
 docker compose -f docker-compose.dev.yaml --profile frontend up --watch
 ```
 
-See the [frontend guide](frontend.md#run-the-frontend) for running it without
-Docker.
+See [frontend/README.md](../frontend/README.md) for running it without Docker.
 
 ## Migrations
 
@@ -98,8 +97,7 @@ uv run pytest
 
 CI ([`ci.yml`](../.github/workflows/ci.yml)) runs these on every pull request
 and push to `main`. Then its `image` job builds the Docker image and rehearses a
-deploy with it, see [How a release works](deployment.md#how-a-release-works).
-Run the checks locally before you push:
+deploy with it. Run the checks locally before you push:
 
 ```bash
 uv run ruff check
