@@ -1,5 +1,3 @@
-import { BrainCircuit } from 'lucide-react';
-
 export default function Footer() {
   return (
     <footer className="bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 transition-colors duration-200">
@@ -7,7 +5,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="col-span-1 md:col-span-1">
             <div className="flex items-center gap-2 mb-4">
-              <BrainCircuit className="h-6 w-6 text-blue-600 dark:text-blue-500" />
+              <img src="/favicon.svg" alt="AI-Hub" className="h-6 w-6 object-contain shrink-0" />
               <span className="text-lg font-bold tracking-tight text-zinc-900 dark:text-white">
                 AI<span className="text-blue-600 dark:text-blue-500">Hub</span>
               </span>

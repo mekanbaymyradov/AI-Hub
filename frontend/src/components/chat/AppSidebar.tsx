@@ -397,7 +397,7 @@ export function AppSidebar({
                   className="cursor-pointer flex items-center justify-between px-2.5 py-2 text-xs text-zinc-700 dark:text-zinc-200 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 focus:bg-zinc-100 dark:focus:bg-white/10 rounded-lg transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    {theme === "dark" ? <Sun className="h-3.5 w-3.5 text-amber-500" /> : <Moon className="h-3.5 w-3.5 text-blue-600" />}
+                    {theme === "dark" ? <Sun className="h-3.5 w-3.5 text-current" /> : <Moon className="h-3.5 w-3.5 text-current" />}
                     <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
                   </div>
                   <span className="text-[10px] text-zinc-400 uppercase font-mono">{theme}</span>
