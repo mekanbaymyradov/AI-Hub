@@ -1,15 +1,19 @@
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.groq import GroqModelSettings
 
-from src.llm.models import UserContext
+from src.llm.models import AgentDeps
+from src.llm.tools import toolset, web_search
 
 agent = Agent(
-    deps_type=UserContext, instructions="You are helpful assistant. Be concise."
+    deps_type=AgentDeps,
+    toolsets=[toolset],
+    capabilities=[web_search],
+    instructions="You are helpful assistant. Be concise.",
 )
 
 
 @agent.instructions
-def user_profile(ctx: RunContext[UserContext]) -> str | None:
+def user_profile(ctx: RunContext[AgentDeps]) -> str | None:
     """Facts about the user; the run skips it when there are none."""
     if ctx.deps.name:
         return f"The user's name is {ctx.deps.name}."
@@ -17,7 +21,7 @@ def user_profile(ctx: RunContext[UserContext]) -> str | None:
 
 
 @agent.instructions
-def custom_instructions(ctx: RunContext[UserContext]) -> str | None:
+def custom_instructions(ctx: RunContext[AgentDeps]) -> str | None:
     """How the user asked to be answered, from their profile settings."""
     if ctx.deps.instructions:
         return (

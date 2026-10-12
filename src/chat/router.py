@@ -26,6 +26,7 @@ from src.chat.models import (
 )
 from src.database import DbSession
 from src.exceptions import error_responses
+from src.http_client import HttpClientDep
 from src.llm.dependencies import LLMRegistryDep
 from src.llm.exceptions import ModelNotFound
 from src.pagination import Page, PageParamsDep
@@ -119,6 +120,10 @@ async def create_attachments(
         '1. `chat`: `{"id": <chat id>}`, sent first, for new and existing chats.\n'
         "2. Unnamed events whose data is a JSON string with the next piece of the "
         "reply. The stream ends when the reply is complete.\n"
+        '   Between them, `tool`: `{"name": <tool name>}` when the model starts '
+        "using a tool, such as `get_weather`, so the client can show it is "
+        "working. A web search is `web_search` on models with built-in search "
+        "and `duckduckgo_search` on the rest.\n"
         "3. `error`: an `ErrorResponse` body (`llm.model_error` or `internal_error`) "
         "if the reply fails after streaming starts. The status is already 200 by "
         "then.\n\n"
@@ -142,11 +147,13 @@ async def send_message(
     db: DbSession,
     storage: StorageDep,
     registry: LLMRegistryDep,
+    http: HttpClientDep,
 ) -> AsyncIterable[ServerSentEvent]:
     async for event in flows.send_message(
         db,
         storage,
         registry,
+        http,
         user=user,
         chat=chat,
         message=message,

@@ -1,6 +1,7 @@
 from typing import Any
 from uuid import uuid4
 
+import httpx2
 import logfire
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
@@ -26,11 +27,17 @@ async def request_otp(
     return code, user
 
 
-async def deliver_otp(email: str, code: str, *, user: User | None) -> None:
+async def deliver_otp(
+    http: httpx2.AsyncClient, email: str, code: str, *, user: User | None
+) -> None:
     """Email a sign-in code. Failures are only logged: the response has already gone."""
     try:
         await otp.send_otp_email(
-            email, code, name=user.name if user else None, is_new_user=user is None
+            http,
+            email,
+            code,
+            name=user.name if user else None,
+            is_new_user=user is None,
         )
     except Exception:
         logfire.exception("OTP delivery failed", user_id=user.id if user else None)

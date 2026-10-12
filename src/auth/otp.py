@@ -2,6 +2,7 @@ import hmac
 import secrets
 from hashlib import sha256
 
+import httpx2
 from redis.asyncio import Redis
 
 from src.auth.config import auth_settings
@@ -57,7 +58,12 @@ async def verify_otp(redis: Redis, *, email: str, code: str) -> None:
 
 
 async def send_otp_email(
-    email: str, code: str, *, name: str | None, is_new_user: bool
+    http: httpx2.AsyncClient,
+    email: str,
+    code: str,
+    *,
+    name: str | None,
+    is_new_user: bool,
 ) -> None:
     variables: dict[str, str | int] = {
         "CODE": code,
@@ -69,6 +75,7 @@ async def send_otp_email(
         variables["USER_NAME"] = name
 
     await send_email(
+        http,
         to=email,
         template=templates.OTP_WELCOME if is_new_user else templates.OTP_SIGNIN,
         variables=variables,
