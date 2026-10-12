@@ -2,21 +2,35 @@
 
 Production runs on one Hetzner server (Ubuntu LTS, x86) with Docker Compose.
 Caddy serves HTTPS in front of the API. The scheduler, Postgres and Redis run
-next to it, reachable only inside Docker's network. Replace `example.com` with
+next to it, reachable only inside Docker's network, along with an OpenTelemetry
+Collector that sends container metrics to Logfire. Replace `example.com` with
 your domain throughout.
 
 ## How a release works
 
 Pushing a `vX.Y.Z` tag runs [`release.yml`](../.github/workflows/release.yml):
 
-1. **ci**: lint and tests from [`ci.yml`](../.github/workflows/ci.yml), for the tagged commit.
-2. **publish**: checks that the tag is `vX.Y.Z` on a commit in `main`, then
-   pushes `ghcr.io/mekanbaymyradov/ai-hub:<tag>`.
-3. **deploy**: copies [`docker-compose.prod.yaml`](../docker-compose.prod.yaml)
-   to the server, runs migrations with the new image, then restarts the app
-   and scheduler on it.
+1. **check-tag**: checks that the tagged commit is on `main`. The workflow only
+   runs for `vX.Y.Z` tags.
+2. **ci**: [`ci.yml`](../.github/workflows/ci.yml) for the tagged commit, the
+   same checks every pull request gets. Lint and tests, then the `image` job
+   builds the image and rehearses a deploy with it: it starts the prod compose
+   stack with placeholder settings the job writes to `.env`, runs the
+   migrations, fails if the models need a migration that doesn't
+   exist, waits for the app to report healthy (which reaches Postgres and
+   Redis), calls `/healthz` through Caddy and checks the crontab. Only on a
+   release does it then push that same image as
+   `ghcr.io/mekanbaymyradov/ai-hub:<tag>`, so production runs the exact image
+   that passed. Pull requests and `main` push nothing.
+3. **deploy**: uploads [`deploy/`](../deploy) to `/opt/ai-hub/incoming/` and
+   runs [`deploy.sh`](../deploy/deploy.sh) from there. It runs migrations with
+   the new image, and only when they pass copies the files into place,
+   restarts the app and scheduler on the new image, reloads Caddy and restarts
+   the collector. A failed migration leaves the live files untouched.
 
-The server holds only `/opt/ai-hub/docker-compose.yaml` and `/opt/ai-hub/.env`.
+`/opt/ai-hub` holds the compose file, `Caddyfile` and `otel-collector.yaml`
+from [`deploy/`](../deploy), plus `.env` and `incoming/`, the last release's
+upload, where `deploy.sh` runs from.
 
 ## Before you start
 
@@ -179,23 +193,27 @@ Run these in `/opt/ai-hub`:
 | Logs | `docker compose logs -f app` |
 | Run a job by hand | `docker compose exec scheduler python -m src.chat.schedule` |
 | Database shell | `docker compose exec postgres psql -U <POSTGRES_USER> <POSTGRES_DB>` |
-| Update Caddy, Postgres and Redis | `docker compose pull caddy postgres redis && docker compose up -d` |
+| Resume a deploy, e.g. after the job lost its connection | `bash incoming/deploy.sh <tag>` |
 
-The Postgres image is pinned to major version 18. Moving to a new major
-version needs a dump and restore, not just a tag change.
+Every image, action and Python package is pinned to an exact version, so
+nothing changes on the server between releases. Dependabot
+([`.github/dependabot.yml`](../.github/dependabot.yml)) opens weekly pull
+requests to bump them; merge one once CI passes, and the next release ships it.
 
-### Change the Caddy config
+Dependabot never proposes a new Postgres major version, because moving to one
+needs a dump and restore, not just a tag change.
 
-The Caddy config lives inside `docker-compose.prod.yaml`. Compose doesn't
-recreate Caddy when only that config changes, so after the release that
-changes it, run:
+### Change the Caddy or collector config
 
-```bash
-docker compose up -d --force-recreate caddy
-```
+Edit [`deploy/Caddyfile`](../deploy/Caddyfile) or
+[`deploy/otel-collector.yaml`](../deploy/otel-collector.yaml) and release. The
+deploy reloads Caddy gracefully, without dropping connections, and restarts the
+collector. On every pull request, CI validates the collector config and serves
+a request through Caddy.
 
-This drops open connections for a moment, which is why deploys don't do it
-every time.
+Running the prod compose file on your laptop needs `-p <other-name>`: it is
+named `ai-hub`, like the dev stack, and would otherwise act on the dev
+containers, network and volumes.
 
 ## Known gaps
 

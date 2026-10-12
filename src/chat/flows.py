@@ -3,6 +3,7 @@ from collections.abc import AsyncIterator, Sequence
 from typing import cast
 from uuid import uuid4
 
+import logfire
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.sse import ServerSentEvent
@@ -45,11 +46,8 @@ from src.llm.constants import TITLE_MODEL_ID
 from src.llm.exceptions import ModelError
 from src.llm.models import UserContext
 from src.llm.registry import LLMRegistry
-from src.logging import get_logger
 from src.pagination import Page, PageParams
 from src.storage import presigned_url
-
-logger = get_logger(__name__)
 
 
 async def _add_prompt(
@@ -75,8 +73,8 @@ async def _add_prompt(
             message_id=message.id,
         )
         if claimed != len(attachments):
-            logger.warning(
-                "Attachments were claimed by another message",
+            logfire.warn(
+                "Attachments already claimed",
                 chat_id=chat.id,
                 expected=len(attachments),
                 claimed=claimed,
@@ -117,7 +115,7 @@ async def generate_chat_name(registry: LLMRegistry, *, prompt: str) -> str | Non
     try:
         result = await title_agent.run(prompt, model=registry.model(spec))
     except Exception:
-        logger.exception("chat_name_failed")
+        logfire.exception("Chat naming failed")
         return None
 
     name = result.output
@@ -154,12 +152,12 @@ async def delete_attachment_objects(storage: S3Client, *, keys: Sequence[str]) -
             Delete={"Objects": [{"Key": key} for key in keys]},
         )
     except Exception:
-        logger.exception("attachments_delete_failed", count=len(keys))
+        logfire.exception("Attachment delete failed", count=len(keys))
         return
 
     # Individual keys fail in the response body, not as an exception.
     if errors := result.get("Errors"):
-        logger.error("attachments_delete_partial", errors=errors)
+        logfire.error("Attachment delete partly failed", errors=errors)
 
 
 async def list_chats(
@@ -415,7 +413,7 @@ async def send_message(
 
     except Exception as exc:
         error = ModelError() if isinstance(exc, AgentRunError) else AppError()
-        logger.exception("reply_failed", model_id=message.model_id)
+        logfire.exception("Reply failed", model_id=message.model_id)
         yield ServerSentEvent(data={"detail": [error.serialize()]}, event="error")
     finally:
         if name_task is not None:

@@ -1,7 +1,18 @@
-# Stage 1: Builder
-FROM python:3.14-slim AS builder
+# supercronic, checked against its release checksum. One stage per CPU
+# architecture, because each binary has its own checksum; only the one matching
+# the build runs. To upgrade, change the version and checksum in both.
+FROM scratch AS supercronic-amd64
+ADD --checksum=sha256:a53ae236602c7338aba3fbaff40bda6300eae3b9fedb8261eb06cfe3724430c1 \
+    https://github.com/aptible/supercronic/releases/download/v0.2.49/supercronic-linux-amd64 /supercronic
 
-ENV PYTHONUNBUFFERED=1
+FROM scratch AS supercronic-arm64
+ADD --checksum=sha256:02aa0cb229ba09050cba6638059dadb9eedc2276632ea43d6a57a2f8c1629dd5 \
+    https://github.com/aptible/supercronic/releases/download/v0.2.49/supercronic-linux-arm64 /supercronic
+
+FROM supercronic-${TARGETARCH} AS supercronic
+
+# Stage 1: Builder
+FROM python:3.14.8-slim AS builder
 
 # Install uv
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
@@ -29,12 +40,9 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
 # Stage 2: Runner
-FROM python:3.14-slim
+FROM python:3.14.8-slim
 
-# Install supercronic
-ARG TARGETARCH
-ARG SUPERCRONIC_VERSION=v0.2.49
-ADD --chmod=755 https://github.com/aptible/supercronic/releases/download/${SUPERCRONIC_VERSION}/supercronic-linux-${TARGETARCH} /usr/local/bin/supercronic
+COPY --from=supercronic --chmod=755 /supercronic /usr/local/bin/supercronic
 
 # Create non root user
 RUN groupadd -g 10001 appgroup && \
@@ -43,11 +51,14 @@ RUN groupadd -g 10001 appgroup && \
 WORKDIR /app
 
 # Copy the application code and .venv from the builder
-COPY --from=builder --chown=appuser:appgroup /app/.venv /app/.venv
 COPY --from=builder --chown=appuser:appgroup /app /app
 
 # Set the virtual environment at the front of the PATH
 ENV PATH="/app/.venv/bin:$PATH"
+
+# Write output straight to docker logs, so console lines arrive on time and a
+# killed process doesn't lose what it buffered
+ENV PYTHONUNBUFFERED=1
 
 # Trust proxy headers only from this address; override at deploy with the
 # real load balancer address

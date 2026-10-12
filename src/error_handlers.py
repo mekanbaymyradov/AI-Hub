@@ -5,9 +5,6 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.exceptions import AppError
-from src.logging import get_logger
-
-logger = get_logger(__name__)
 
 
 async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
@@ -33,8 +30,10 @@ async def handle_http_exception(
 
 
 async def handle_unexpected_error(request: Request, exc: Exception) -> JSONResponse:
-    """Log an uncaught exception and hide it behind a generic 500."""
-    logger.exception("unhandled_error")
+    """Hide an uncaught exception behind a generic 500.
+
+    Starlette re-raises the exception after this runs, so the request span records it.
+    """
     return await handle_app_error(request, AppError())
 
 

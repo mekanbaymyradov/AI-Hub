@@ -21,6 +21,10 @@ Everything else has a working default.
 | `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL` | Cloudflare R2 or any S3-compatible store, with two buckets: `S3_PUBLIC_BUCKET` for avatars, served over `S3_PUBLIC_BASE_URL`, and `S3_PRIVATE_BUCKET` for attachments, with public access off |
 | At least one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GROQ_API_KEY` | Providers without a key are left out of the model list |
 
+Optional: set `LOGFIRE_TOKEN` to a write token from your Logfire project. The
+`app` and `scheduler` containers then send traces tagged `environment=local`,
+with full LLM prompts and replies. Without it, they only print to the console.
+
 ## Run
 
 ```bash
@@ -48,6 +52,9 @@ uv run alembic upgrade head
 
 # create, after changing models
 uv run alembic revision --autogenerate -m "add something"
+
+# check that the models and migrations agree; CI fails otherwise
+uv run alembic check
 ```
 
 Read each generated revision before applying it, because autogenerate misses
@@ -59,7 +66,8 @@ The `scheduler` service runs [`crontab`](../crontab) with supercronic. Times are
 in UTC. To add a job:
 
 1. Create `src/<domain>/schedule.py`.
-2. Add a line for it to `crontab`.
+2. Add a line for it to `crontab`. For the schedule syntax, see
+   [supercronic's cron expressions](https://github.com/aptible/supercronic/tree/master/cronexpr).
 
 To run a job by hand:
 
@@ -79,8 +87,10 @@ uv run pytest
 
 ## Checks
 
-CI ([`ci.yml`](../.github/workflows/ci.yml)) runs these on every push to `main`.
-Run them locally before you push:
+CI ([`ci.yml`](../.github/workflows/ci.yml)) runs these on every pull request
+and push to `main`. Then its `image` job builds the Docker image and rehearses a
+deploy with it, see [How a release works](deployment.md#how-a-release-works).
+Run the checks locally before you push:
 
 ```bash
 uv run ruff check

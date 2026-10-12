@@ -1,0 +1,11 @@
+{$API_DOMAIN} {
+	# Hold requests while a deploy restarts the app, instead of returning 502.
+	reverse_proxy app:8000 {
+		lb_try_duration 30s
+	}
+	# 5 attachments of 10 MiB, plus multipart overhead.
+	request_body {
+		max_size 60MB
+	}
+	header Strict-Transport-Security "max-age=31536000"
+}

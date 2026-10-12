@@ -49,8 +49,14 @@ auth_router = APIRouter(prefix="/auth", tags=["Auth"])
     description="Always accepted, whether or not the address is registered.",
     dependencies=[Depends(ip_rate_limit(times=5, seconds=3600))],
 )
-async def request_otp(payload: OTPRequest, db: DbSession, redis: RedisDep) -> None:
-    await flows.request_otp(db, redis, email=payload.email)
+async def request_otp(
+    payload: OTPRequest,
+    db: DbSession,
+    redis: RedisDep,
+    background_tasks: BackgroundTasks,
+) -> None:
+    code, user = await flows.request_otp(db, redis, email=payload.email)
+    background_tasks.add_task(flows.deliver_otp, payload.email, code, user=user)
 
 
 @auth_router.post(

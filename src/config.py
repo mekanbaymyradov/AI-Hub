@@ -17,7 +17,6 @@ class AppBaseSettings(BaseSettings):
 class Settings(AppBaseSettings):
     project_title: str = "AI-Hub"
     app_version: str = "1.0"
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR"] = "INFO"
     environment: Literal["local", "production"] = "local"
     debug: bool = False
     # Browser origins allowed to call the API with cookies; a JSON list in env.
