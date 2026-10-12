@@ -1,11 +1,11 @@
 import { apiClient, getAccessToken } from './axiosInstance';
 import { 
-  PageChatPublic, 
-  ChatRename, 
-  ChatPublic, 
-  PageMessagePublic, 
-  AttachmentPublic,
-  MessageRequest
+  type PageChatPublic, 
+  type ChatRename, 
+  type ChatPublic, 
+  type PageMessagePublic, 
+  type AttachmentPublic,
+  type MessageRequest
 } from './types';
 
 export const chatApi = {
@@ -50,7 +50,8 @@ export const chatApi = {
       onChunk?: (chunk: string) => void;
       onError?: (error: string) => void;
       onComplete?: () => void;
-    }
+    },
+    signal?: AbortSignal
   ) => {
     try {
       const headers: Record<string, string> = {
@@ -64,19 +65,50 @@ export const chatApi = {
 
       const baseURL = apiClient.defaults.baseURL || 'http://localhost:8000';
 
-      const response = await fetch(`${baseURL}/chats/messages`, {
+      let response = await fetch(`${baseURL}/chats/messages`, {
         method: 'POST',
         headers,
         body: JSON.stringify(data),
+        signal,
       });
+
+      if (response.status === 401) {
+        try {
+          const axios = (await import('axios')).default;
+          const { data: tokenData } = await axios.post('/auth/token/refresh', {}, {
+            baseURL: apiClient.defaults.baseURL,
+            withCredentials: true
+          });
+          const newToken = tokenData.access_token;
+          const { setAccessToken } = await import('./axiosInstance');
+          setAccessToken(newToken);
+          
+          headers['Authorization'] = `Bearer ${newToken}`;
+          response = await fetch(`${baseURL}/chats/messages`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(data),
+            signal,
+          });
+        } catch (refreshErr) {
+          const { setAccessToken } = await import('./axiosInstance');
+          setAccessToken(null);
+          throw new Error('Authentication expired. Please log in again.');
+        }
+      }
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail?.[0]?.msg || 'Failed to start stream');
+        const msg =
+          errorData.detail?.[0]?.msg ||
+          (typeof errorData.detail === 'string' ? errorData.detail : null) ||
+          errorData.message ||
+          `Failed to send message (${response.status})`;
+        throw new Error(msg);
       }
 
       if (!response.body) {
-        throw new Error('No response body');
+        throw new Error('No response body received');
       }
 
       const reader = response.body.getReader();
@@ -84,55 +116,93 @@ export const chatApi = {
 
       let buffer = '';
 
+      const processBlock = (block: string) => {
+        const lines = block.split(/\r?\n/);
+        let eventType = 'message';
+        const dataLines: string[] = [];
+
+        for (const line of lines) {
+          if (!line || line.startsWith(':')) {
+            continue;
+          }
+          if (line.startsWith('event: ')) {
+            eventType = line.slice(7).trim();
+          } else if (line.startsWith('event:')) {
+            eventType = line.slice(6).trim();
+          } else if (line.startsWith('data: ')) {
+            dataLines.push(line.slice(6));
+          } else if (line.startsWith('data:')) {
+            dataLines.push(line.slice(5));
+          }
+        }
+
+        const dataStr = dataLines.join('\n');
+
+        if (eventType === 'chat') {
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (typeof parsed?.id === 'number') {
+              callbacks.onChatId?.(parsed.id);
+            }
+          } catch (e) {
+            console.error('Failed to parse chat event data:', e);
+          }
+        } else if (eventType === 'error') {
+          let errorMsg = dataStr;
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (Array.isArray(parsed?.detail) && parsed.detail[0]?.msg) {
+              errorMsg = parsed.detail[0].msg;
+            } else if (typeof parsed?.detail === 'string') {
+              errorMsg = parsed.detail;
+            } else if (parsed?.message) {
+              errorMsg = parsed.message;
+            }
+          } catch {
+            // keep raw dataStr
+          }
+          callbacks.onError?.(errorMsg || 'An error occurred during response streaming');
+        } else {
+          // Unnamed event (text chunk)
+          let chunk = dataStr;
+          try {
+            const parsed = JSON.parse(dataStr);
+            if (typeof parsed === 'string') {
+              chunk = parsed;
+            }
+          } catch {
+            // chunk is raw dataStr
+          }
+          callbacks.onChunk?.(chunk);
+        }
+      };
+
       while (true) {
         const { value, done } = await reader.read();
         if (done) {
+          if (buffer.trim()) {
+            processBlock(buffer);
+          }
           callbacks.onComplete?.();
           break;
         }
 
         buffer += decoder.decode(value, { stream: true });
 
-        
-        const messages = buffer.split(/\r?\n\r?\n/);
-        buffer = messages.pop() || ''; 
+        const parts = buffer.split(/\r?\n\r?\n/);
+        buffer = parts.pop() || '';
 
-        for (const message of messages) {
-          if (!message.trim()) continue;
-
-          let eventType = 'message';
-          let dataStr = '';
-
-          const lines = message.split(/\r?\n/);
-          for (const line of lines) {
-            if (line.startsWith('event: ')) {
-              eventType = line.substring(7);
-            } else if (line.startsWith('data: ')) {
-              dataStr += line.substring(6);
-            }
-          }
-
-          if (eventType === 'chat') {
-            try {
-              const parsed = JSON.parse(dataStr);
-              callbacks.onChatId?.(parsed.id);
-            } catch (e) {
-              
-            }
-          } else if (eventType === 'error') {
-            callbacks.onError?.(dataStr);
-          } else {
-            
-            try {
-              const parsed = JSON.parse(dataStr);
-              callbacks.onChunk?.(parsed);
-            } catch (e) {
-              callbacks.onChunk?.(dataStr);
-            }
+        for (const part of parts) {
+          if (part.trim()) {
+            processBlock(part);
           }
         }
       }
     } catch (err: any) {
+      if (signal?.aborted || err.name === 'AbortError') {
+        callbacks.onComplete?.();
+        return;
+      }
       callbacks.onError?.(err.message || 'Unknown error');
     }
   }

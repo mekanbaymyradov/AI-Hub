@@ -32,6 +32,7 @@ uniform float uTime;
 uniform vec2 uResolution;
 uniform vec3 uColor1;
 uniform vec3 uColor2;
+uniform vec3 uBgColor;
 varying vec2 vUv;
 
 vec3 permute(vec3 x) { return mod(((x*34.0)+1.0)*x, 289.0); }
@@ -121,7 +122,7 @@ void main() {
     
     vec2 cornerDist = vec2(uv.x, uv.y);
     float fadeMask = smoothstep(0.0, 0.25, length(cornerDist));
-    color = mix(vec3(1.0), color, fadeMask);
+    color = mix(uBgColor, color, fadeMask);
     
     
     float vignette = smoothstep(1.2, 0.3, length(uv - 0.5));
@@ -133,6 +134,7 @@ void main() {
 
 const HERO_GEOMETRIC_FALLBACK_COLOR_1 = "#3B82F6";
 const HERO_GEOMETRIC_FALLBACK_COLOR_2 = "#F0F9FF";
+const HERO_GEOMETRIC_FALLBACK_BG = "#FFFFFF";
 const HEX_COLOR_REGEX = /^#?[0-9a-fA-F]{6}$/;
 
 function sanitizeHexColor(value: string, fallback: string) {
@@ -144,10 +146,12 @@ function sanitizeHexColor(value: string, fallback: string) {
 const GradientPlane = ({
     color1,
     color2,
+    bgColor = "#FFFFFF",
     speed = 1
 }: {
     color1: string;
     color2: string;
+    bgColor?: string;
     speed?: number
 }) => {
     const meshRef = useRef<THREE.Mesh>(null);
@@ -157,6 +161,7 @@ const GradientPlane = ({
             uResolution: { value: new THREE.Vector2(1000, 1000) },
             uColor1: { value: new THREE.Color(HERO_GEOMETRIC_FALLBACK_COLOR_1) },
             uColor2: { value: new THREE.Color(HERO_GEOMETRIC_FALLBACK_COLOR_2) },
+            uBgColor: { value: new THREE.Color(HERO_GEOMETRIC_FALLBACK_BG) },
         }),
         []
     );
@@ -167,6 +172,7 @@ const GradientPlane = ({
         uniforms.uResolution.value.set(size.width, size.height);
         uniforms.uColor1.value.set(sanitizeHexColor(color1, HERO_GEOMETRIC_FALLBACK_COLOR_1));
         uniforms.uColor2.value.set(sanitizeHexColor(color2, HERO_GEOMETRIC_FALLBACK_COLOR_2));
+        uniforms.uBgColor.value.set(sanitizeHexColor(bgColor, HERO_GEOMETRIC_FALLBACK_BG));
     });
 
     return (
@@ -192,11 +198,12 @@ interface HeroGeometricProps extends React.ComponentPropsWithoutRef<"div"> {
     description?: string;
     color1?: string;
     color2?: string;
+    bgColor?: string;
     speed?: number;
 }
 
 const HERO_HEADLINE_CLASS =
-    "pb-[0.08em] text-[12cqi] md:text-[8cqi] lg:text-[6cqi] leading-[0.96] tracking-tighter font-bold text-zinc-900";
+    "pb-[0.08em] text-[12cqi] md:text-[8cqi] lg:text-[6cqi] leading-[0.96] tracking-tighter font-bold text-zinc-900 dark:text-white";
 
 export default function HeroGeometric({
     title1,
@@ -204,6 +211,7 @@ export default function HeroGeometric({
     description,
     color1 = "#3B82F6", 
     color2 = "#F0F9FF", 
+    bgColor = "#FFFFFF",
     speed = 1,
     className,
     ...props
@@ -212,7 +220,7 @@ export default function HeroGeometric({
 
     return (
         <div
-            className={cn("relative w-full min-h-screen flex flex-col items-center overflow-hidden bg-white text-black", className)}
+            className={cn("relative w-full min-h-screen flex flex-col items-center overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors duration-200", className)}
             style={{
                 containerType: "size",
                 ...props.style
@@ -235,7 +243,7 @@ export default function HeroGeometric({
                             setTimeout(() => setCanvasReady(true), 100);
                         }}
                     >
-                        <GradientPlane color1={color1} color2={color2} speed={speed} />
+                        <GradientPlane color1={color1} color2={color2} bgColor={bgColor} speed={speed} />
                     </Canvas>
                 </WebGLErrorBoundary>
             </div>
@@ -279,7 +287,7 @@ export default function HeroGeometric({
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={canvasReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                                     transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-                                    className="text-lg md:text-[1.35rem] leading-relaxed text-neutral-600 font-normal"
+                                    className="text-lg md:text-[1.35rem] leading-relaxed text-zinc-600 dark:text-zinc-400 font-normal"
                                 >
                                     {description}
                                 </motion.p>
