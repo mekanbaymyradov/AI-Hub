@@ -9,3 +9,20 @@
 	}
 	header Strict-Transport-Security "max-age=31536000"
 }
+
+{$WEB_DOMAIN} {
+	reverse_proxy frontend:8080 {
+		lb_try_duration 30s
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		# Images only from our own storage, so a markdown image in an LLM reply
+		# can't carry chat content off to another host. Report-only until a
+		# release shows no reports in the browser console; then rename it to
+		# Content-Security-Policy.
+		Content-Security-Policy-Report-Only "default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' {$S3_PUBLIC_BASE_URL} {$S3_ENDPOINT_URL}; connect-src 'self' https://{$API_DOMAIN}; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+	}
+}

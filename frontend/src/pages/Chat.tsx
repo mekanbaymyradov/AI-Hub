@@ -1,65 +1,55 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useParams } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { chatApi } from "@/api/chat";
-import { useAuth } from "@/context/AuthContext";
-import { type AttachmentPublic } from "@/api/types";
+import { queryKeys, useChatMessages, useChats } from "@/api/queries";
 
 import { AppSidebar } from "@/components/chat/AppSidebar";
 import { ChatHeader } from "@/components/chat/ChatHeader";
-import { ChatGreeting } from "@/components/chat/ChatGreeting";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
-import { ChatInput } from "@/components/chat/ChatInput";
+import { ChatInput, type OutgoingMessage } from "@/components/chat/ChatInput";
+import { NamePromptModal } from "@/components/chat/NamePromptModal";
 import { type UIMessage } from "@/components/chat/types";
 
+// Ids for messages shown before the API has saved them; history reloads replace them with real ids.
+let nextLocalId = 0;
+const localId = () => `local-${nextLocalId++}`;
+
 export default function Chat() {
-  const { user } = useAuth();
   const queryClient = useQueryClient();
 
   const [messages, setMessages] = useState<UIMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const isStreamingRef = useRef(false);
+  const [activeTool, setActiveTool] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  const [activeChatId, setActiveChatId] = useState<number | null>(null);
+  // The open chat lives in the URL, so a reload or a shared link reopens it.
+  const navigate = useNavigate();
+  const { chatId } = useParams();
+  const activeChatId = chatId === undefined ? null : Number(chatId);
+  // The chat the current stream just created. Moving to its URL must keep the reply that is still streaming.
+  const createdChatIdRef = useRef<number | null>(null);
 
-  const { data: chatsData } = useQuery({
-    queryKey: ["chats"],
-    queryFn: () => chatApi.getChats(),
-  });
+  const { data: chatsData } = useChats();
 
   const currentChatTitle = activeChatId
-    ? chatsData?.items.find((t) => t.id === activeChatId)?.name || "Conversation"
+    ? chatsData?.pages.flatMap((page) => page.items).find((chat) => chat.id === activeChatId)?.name ??
+      "Conversation"
     : undefined;
 
-  const { data: historyData, isLoading: isLoadingHistory } = useQuery({
-    queryKey: ["chat-messages", activeChatId],
-    queryFn: () => chatApi.getChatMessages(activeChatId!),
-    enabled: !!activeChatId,
-  });
+  const messagesQuery = useChatMessages(activeChatId);
+  const historyData = messagesQuery.data;
 
+  // A deleted, foreign or malformed chat id falls back to a new chat.
+  const errorStatus = isAxiosError(messagesQuery.error) ? messagesQuery.error.response?.status : undefined;
+  const chatNotFound = errorStatus === 404 || errorStatus === 422;
   useEffect(() => {
-    if (historyData && !isStreamingRef.current) {
-      const sorted = [...historyData.items].sort((a, b) => {
-        const timeA = new Date(a.created_at).getTime();
-        const timeB = new Date(b.created_at).getTime();
-        if (timeA !== timeB) return timeA - timeB;
-        return a.id - b.id;
-      });
-
-      const uiMsgs: UIMessage[] = sorted.map((m) => ({
-        id: m.id.toString(),
-        role: m.kind === "response" ? "ai" : "user",
-        content: m.content,
-        attachments: m.attachments || [],
-        created_at: m.created_at,
-        model_id: m.model_id,
-      }));
-
-      setMessages(uiMsgs);
-    }
-  }, [historyData]);
+    if (chatNotFound) navigate("/", { replace: true });
+  }, [chatNotFound, navigate]);
 
   const handleStopGeneration = useCallback(() => {
     if (abortControllerRef.current) {
@@ -68,110 +58,112 @@ export default function Chat() {
     }
     setIsStreaming(false);
     isStreamingRef.current = false;
+    setActiveTool(null);
   }, []);
 
-  const handleSelectChat = useCallback((id: number) => {
-    if (id === activeChatId) return;
+  // Runs before the history effect below, so a cached chat's messages replace the cleared ones.
+  useEffect(() => {
+    if (activeChatId !== null && activeChatId === createdChatIdRef.current) {
+      createdChatIdRef.current = null;
+      return;
+    }
     handleStopGeneration();
-    setActiveChatId(id);
     setMessages([]);
   }, [activeChatId, handleStopGeneration]);
 
+  useEffect(() => {
+    if (historyData && !isStreamingRef.current) {
+      // The first page holds the newest messages, and each page reads oldest first.
+      const history = historyData.pages.toReversed().flatMap((page) => page.items);
+
+      const uiMsgs: UIMessage[] = history.map((m) => ({
+        id: m.id.toString(),
+        role: m.kind === "response" ? "ai" : "user",
+        content: m.content,
+        attachments: m.attachments ?? [],
+      }));
+
+      setMessages(uiMsgs);
+    }
+  }, [historyData]);
+
+  // Changing the URL is enough: the effect above stops the reply and clears the screen.
+  const handleSelectChat = useCallback((id: number) => {
+    if (id !== activeChatId) navigate(`/chats/${id}`);
+  }, [activeChatId, navigate]);
+
   const handleNewThread = useCallback(() => {
+    // Cleared here too: on "/" already, as after a first message that failed, the URL doesn't change.
     handleStopGeneration();
-    setActiveChatId(null);
     setMessages([]);
-  }, [handleStopGeneration]);
+    navigate("/");
+  }, [handleStopGeneration, navigate]);
 
-  const handleSend = async (
-    text: string,
-    attachments: AttachmentPublic[],
-    modelId: string
-  ) => {
-    if ((!text.trim() && attachments.length === 0) || isStreaming) return;
+  const updateMessage = (id: string, change: Partial<UIMessage>) =>
+    setMessages((prev) => prev.map((msg) => (msg.id === id ? { ...msg, ...change } : msg)));
 
-    const sendText = text.trim() || (attachments.length > 0 ? "Attached files" : "");
-    const currentAttachments = [...attachments];
-    const currentAttachmentIds = currentAttachments.map((a) => a.id);
+  const handleSend = async ({ prompt, attachments, modelId, effort }: OutgoingMessage) => {
+    if (isStreaming) return;
 
-    const userMessage: UIMessage = {
-      id: Date.now().toString(),
-      role: "user",
-      content: sendText,
-      attachments: currentAttachments,
-      created_at: new Date().toISOString(),
-    };
-
-    setMessages((prev) => [...prev, userMessage]);
+    const sendText = prompt || "Attached files";
+    const replyId = localId();
+    setMessages((prev) => [
+      ...prev,
+      { id: localId(), role: "user", content: sendText, attachments },
+      { id: replyId, role: "ai", content: "" },
+    ]);
 
     setIsStreaming(true);
     isStreamingRef.current = true;
-
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
     let streamBuffer = "";
-    const aiMessageId = (Date.now() + 1).toString();
-
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: aiMessageId,
-        role: "ai",
-        content: "",
-        created_at: new Date().toISOString(),
-      },
-    ]);
-
     let resolvedChatId = activeChatId;
 
     await chatApi.streamMessage(
       {
-        chat_id: activeChatId || undefined,
+        chat_id: activeChatId,
         model_id: modelId,
         prompt: sendText,
-        attachment_ids: currentAttachmentIds,
+        attachment_ids: attachments.map((a) => a.id),
+        effort,
       },
       {
         onChatId: (newChatId) => {
           resolvedChatId = newChatId;
           if (!activeChatId) {
-            setActiveChatId(newChatId);
-            queryClient.invalidateQueries({ queryKey: ["chats"] });
+            createdChatIdRef.current = newChatId;
+            // Replace, so Back doesn't return to the empty new-chat screen.
+            navigate(`/chats/${newChatId}`, { replace: true });
+            queryClient.invalidateQueries({ queryKey: queryKeys.chats });
           }
         },
-        onChunk: (chunk) => {
-          streamBuffer += chunk;
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId ? { ...msg, content: streamBuffer } : msg
-            )
-          );
+        onTool: (name) => {
+          // Text after the tool call continues in a new paragraph.
+          if (streamBuffer && !streamBuffer.endsWith("\n")) {
+            streamBuffer += "\n\n";
+          }
+          setActiveTool(name);
         },
-        onError: (err) => {
+        onChunk: (chunk) => {
+          setActiveTool(null);
+          streamBuffer += chunk;
+          updateMessage(replyId, { content: streamBuffer });
+        },
+        onError: (error) => {
+          setActiveTool(null);
           setIsStreaming(false);
           isStreamingRef.current = false;
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === aiMessageId
-                ? {
-                    ...msg,
-                    content: streamBuffer
-                      ? `${streamBuffer}\n\n**Error:** ${err}`
-                      : `**Error:** ${err}`,
-                  }
-                : msg
-            )
-          );
+          updateMessage(replyId, { error });
         },
         onComplete: () => {
+          setActiveTool(null);
           setIsStreaming(false);
           isStreamingRef.current = false;
-          queryClient.invalidateQueries({ queryKey: ["chats"] });
+          queryClient.invalidateQueries({ queryKey: queryKeys.chats });
           if (resolvedChatId) {
-            queryClient.invalidateQueries({
-              queryKey: ["chat-messages", resolvedChatId],
-            });
+            queryClient.invalidateQueries({ queryKey: queryKeys.chatMessages(resolvedChatId) });
           }
         },
       },
@@ -195,9 +187,11 @@ export default function Chat() {
 
           <ChatMessageList
             messages={messages}
-            isLoadingHistory={isLoadingHistory}
+            isLoadingHistory={messagesQuery.isLoading}
             activeChatId={activeChatId}
             isStreaming={isStreaming}
+            activeTool={activeTool}
+            olderMessages={messagesQuery}
           />
 
           <ChatInput
@@ -205,12 +199,11 @@ export default function Chat() {
             onStop={handleStopGeneration}
             isStreaming={isStreaming}
             isInitialState={isInitialState}
-            greetingNode={
-              <ChatGreeting userName={user?.name} userEmail={user?.email} />
-            }
           />
         </main>
       </div>
+
+      <NamePromptModal />
     </SidebarProvider>
   );
 }

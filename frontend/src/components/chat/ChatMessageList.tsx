@@ -1,7 +1,8 @@
-import React, { useRef, useEffect } from "react";
+import { useRef, useLayoutEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useLoadMore, type PageLoader } from "@/hooks/use-load-more";
 import { ChatMessageItem } from "./ChatMessageItem";
 import { type UIMessage } from "./types";
 
@@ -10,6 +11,8 @@ interface ChatMessageListProps {
   isLoadingHistory: boolean;
   activeChatId: number | null;
   isStreaming: boolean;
+  activeTool: string | null;
+  olderMessages: PageLoader;
 }
 
 export function ChatMessageList({
@@ -17,29 +20,38 @@ export function ChatMessageList({
   isLoadingHistory,
   activeChatId,
   isStreaming,
+  activeTool,
+  olderMessages,
 }: ChatMessageListProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const loadOlderRef = useLoadMore(olderMessages);
+  // What the list looked like at the last render, to tell older messages
+  // arriving at the top from the conversation moving on at the bottom.
+  const previous = useRef<{ firstId?: string; lastId?: string; scrollHeight: number }>({
+    scrollHeight: 0,
+  });
 
-  const scrollToBottom = (smooth = false) => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector<HTMLElement>(
-        '[data-slot="scroll-area-viewport"], [data-radix-scroll-area-viewport]'
-      );
-      if (scrollContainer) {
-        scrollContainer.scrollTo({
-          top: scrollContainer.scrollHeight,
-          behavior: smooth ? "smooth" : "auto",
-        });
-        return;
-      }
+  useLayoutEffect(() => {
+    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
+      '[data-slot="scroll-area-viewport"]'
+    );
+    if (!viewport) return;
+
+    const firstId = messages[0]?.id;
+    const lastId = messages[messages.length - 1]?.id;
+    const olderLoaded =
+      previous.current.firstId !== undefined &&
+      firstId !== previous.current.firstId &&
+      lastId === previous.current.lastId;
+
+    if (olderLoaded) {
+      // Keep the reader on the message they were reading.
+      viewport.scrollTop += viewport.scrollHeight - previous.current.scrollHeight;
+    } else {
+      viewport.scrollTo({ top: viewport.scrollHeight });
     }
-    messagesEndRef.current?.scrollIntoView({ behavior: smooth ? "smooth" : "auto" });
-  };
-
-  useEffect(() => {
-    scrollToBottom(false);
-  }, [messages, isStreaming]);
+    previous.current = { firstId, lastId, scrollHeight: viewport.scrollHeight };
+  }, [messages, isStreaming, activeTool]);
 
   return (
     <div className="flex-1 overflow-hidden">
@@ -51,19 +63,30 @@ export function ChatMessageList({
               <span className="text-sm">Loading conversation...</span>
             </div>
           ) : (
-            <AnimatePresence initial={false}>
-              {messages.map((msg, index) => (
-                <ChatMessageItem
-                  key={msg.id}
-                  message={msg}
-                  isStreaming={isStreaming}
-                  isLastMessage={index === messages.length - 1}
-                />
-              ))}
-            </AnimatePresence>
+            <>
+              {activeChatId !== null && (
+                <div ref={loadOlderRef} aria-hidden="true" className="flex justify-center h-6">
+                  {olderMessages.isFetchingNextPage && (
+                    <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+                  )}
+                </div>
+              )}
+              <AnimatePresence initial={false}>
+                {messages.map((msg, index) => {
+                  const isLastMessage = index === messages.length - 1;
+                  return (
+                    <ChatMessageItem
+                      key={msg.id}
+                      message={msg}
+                      isStreaming={isStreaming}
+                      isLastMessage={isLastMessage}
+                      activeTool={isLastMessage ? activeTool : null}
+                    />
+                  );
+                })}
+              </AnimatePresence>
+            </>
           )}
-
-          <div ref={messagesEndRef} className="h-px" />
         </div>
       </ScrollArea>
     </div>

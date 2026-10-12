@@ -1,7 +1,7 @@
 from typing import Any
 
 import pytest
-from httpx2 import AsyncClient
+from httpx2 import AsyncClient, ConnectError
 from logfire.testing import CaptureLogfire
 
 from src.auth.constants import INSTRUCTIONS_MAX_LENGTH
@@ -57,6 +57,22 @@ async def test_production_request_span_drops_rejected_input(
     assert instructions not in str(attributes)
 
 
+async def test_production_http_span_records_no_query(
+    capfire: CaptureLogfire, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "environment", "production")
+
+    async with AsyncClient() as http:
+        # Nothing listens on port 1, so the request fails without leaving the machine.
+        with pytest.raises(ConnectError):
+            await http.get("http://localhost:1/v1/search", params={"name": "Paris"})
+
+    spans = capfire.exporter.exported_spans_as_dict()
+    span = next(span for span in spans if span["name"] == "GET")
+    assert span["attributes"]["http.url"] == "http://localhost:1/v1/search"
+    assert "Paris" not in str(span)
+
+
 async def test_request_span_records_user_id(
     client: AsyncClient, user: User, token: str, capfire: CaptureLogfire
 ):
@@ -65,6 +81,18 @@ async def test_request_span_records_user_id(
     assert response.status_code == 200
     attributes = request_span_attributes(capfire, "GET /auth/me")
     assert attributes["user_id"] == user.id
+
+
+async def test_global_rate_limit_marks_request_span(
+    client: AsyncClient, capfire: CaptureLogfire, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setattr(settings, "rate_limit_ip_limit", 0)
+
+    response = await client.get("/llms/models")
+
+    assert response.status_code == 429
+    attributes = request_span_attributes(capfire, "GET /llms/models")
+    assert attributes["rate_limit.global"] == "ip:127.0.0.1"
 
 
 async def test_local_request_span_records_only_client_input(

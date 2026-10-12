@@ -3,6 +3,7 @@ from collections.abc import Awaitable, Callable
 import logfire
 from fastapi import Request
 from fastapi.security import HTTPAuthorizationCredentials
+from opentelemetry import trace
 from redis.asyncio import Redis
 from redis.exceptions import RedisError
 
@@ -51,12 +52,16 @@ async def global_rate_limit(request: Request, redis: RedisDep) -> None:
         return
 
     identity, times = _identity(request, await bearer_scheme(request))
-    await _check(
-        redis,
-        key=f"ratelimit:global:{identity}",
-        times=times,
-        seconds=settings.rate_limit_window_seconds,
-    )
+    try:
+        await _check(
+            redis,
+            key=f"ratelimit:global:{identity}",
+            times=times,
+            seconds=settings.rate_limit_window_seconds,
+        )
+    except RateLimitExceeded:
+        trace.get_current_span().set_attribute("rate_limit.global", identity)
+        raise
 
 
 def user_rate_limit(times: int, seconds: int) -> Callable[..., Awaitable[None]]:

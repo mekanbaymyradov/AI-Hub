@@ -4,7 +4,9 @@ from typing import Any
 
 import logfire
 from fastapi import Request, WebSocket
+from logfire.integrations.httpx import RequestInfo
 from opentelemetry.instrumentation.botocore import BotocoreInstrumentor
+from opentelemetry.trace import Span
 
 from src.config import settings
 from src.database import engine
@@ -24,13 +26,23 @@ def setup_observability() -> None:
     logging.basicConfig(handlers=[logfire.LogfireLoggingHandler()])
 
     logfire.instrument_sqlalchemy(engine=engine)
-    logfire.instrument_httpx()
+    # Every outgoing client here is async (the shared httpx2 client and the LLM
+    # SDKs'), and request_hook would only cover sync ones.
+    logfire.instrument_httpx(async_request_hook=drop_url_query)
     # boto3 (R2) sends over urllib3, which instrument_httpx doesn't see, and
     # Logfire has no botocore helper.
     BotocoreInstrumentor().instrument()
     logfire.instrument_redis()
     # Users' chat text stays out of production traces.
     logfire.instrument_pydantic_ai(include_content=settings.environment == "local")
+
+
+async def drop_url_query(span: Span, request: RequestInfo) -> None:
+    """Remove the query string from an outgoing request's span URL, in production."""
+    if settings.environment == "production":
+        # Tools put user input in query strings, like a city name, and Logfire
+        # never scrubs URLs.
+        span.set_attribute("http.url", str(request.url.copy_with(query=None)))
 
 
 def request_attributes_mapper(

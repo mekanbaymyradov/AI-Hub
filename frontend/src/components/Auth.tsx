@@ -1,214 +1,278 @@
-import React, { useState, useRef, useEffect, KeyboardEvent } from "react";
+import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowLeft, ArrowRight, Check, LoaderCircle, Mail } from "lucide-react";
 import { authApi } from "@/api/auth";
-import { useNavigate, Link } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import { getErrorMessage } from "@/api/errors";
+import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { cn } from "@/lib/utils";
 
-const OTP_LENGTH = 6; 
+const OTP_LENGTH = 6;
+const EMPTY_OTP: string[] = Array(OTP_LENGTH).fill("");
+
+const stepMotion = {
+  initial: { opacity: 0, y: 8 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -8 },
+  transition: { duration: 0.2, ease: "easeOut" },
+} as const;
 
 export function Auth() {
   const [email, setEmail] = useState("");
-  const [step, setStep] = useState<"request" | "verify">("request");
-  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState<"email" | "code">("email");
+  const [pending, setPending] = useState<"send" | "verify" | null>(null);
   const [error, setError] = useState<string | null>(null);
-  
-  const [otp, setOtp] = useState<string[]>(new Array(OTP_LENGTH).fill(""));
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [resent, setResent] = useState(false);
+  const [otp, setOtp] = useState(EMPTY_OTP);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
-  
+
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  useEffect(() => {
-    if (resendCooldown <= 0) return;
-    const interval = setInterval(() => setResendCooldown(prev => prev - 1), 1000);
-    return () => clearInterval(interval);
-  }, [resendCooldown]);
-
-  const handleRequestOtp = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (resendCooldown > 0) return;
-    
-    setLoading(true);
+  const requestCode = async () => {
+    setPending("send");
     setError(null);
     try {
       await authApi.requestOtp({ email });
-      setStep("verify");
-      setResendCooldown(350);
-      setOtp(new Array(OTP_LENGTH).fill(""));
-      
-      setTimeout(() => inputRefs.current[0]?.focus(), 100);
-    } catch (err: any) {
-      const msg = err.response?.data?.detail?.[0]?.msg || "Failed to request OTP. Please try again.";
-      setError(msg);
+      // The server replaces any earlier code, so start again from empty boxes.
+      setOtp(EMPTY_OTP);
+      setResent(step === "code");
+      setStep("code");
+      inputRefs.current[0]?.focus();
+    } catch (err) {
+      setError(getErrorMessage(err, "Couldn't send the code. Please try again."));
     } finally {
-      setLoading(false);
+      setPending(null);
     }
   };
 
-  const verifyOtp = async (completeOtpArray: string[]) => {
-    setLoading(true);
+  const verifyCode = async (digits: string[]) => {
+    setPending("verify");
     setError(null);
-    const otpCode = completeOtpArray.join("");
-    
     try {
-      const { access_token } = await authApi.verifyOtp({ email, code: otpCode });
+      const { access_token } = await authApi.verifyOtp({ email, code: digits.join("") });
       await login(access_token);
-      navigate("/", { replace: true }); 
-    } catch (err: any) {
-      const msg = err.response?.data?.detail?.[0]?.msg || "Invalid OTP. Please try again.";
-      setError(msg);
-      setOtp(new Array(OTP_LENGTH).fill(""));
+      navigate("/", { replace: true });
+    } catch (err) {
+      setError(getErrorMessage(err, "That code didn't work. Please try again."));
+      setOtp(EMPTY_OTP);
       inputRefs.current[0]?.focus();
     } finally {
-      setLoading(false);
+      setPending(null);
     }
   };
 
-  const handleOtpChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const { value } = e.target;
-    const newOtp = [...otp];
-    const digit = value.replace(/\D/g, "").slice(-1);
-    
-    newOtp[index] = digit;
-    setOtp(newOtp);
+  const handleOtpChange = (e: ChangeEvent<HTMLInputElement>, index: number) => {
+    // More than one digit means a paste or autofill, which spreads across the following boxes.
+    const digits = e.target.value.replace(/\D/g, "").slice(0, OTP_LENGTH - index).split("");
+    const next = [...otp];
+    if (digits.length === 0) next[index] = "";
+    digits.forEach((digit, i) => {
+      next[index + i] = digit;
+    });
+
+    setOtp(next);
     setError(null);
-
-    if (digit && index < OTP_LENGTH - 1) {
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    if (newOtp.every(d => d !== "")) {
-      verifyOtp(newOtp);
-    }
+    setResent(false);
+    if (digits.length > 0) inputRefs.current[Math.min(index + digits.length, OTP_LENGTH - 1)]?.focus();
+    if (next.every(Boolean)) verifyCode(next);
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>, index: number) => {
-    if (e.key === "Backspace" && !otp[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
-    }
+    if ((e.key === "Backspace" && !otp[index]) || e.key === "ArrowLeft") inputRefs.current[index - 1]?.focus();
+    if (e.key === "ArrowRight") inputRefs.current[index + 1]?.focus();
+  };
+
+  const changeEmail = () => {
+    setStep("email");
+    setOtp(EMPTY_OTP);
+    setError(null);
+    setResent(false);
   };
 
   return (
-    <div className="relative flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 transition-colors duration-200">
-      <div className="absolute top-5 right-5 flex items-center gap-2">
-        <ThemeToggle />
-      </div>
-      <div className="absolute top-5 left-5">
-        <Link to="/" className="flex items-center gap-2 text-zinc-900 dark:text-white font-semibold text-sm hover:opacity-80 transition-opacity">
-          <img src="/favicon.svg" alt="AI-Hub" className="h-5 w-5 object-contain shrink-0" />
-          <span>AI<span className="text-blue-600 dark:text-blue-500">Hub</span></span>
-        </Link>
-      </div>
+    <div className="relative flex min-h-screen flex-col bg-zinc-50 transition-colors duration-200 dark:bg-zinc-950">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 text-zinc-300 dark:text-zinc-800"
+        style={{
+          backgroundImage: "radial-gradient(currentColor 1px, transparent 1px)",
+          backgroundSize: "24px 24px",
+          maskImage: "radial-gradient(ellipse 50% 50% at 50% 45%, black, transparent)",
+        }}
+      />
 
-      <Card className="w-full max-w-md shadow-2xl border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 rounded-2xl backdrop-blur-md">
-        <CardHeader className="text-center pt-8 pb-4">
-          <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/60 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-blue-100 dark:border-blue-900/40">
-            <img src="/favicon.svg" alt="AI-Hub" className="h-6 w-6 object-contain shrink-0" />
-          </div>
-          <CardTitle className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
-            {step === "request" ? "Welcome to AI-Hub" : "Enter Verification Code"}
-          </CardTitle>
-          <CardDescription className="text-center text-zinc-500 dark:text-zinc-400 text-sm mt-1">
-            {step === "request" 
-              ? "Sign in or create an account with your email."
-              : `We sent a 6-digit code to ${email}`}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="px-8 pb-8">
-          {step === "request" ? (
-            <form onSubmit={handleRequestOtp} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-zinc-700 dark:text-zinc-300 font-medium text-xs">
-                  Email Address
-                </Label>
-                <Input 
-                  id="email" 
-                  type="email" 
-                  placeholder="name@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="h-11 bg-zinc-50 dark:bg-zinc-800/80 border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white focus-visible:ring-blue-500"
-                  required 
-                />
-              </div>
-              {error && <p className="text-xs text-red-500 font-medium">{error}</p>}
-              <Button 
-                type="submit" 
-                className="w-full h-11 text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md shadow-blue-500/20 transition-all cursor-pointer" 
-                disabled={loading}
+      <header className="relative flex items-center justify-between px-5 py-4 sm:px-8">
+        <Link
+          to="/"
+          aria-label="AI-Hub home"
+          className="transition-opacity hover:opacity-80"
+        >
+          <Logo className="text-base font-semibold" />
+        </Link>
+        <ThemeToggle />
+      </header>
+
+      {/* The bottom padding lifts the card slightly above center, where the eye expects it. */}
+      <main className="relative flex flex-1 items-center justify-center px-4 pb-20">
+        <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-900/5 sm:p-8 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20">
+          <AnimatePresence mode="wait" initial={false}>
+            {step === "email" ? (
+              <motion.form
+                key="email"
+                {...stepMotion}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  requestCode();
+                }}
               >
-                {loading ? "Sending..." : "Continue with Email"}
-              </Button>
-            </form>
-          ) : (
-            <div className="flex flex-col space-y-6">
-              <div className="flex justify-between items-center text-xs font-medium text-zinc-500 dark:text-zinc-400 px-1">
-                <span>Verification Code</span>
-                <span>{resendCooldown > 0 ? `00:${resendCooldown.toString().padStart(2, '0')}s` : "Ready to resend"}</span>
-              </div>
-              
-              <div className="flex justify-between gap-2">
-                {otp.map((digit, index) => (
-                  <input
-                    key={index}
-                    ref={(el) => (inputRefs.current[index] = el)}
-                    type="text"
-                    value={digit}
-                    onChange={(e) => handleOtpChange(e, index)}
-                    onKeyDown={(e) => handleKeyDown(e, index)}
-                    disabled={loading}
-                    className={`w-[52px] h-[60px] bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 rounded-xl text-zinc-900 dark:text-white text-center text-2xl font-semibold outline-none transition-all 
-                        ${error ? 'border-red-500 ring-2 ring-red-500/20' : 'focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'} 
-                        ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    autoFocus={index === 0}
+                <div className="text-center">
+                  <span className="mx-auto mb-4 flex size-11 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-500/10">
+                    <img src="/favicon.svg" alt="" className="size-6 object-contain" />
+                  </span>
+                  <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Welcome to AI-Hub</h1>
+                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    Sign in or create an account with your email. No password needed.
+                  </p>
+                </div>
+
+                <div className="mt-6 space-y-2">
+                  <Label htmlFor="email" className="text-zinc-700 dark:text-zinc-300">
+                    Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="name@example.com"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      setError(null);
+                    }}
+                    aria-invalid={error !== null}
+                    className="h-11 rounded-xl px-3.5"
+                    autoFocus
                     required
                   />
-                ))}
-              </div>
+                </div>
+                {error && (
+                  <p role="alert" className="mt-2 text-sm font-medium text-red-500">
+                    {error}
+                  </p>
+                )}
 
-              <div className="h-5 text-start px-1">
-                {error && <span className="text-red-500 text-xs font-medium">{error}</span>}
-                {loading && !error && <span className="text-zinc-500 text-xs font-medium">Verifying code...</span>}
-              </div>
-
-              <div className="flex flex-col gap-2.5 mt-2">
                 <Button
-                  type="button"
-                  onClick={() => handleRequestOtp()}
-                  disabled={resendCooldown > 0 || loading}
-                  className={cn(
-                    "w-full h-10 text-sm font-semibold rounded-xl transition-all cursor-pointer",
-                    resendCooldown > 0 
-                      ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500 cursor-not-allowed" 
-                      : "bg-blue-600 hover:bg-blue-700 text-white shadow-md shadow-blue-500/20"
+                  type="submit"
+                  disabled={pending !== null}
+                  className="mt-5 h-11 w-full gap-2 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-700"
+                >
+                  {pending === "send" ? (
+                    <>
+                      <LoaderCircle className="animate-spin" />
+                      Sending code…
+                    </>
+                  ) : (
+                    <>
+                      Continue
+                      <ArrowRight />
+                    </>
                   )}
-                >
-                  Resend Code
                 </Button>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  className="w-full h-9 text-xs text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white rounded-xl cursor-pointer" 
-                  onClick={() => {
-                    setStep("request");
-                    setOtp(new Array(OTP_LENGTH).fill(""));
-                    setError(null);
-                  }}
-                  disabled={loading}
-                >
-                  Back to email
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </motion.form>
+            ) : (
+              <motion.div key="code" {...stepMotion}>
+                <div className="text-center">
+                  <span className="mx-auto mb-4 flex size-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
+                    <Mail className="size-5" />
+                  </span>
+                  <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Check your email</h1>
+                  <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
+                    Enter the 6-digit code we sent to
+                    <br />
+                    <span className="font-medium break-all text-zinc-900 dark:text-white">{email}</span>
+                  </p>
+                </div>
+
+                <div className="mt-6 grid grid-cols-6 gap-2">
+                  {otp.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => {
+                        inputRefs.current[index] = el;
+                      }}
+                      value={digit}
+                      onChange={(e) => handleOtpChange(e, index)}
+                      onKeyDown={(e) => handleKeyDown(e, index)}
+                      // Selecting the digit lets typing replace it instead of appending to it.
+                      onFocus={(e) => e.target.select()}
+                      readOnly={pending === "verify"}
+                      inputMode="numeric"
+                      autoComplete={index === 0 ? "one-time-code" : "off"}
+                      aria-label={`Digit ${index + 1}`}
+                      aria-invalid={error !== null}
+                      autoFocus={index === 0}
+                      className={cn(
+                        "h-12 w-full min-w-0 rounded-xl border bg-zinc-50 text-center text-xl font-semibold text-zinc-900 outline-none transition-all dark:bg-zinc-950 dark:text-white",
+                        error
+                          ? "border-red-500 ring-2 ring-red-500/20"
+                          : "border-zinc-200 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-800 dark:focus:bg-zinc-900",
+                        pending === "verify" && "opacity-50",
+                      )}
+                    />
+                  ))}
+                </div>
+
+                {/* One line for every state, so the card doesn't change height as it switches. */}
+                <p role="status" className="mt-3 flex h-5 items-center justify-center text-center text-xs font-medium">
+                  {error ? (
+                    <span className="text-red-500">{error}</span>
+                  ) : pending === "verify" ? (
+                    <span className="flex items-center gap-1.5 text-zinc-500">
+                      <LoaderCircle className="size-3.5 animate-spin" />
+                      Checking your code…
+                    </span>
+                  ) : resent ? (
+                    <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
+                      <Check className="size-3.5" />
+                      New code sent. The old one no longer works.
+                    </span>
+                  ) : (
+                    <span className="text-zinc-500 dark:text-zinc-400">
+                      The code works once and expires in 5 minutes.
+                    </span>
+                  )}
+                </p>
+
+                <div className="mt-6 flex items-center justify-between border-t border-zinc-100 pt-5 text-sm dark:border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={changeEmail}
+                    disabled={pending !== null}
+                    className="inline-flex items-center gap-1.5 font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-white"
+                  >
+                    <ArrowLeft className="size-4" />
+                    Change email
+                  </button>
+                  <button
+                    type="button"
+                    onClick={requestCode}
+                    disabled={pending !== null}
+                    className="font-semibold text-blue-600 transition-colors hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
+                  >
+                    {pending === "send" ? "Sending…" : "Resend code"}
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </main>
     </div>
   );
 }

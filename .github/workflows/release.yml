@@ -27,7 +27,7 @@ jobs:
     needs: check-tag
     uses: ./.github/workflows/ci.yml
     with:
-      tag: ${{ github.ref_name }}  # its image job pushes the image it tested
+      tag: ${{ github.ref_name }}  # its image job pushes the images it tested
     # A called workflow gets no more than its caller grants.
     permissions:
       contents: read
