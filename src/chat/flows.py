@@ -3,22 +3,33 @@ from collections.abc import AsyncIterator, Sequence
 from typing import cast
 from uuid import uuid4
 
+import httpx2
 import logfire
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.sse import ServerSentEvent
 from mypy_boto3_s3 import S3Client
+from pydantic_ai import AgentRunResultEvent
 from pydantic_ai.exceptions import AgentRunError
 from pydantic_ai.messages import (
+    AgentStreamEvent,
     DocumentUrl,
+    FunctionToolCallEvent,
     ImageUrl,
     ModelMessage,
     ModelMessagesTypeAdapter,
     ModelRequest,
+    NativeToolCallPart,
+    PartDeltaEvent,
+    PartStartEvent,
+    TextPart,
+    TextPartDelta,
+    ToolCallPart,
     UserContent,
     UserPromptPart,
 )
 from pydantic_ai.models import Model
+from pydantic_ai.settings import ModelSettings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import User
@@ -44,7 +55,7 @@ from src.exceptions import AppError
 from src.llm.agents import agent, title_agent
 from src.llm.constants import TITLE_MODEL_ID
 from src.llm.exceptions import ModelError
-from src.llm.models import UserContext
+from src.llm.models import AgentDeps
 from src.llm.registry import LLMRegistry
 from src.pagination import Page, PageParams
 from src.storage import presigned_url
@@ -354,10 +365,30 @@ async def create_reply(
     await db.commit()
 
 
+def _event_to_sse(event: AgentStreamEvent) -> ServerSentEvent | None:
+    """Return what the client is sent for an agent event, or None to send nothing."""
+    match event:
+        case (
+            PartStartEvent(part=TextPart(content=text))
+            | PartDeltaEvent(delta=TextPartDelta(content_delta=text))
+        ) if text:
+            return ServerSentEvent(data=text)
+        # Only the name: the arguments can carry the user's text. A provider's
+        # built-in tool, like its web search, arrives as a part, not a call event.
+        case (
+            FunctionToolCallEvent(part=ToolCallPart(tool_name=name))
+            | PartStartEvent(part=NativeToolCallPart(tool_name=name))
+        ):
+            return ServerSentEvent(data={"name": name}, event="tool")
+        case _:
+            return None
+
+
 async def send_message(
     db: AsyncSession,
     storage: S3Client,
     registry: LLMRegistry,
+    http: httpx2.AsyncClient,
     *,
     user: User,
     chat: Chat | None,
@@ -392,21 +423,28 @@ async def send_message(
         # ends the history, and leaves it out of new_messages().
         history = await get_history(db, storage, chat_id=chat.id)
 
-        async with agent.run_stream(
+        # Not run_stream(), which ends the run at the first text and so skips a
+        # tool call that follows it, as in "Let me check." and then a call.
+        async with agent.run_stream_events(
             model=model,
             message_history=history,
-            deps=UserContext(name=user.name, instructions=user.instructions),
-        ) as result:
-            async for text in result.stream_text(delta=True):
-                yield ServerSentEvent(data=text)
-
-            # Only reached when the stream ran to completion.
-            await create_reply(
-                db,
-                chat_id=chat.id,
-                messages=result.new_messages(),
-                model_id=message.model_id,
-            )
+            deps=AgentDeps(name=user.name, instructions=user.instructions, http=http),
+            # `thinking` takes no None, so an omitted effort sends no settings.
+            model_settings=(
+                ModelSettings(thinking=message.effort) if message.effort else None
+            ),
+        ) as events:
+            async for event in events:
+                # The last event, sent only when the run completed.
+                if isinstance(event, AgentRunResultEvent):
+                    await create_reply(
+                        db,
+                        chat_id=chat.id,
+                        messages=event.result.new_messages(),
+                        model_id=message.model_id,
+                    )
+                elif sse := _event_to_sse(event):
+                    yield sse
 
         if name_task is not None and (name := await name_task):
             await apply_chat_name(db, chat=chat, name=name)

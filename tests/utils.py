@@ -83,6 +83,7 @@ async def send_message(
     chat_id: int | None = None,
     model_id: str = MODEL_ID,
     attachment_ids: Sequence[int] = (),
+    effort: str | None = None,
 ) -> Response:
     return await client.post(
         "/chats/messages",
@@ -92,6 +93,7 @@ async def send_message(
             "chat_id": chat_id,
             "model_id": model_id,
             "attachment_ids": list(attachment_ids),
+            "effort": effort,
         },
     )
 

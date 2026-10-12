@@ -12,13 +12,22 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
+    NativeToolCallPart,
+    NativeToolReturnPart,
     TextPart,
     ToolCallPart,
     ToolReturnPart,
     UserPromptPart,
 )
-from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.function import (
+    AgentInfo,
+    BuiltinToolCallsReturns,
+    DeltaToolCall,
+    DeltaToolCalls,
+    FunctionModel,
+)
 from pydantic_ai.models.test import TestModel
+from pydantic_ai.profiles import ModelProfile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import User
@@ -516,6 +525,79 @@ async def test_send_message_sends_attachments(
     stored = await client.get(f"/chats/{chat_id}/messages", headers=auth_header(token))
     [stored_prompt, _] = stored.json()["items"]
     assert [a["id"] for a in stored_prompt["attachments"]] == [attachment.id]
+
+
+async def test_send_message_runs_tool_after_text(client: AsyncClient, token: str):
+    async def reply(
+        messages: list[ModelMessage], _info: AgentInfo
+    ) -> AsyncIterator[str | DeltaToolCalls]:
+        if len(messages) == 1:
+            # Text ahead of a call in one response: run_stream() would stop here.
+            yield "Let me check. "
+            yield {0: DeltaToolCall(name="get_current_time", json_args="{}")}
+        else:
+            yield "Done."
+
+    with agent.override(model=FunctionModel(stream_function=reply)):
+        response = await send_message(client, token, prompt="What time is it?")
+
+    assert response.status_code == 200
+    events = await sse_events(response)
+    chat_id = streamed_chat_id(events)
+    assert [
+        (event.event, event.json()) for event in events if event.event == "tool"
+    ] == [("tool", {"name": "get_current_time"})]
+    assert streamed_text(events) == "Let me check. Done."
+    stored = await client.get(f"/chats/{chat_id}/messages", headers=auth_header(token))
+    assert [message["content"] for message in stored.json()["items"]] == [
+        "What time is it?",
+        "Let me check. ",
+        "Done.",
+    ]
+
+
+async def test_send_message_streams_native_search(client: AsyncClient, token: str):
+    async def reply(
+        _messages: list[ModelMessage], _info: AgentInfo
+    ) -> AsyncIterator[str | BuiltinToolCallsReturns]:
+        # The provider runs its own search, so the call and its results arrive
+        # in the response instead of going through a tool of ours.
+        yield {0: NativeToolCallPart("web_search", {"query": "python release"})}
+        yield {1: NativeToolReturnPart("web_search", [{"title": "Python 3.14"}])}
+        yield "Python 3.14."
+
+    with agent.override(model=FunctionModel(stream_function=reply)):
+        response = await send_message(client, token, prompt="Latest Python?")
+
+    assert response.status_code == 200
+    events = await sse_events(response)
+    assert [event.json() for event in events if event.event == "tool"] == [
+        {"name": "web_search"}
+    ]
+    assert streamed_text(events) == "Python 3.14."
+
+
+@pytest.mark.parametrize("effort", ["high", None])
+async def test_send_message_passes_effort(
+    client: AsyncClient, token: str, effort: str | None
+):
+    seen = []
+
+    async def reply(
+        _messages: list[ModelMessage], info: AgentInfo
+    ) -> AsyncIterator[str]:
+        seen.append(info.model_request_parameters.thinking)
+        yield "Done."
+
+    # Like every catalog model; without it, pydantic-ai drops the setting.
+    model = FunctionModel(
+        stream_function=reply, profile=ModelProfile(supports_thinking=True)
+    )
+    with agent.override(model=model):
+        response = await send_message(client, token, effort=effort)
+
+    assert response.status_code == 200
+    assert seen == [effort]
 
 
 async def test_send_message_reports_model_failure(client: AsyncClient, token: str):

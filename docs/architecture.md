@@ -31,6 +31,35 @@ catalog is served at `GET /llms/models`.
 `POST /chats/messages` streams the reply over Server-Sent Events using
 FastAPI's `EventSourceResponse` (`src/chat/router.py`).
 
+## Agent tools
+
+`src/llm/tools.py`. The chat agent's tools live in one `FunctionToolset`:
+`get_current_time` and `get_weather` (Open-Meteo, no API key).
+
+- **Web search:** the `WebSearch` capability, always on. Claude and Gemini use
+  their provider's built-in search; every other model gets a DuckDuckGo tool.
+  Built-in search is an allowlist of providers (`_native_web_search`), because
+  pydantic-ai's own support check can't be trusted: it claims built-in search
+  for every Groq model, and they reject it.
+- **Effort:** a message's `effort` (`low`, `medium` or `high`) becomes the
+  run's `thinking` setting, which pydantic-ai maps to each provider's own.
+  Reasoning is stored with the chat but never streamed or shown in the
+  transcript.
+
+- **Descriptions:** a tool's docstring is what the model reads, so it is
+  written for the model.
+- **Errors:** a tool raises `ModelRetry` when the model should fix its
+  arguments, such as an unknown city, and `ToolFailed` when retrying cannot
+  help, such as the weather service being down. Both go back to the model
+  instead of failing the reply.
+- **HTTP:** tools call out through one `httpx2` client opened in the app's
+  lifespan and handed over in the agent's deps, so tests swap in a
+  `MockTransport`.
+- **Streaming:** replies run with `run_stream_events()`, because `run_stream()`
+  ends the run at the first text and skips a tool call that follows it. Each
+  call sends a `tool` event with the tool's name, never its arguments. Tool
+  calls and results are stored with the chat but left out of its transcript.
+
 ## Attachments
 
 `src/chat/`. Attachments follow a lifecycle:

@@ -9,9 +9,11 @@ dependencies = [
     "boto3-stubs[s3]>=1.35",
     "boto3>=1.43.108",
     "fastapi[standard]>=0.141.1",
+    "httpx2>=2.13.1",
     "logfire[fastapi,httpx,sqlalchemy,redis]>=4.41.0",
     "opentelemetry-instrumentation-botocore>=0.66b0",
     "psycopg[binary]>=3.3.5",
+    "pydantic-ai-slim[duckduckgo]>=2.53.0",
     "pydantic-ai[groq]>=2.33.0",
     "pydantic-settings>=2.15.0",
     "pydantic[email]>=2.13.5",
@@ -47,7 +49,6 @@ convention = "pep257"
 [dependency-groups]
 dev = [
     "asgi-lifespan==2.*",
-    "httpx2>=2.13.1",
     "moto[s3]>=5.2.3",
     "pytest>=9.1.1",
     "ruff>=0.16.10",

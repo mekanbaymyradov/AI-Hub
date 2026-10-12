@@ -94,6 +94,10 @@ class MessageRequest(BaseModel):
         max_length=chat_settings.attachment_max_count,
         description="Ids from POST /chats/attachments that no message has used yet.",
     )
+    effort: Literal["low", "medium", "high"] | None = Field(
+        None,
+        description="How hard the model reasons before replying; omit for its default.",
+    )
 
 
 class ChatPublic(BaseModel):
