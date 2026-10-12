@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { BrainCircuit } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const OTP_LENGTH = 6; 
@@ -102,7 +101,7 @@ export function Auth() {
       </div>
       <div className="absolute top-5 left-5">
         <Link to="/" className="flex items-center gap-2 text-zinc-900 dark:text-white font-semibold text-sm hover:opacity-80 transition-opacity">
-          <BrainCircuit className="h-5 w-5 text-blue-600 dark:text-blue-500" />
+          <img src="/favicon.svg" alt="AI-Hub" className="h-5 w-5 object-contain shrink-0" />
           <span>AI<span className="text-blue-600 dark:text-blue-500">Hub</span></span>
         </Link>
       </div>
@@ -110,7 +109,7 @@ export function Auth() {
       <Card className="w-full max-w-md shadow-2xl border-zinc-200/80 dark:border-zinc-800 bg-white dark:bg-zinc-900/90 rounded-2xl backdrop-blur-md">
         <CardHeader className="text-center pt-8 pb-4">
           <div className="w-12 h-12 bg-blue-50 dark:bg-blue-950/60 rounded-2xl flex items-center justify-center mx-auto mb-3 border border-blue-100 dark:border-blue-900/40">
-            <BrainCircuit className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+            <img src="/favicon.svg" alt="AI-Hub" className="h-6 w-6 object-contain shrink-0" />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
             {step === "request" ? "Welcome to AI-Hub" : "Enter Verification Code"}

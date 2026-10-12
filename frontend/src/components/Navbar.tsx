@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { BrainCircuit, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 
 export default function Navbar() {
@@ -8,7 +8,7 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <div className="flex items-center gap-2.5">
-            <BrainCircuit className="h-7 w-7 text-blue-600 dark:text-blue-500" />
+            <img src="/favicon.svg" alt="AI-Hub" className="h-7 w-7 object-contain shrink-0" />
             <Link to="/" className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-1">
               AI<span className="text-blue-600 dark:text-blue-500">Hub</span>
             </Link>

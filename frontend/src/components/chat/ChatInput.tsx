@@ -178,7 +178,17 @@ export function ChatInput({
     >
       <div className="w-full max-w-2xl mx-auto pointer-events-auto flex flex-col">
         <AnimatePresence>
-          {isInitialState && greetingNode}
+          {isInitialState &&
+            (React.isValidElement(greetingNode)
+              ? React.cloneElement(greetingNode as React.ReactElement<any>, {
+                  onSelectPrompt: (prompt: string) => {
+                    setInput(prompt);
+                    if (textareaRef.current) {
+                      textareaRef.current.focus();
+                    }
+                  },
+                })
+              : greetingNode)}
         </AnimatePresence>
 
         <motion.div layoutId="input-box" className="relative group w-full">
