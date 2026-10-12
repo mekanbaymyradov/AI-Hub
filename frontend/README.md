@@ -1,7 +1,7 @@
 # AI-Hub frontend
 
-React, Vite and TypeScript. To run it next to the API, see
-[docs/frontend.md](../docs/frontend.md).
+React, Vite and TypeScript. To run it next to the API, see the
+[development guide](../docs/development.md).
 
 ```bash
 npm ci
@@ -16,5 +16,4 @@ npm run lint
 npm run build
 ```
 
-Each release deploys it with the API; see
-[Build and deploy](../docs/frontend.md#build-and-deploy).
+Each release deploys it with the API.
