@@ -94,6 +94,9 @@ Deleting a chat also deletes its files.
   | Send a message | 20 per minute per user |
 
 - **Response:** a request over the limit gets a 429 with `Retry-After`.
+- **Monitoring:** when the app-wide limit rejects a request, its request span
+  gets `rate_limit.global` set to who hit it (`user:42` or `ip:…`). The Logfire
+  alert *Global rate limit reached* watches it. Per-route limits aren't marked.
 - **Failure:** if Redis is down, the limiter fails open and logs a warning,
   instead of blocking all traffic.
 - **Exempt:** `/healthz` is not counted.
@@ -139,4 +142,7 @@ Logfire is the only logging API: code calls `logfire.info()`,
   timing. Request spans record the client's
   input locally, but in production only validation errors, without the rejected
   input (`request_attributes_mapper` in `src/observability.py`), plus the signed-in
-  user's ID. Logs and spans identify users by ID, never by email.
+  user's ID. Outgoing HTTP spans keep the URL without its query string in
+  production, because tools put user input there, like a city name, and Logfire
+  never scrubs URLs (`drop_url_query` in `src/observability.py`). Logs and spans
+  identify users by ID, never by email.

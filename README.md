@@ -7,7 +7,7 @@ A production-grade, multi-provider LLM chat API built with FastAPI and the Pydan
 [![License](https://img.shields.io/github/license/mekanbaymyradov/AI-Hub)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-**Status:** in active development, backend API only.
+**Status:** in active development. The API and the web app deploy together.
 
 ## Features
 

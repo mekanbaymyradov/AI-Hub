@@ -1,20 +1,13 @@
 "use client";
 
 import { useRef, useMemo, useState } from "react";
-import { Canvas, useFrame, type ThreeElements } from "@react-three/fiber";
+import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { motion } from "framer-motion";
 
-import { cn } from "../../../lib/utils";
+import { cn } from "@/lib/utils";
 import { WebGLErrorBoundary } from "./webgl-error-boundary";
 
-
-declare module "react" {
-    namespace JSX {
-        
-        interface IntrinsicElements extends ThreeElements { }
-    }
-}
 
 
 
@@ -155,6 +148,8 @@ const GradientPlane = ({
     speed?: number
 }) => {
     const meshRef = useRef<THREE.Mesh>(null);
+    const materialRef = useRef<THREE.ShaderMaterial>(null);
+    // The starting values only; each frame updates them through the material.
     const uniforms = useMemo(
         () => ({
             uTime: { value: 0 },
@@ -166,19 +161,22 @@ const GradientPlane = ({
         []
     );
 
-    useFrame((state) => {
-        const { clock, size } = state;
-        uniforms.uTime.value = clock.getElapsedTime() * speed;
-        uniforms.uResolution.value.set(size.width, size.height);
-        uniforms.uColor1.value.set(sanitizeHexColor(color1, HERO_GEOMETRIC_FALLBACK_COLOR_1));
-        uniforms.uColor2.value.set(sanitizeHexColor(color2, HERO_GEOMETRIC_FALLBACK_COLOR_2));
-        uniforms.uBgColor.value.set(sanitizeHexColor(bgColor, HERO_GEOMETRIC_FALLBACK_BG));
+    useFrame(({ clock, size }) => {
+        const material = materialRef.current;
+        if (!material) return;
+        const { uTime, uResolution, uColor1, uColor2, uBgColor } = material.uniforms;
+        uTime.value = clock.getElapsedTime() * speed;
+        uResolution.value.set(size.width, size.height);
+        uColor1.value.set(sanitizeHexColor(color1, HERO_GEOMETRIC_FALLBACK_COLOR_1));
+        uColor2.value.set(sanitizeHexColor(color2, HERO_GEOMETRIC_FALLBACK_COLOR_2));
+        uBgColor.value.set(sanitizeHexColor(bgColor, HERO_GEOMETRIC_FALLBACK_BG));
     });
 
     return (
         <mesh ref={meshRef} scale={[2, 2, 1]}>
             <planeGeometry args={[2, 2]} />
             <shaderMaterial
+                ref={materialRef}
                 vertexShader={vertexShader}
                 fragmentShader={fragmentShader}
                 uniforms={uniforms}
@@ -247,6 +245,12 @@ export default function HeroGeometric({
                     </Canvas>
                 </WebGLErrorBoundary>
             </div>
+            {/* Fades the shader into the page so the next section has no hard edge. */}
+            <div
+                aria-hidden
+                className="absolute inset-x-0 bottom-0 z-0 h-1/4 pointer-events-none"
+                style={{ background: `linear-gradient(to bottom, transparent, ${sanitizeHexColor(bgColor, HERO_GEOMETRIC_FALLBACK_BG)})` }}
+            />
 
             {}
             {(title1 || title2 || description) && (

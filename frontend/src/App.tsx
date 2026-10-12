@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/context/AuthContext";
-import { ThemeProvider } from "@/context/ThemeContext";
+import { AuthProvider } from "@/context/AuthProvider";
+import { useAuth } from "@/context/auth";
+import { ThemeProvider } from "@/context/ThemeProvider";
 import { Auth } from "@/components/Auth";
 import Chat  from "@/pages/Chat";
 import Landing from "@/pages/Landing";
@@ -22,6 +23,10 @@ function AppRoutes() {
         <Route
           path="/"
           element={isAuthenticated ? <Chat /> : <Landing />}
+        />
+        <Route
+          path="/chats/:chatId"
+          element={isAuthenticated ? <Chat /> : <Navigate to="/login" replace />}
         />
         <Route
           path="/login"

@@ -1,4 +1,4 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 
@@ -18,7 +18,7 @@ export const ChatHeader = memo(function ChatHeader({ chatTitle }: ChatHeaderProp
         )}
       </div>
       <div className="flex items-center gap-2">
-        <ThemeToggle size="icon-sm" className="h-8 w-8" />
+        <ThemeToggle />
       </div>
     </header>
   );

@@ -77,6 +77,16 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+  frontend:
+    image: ghcr.io/mekanbaymyradov/ai-hub-frontend:${IMAGE_TAG:?set by the release workflow}
+    restart: unless-stopped
+    # No env_file: static files need none of the app's secrets.
+    healthcheck:
+      # The Alpine image has busybox wget, not curl.
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
   caddy:
     image: caddy:2.11.7-alpine
     restart: unless-stopped
@@ -86,8 +96,13 @@ services:
       - "0.0.0.0:80:80"
       - "0.0.0.0:443:443"
       - "0.0.0.0:443:443/udp"
+    # The Caddyfile reads these as {$NAME}.
     environment:
-      API_DOMAIN: ${API_DOMAIN:?}  # the Caddyfile reads it as {$API_DOMAIN}
+      API_DOMAIN: ${API_DOMAIN:?}
+      WEB_DOMAIN: ${WEB_DOMAIN:?}
+      # The frontend's image hosts: avatars, and signed attachment URLs.
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:?}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:?}
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile

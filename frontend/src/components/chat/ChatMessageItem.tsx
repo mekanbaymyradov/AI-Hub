@@ -1,14 +1,24 @@
-import React, { memo } from "react";
+import { memo } from "react";
 import { motion } from "framer-motion";
-import { FileText } from "lucide-react";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { AlertCircle, FileText, Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { FormattedMessage } from "./FormattedMessage";
 import { type UIMessage } from "./types";
+
+// Named after the API's `tool` events; native and DuckDuckGo search share a label.
+const TOOL_LABELS: Record<string, string> = {
+  get_weather: "Checking the weather…",
+  get_current_time: "Checking the time…",
+  web_search: "Searching the web…",
+  duckduckgo_search: "Searching the web…",
+};
 
 interface ChatMessageItemProps {
   message: UIMessage;
   isStreaming?: boolean;
   isLastMessage?: boolean;
+  /** The tool the model is running for this reply, if any. */
+  activeTool?: string | null;
 }
 
 export const ChatMessageItem = memo(
@@ -16,20 +26,22 @@ export const ChatMessageItem = memo(
     message,
     isStreaming = false,
     isLastMessage = false,
+    activeTool = null,
   }: ChatMessageItemProps) {
     const isUser = message.role === "user";
-    const showStreamingDots = !isUser && isStreaming && isLastMessage && !message.content;
+    const showStreamingDots =
+      !isUser && isStreaming && isLastMessage && !message.content && !activeTool;
 
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className={`flex w-full mb-8 ${isUser ? "justify-end" : "justify-start"}`}
+        className={cn("flex w-full mb-8", isUser ? "justify-end" : "justify-start")}
       >
         {isUser ? (
           <div className="max-w-[75%] bg-blue-600 dark:bg-zinc-800 text-white dark:text-zinc-100 px-5 py-3.5 rounded-[24px] text-[15px] leading-relaxed shadow-sm shadow-blue-500/10 dark:shadow-none border border-transparent dark:border-zinc-700/60 flex flex-col gap-2.5">
-            {message.attachments && message.attachments.length > 0 && (
+            {!!message.attachments?.length && (
               <div className="flex flex-wrap gap-2 pt-0.5">
                 {message.attachments.map((att) => {
                   const isImage = att.media_type.startsWith("image/");
@@ -71,12 +83,9 @@ export const ChatMessageItem = memo(
           </div>
         ) : (
           <div className="flex gap-4 w-full">
-            <Avatar className="bg-blue-50 dark:bg-zinc-900 border border-blue-200 dark:border-white/10 mt-1 shrink-0 text-blue-600 dark:text-blue-400 flex items-center justify-center">
-              <AvatarImage src="/favicon.svg" alt="AI-Hub" className="p-1.5 object-contain" />
-              <AvatarFallback className="flex items-center justify-center size-full">
-                <img src="/favicon.svg" alt="AI-Hub" className="h-4 w-4 object-contain" />
-              </AvatarFallback>
-            </Avatar>
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 mt-1 dark:border-white/10 dark:bg-zinc-900">
+              <img src="/favicon.svg" alt="AI-Hub" className="size-5 object-contain" />
+            </span>
             <div className="flex-1 min-w-0 mt-1 text-[15px] text-zinc-800 dark:text-zinc-300 leading-relaxed">
               {message.content ? (
                 <FormattedMessage
@@ -85,23 +94,28 @@ export const ChatMessageItem = memo(
                 />
               ) : showStreamingDots ? (
                 <div className="flex space-x-1.5 h-6 items-center px-1">
-                  <motion.div
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0 }}
-                    className="w-1.5 h-1.5 bg-blue-600 dark:bg-zinc-500 rounded-full"
-                  />
-                  <motion.div
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0.2 }}
-                    className="w-1.5 h-1.5 bg-blue-600 dark:bg-zinc-500 rounded-full"
-                  />
-                  <motion.div
-                    animate={{ opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: 0.4 }}
-                    className="w-1.5 h-1.5 bg-blue-600 dark:bg-zinc-500 rounded-full"
-                  />
+                  {[0, 0.2, 0.4].map((delay) => (
+                    <motion.div
+                      key={delay}
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ duration: 1, repeat: Infinity, delay }}
+                      className="w-1.5 h-1.5 bg-blue-600 dark:bg-zinc-500 rounded-full"
+                    />
+                  ))}
                 </div>
               ) : null}
+              {message.error && (
+                <div className="my-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-300 text-xs flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
+                  <div className="flex-1 leading-relaxed">{message.error}</div>
+                </div>
+              )}
+              {activeTool && (
+                <div className="flex items-center gap-2 h-6 px-1 text-sm text-zinc-500 dark:text-zinc-400">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
+                  <span>{TOOL_LABELS[activeTool] ?? `Using ${activeTool}…`}</span>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -112,9 +126,11 @@ export const ChatMessageItem = memo(
     return (
       prev.message.id === next.message.id &&
       prev.message.content === next.message.content &&
+      prev.message.error === next.message.error &&
       prev.message.attachments === next.message.attachments &&
       prev.isStreaming === next.isStreaming &&
-      prev.isLastMessage === next.isLastMessage
+      prev.isLastMessage === next.isLastMessage &&
+      prev.activeTool === next.activeTool
     );
   }
 );

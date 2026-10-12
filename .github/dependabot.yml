@@ -7,6 +7,10 @@ updates:
       interval: weekly
     cooldown:
       default-days: 7
+    ignore:
+      # Logfire decides which OpenTelemetry version it supports; bumping these
+      # alone pulls in a Logfire pre-release.
+      - dependency-name: "opentelemetry-*"
     groups:
       python:
         update-types: [minor, patch]
@@ -22,13 +26,24 @@ updates:
         update-types: [minor, patch]
 
   - package-ecosystem: docker
-    directory: /
+    # /frontend holds the node image and the Caddy image that serves the build.
+    directories: ["/", "/frontend"]
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
     groups:
       dockerfile:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      npm:
         update-types: [minor, patch]
 
   - package-ecosystem: docker-compose

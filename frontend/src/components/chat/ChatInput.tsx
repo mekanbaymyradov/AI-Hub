@@ -1,78 +1,69 @@
-import React, { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import {
-  ArrowUp,
-  ChevronDown,
-  Loader2,
-  X,
-  Paperclip,
-  Square,
-  FileText,
-  AlertCircle,
-  Check,
-} from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertCircle, ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
 
 import { chatApi } from "@/api/chat";
-import { llmApi } from "@/api/llm";
-import { type AttachmentPublic } from "@/api/types";
+import { getErrorMessage } from "@/api/errors";
+import { useModels } from "@/api/queries";
+import { type AttachmentPublic, type Effort } from "@/api/types";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { ChatGreeting } from "./ChatGreeting";
+import { EffortPicker } from "./EffortPicker";
+import { ModelPicker } from "./ModelPicker";
+
+// The API's limits for attachments.
+const ATTACHMENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
+const MAX_ATTACHMENTS = 5;
+const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
+
+export interface OutgoingMessage {
+  prompt: string;
+  attachments: AttachmentPublic[];
+  modelId: string;
+  effort: Effort | null;
+}
 
 interface ChatInputProps {
-  onSend: (text: string, attachments: AttachmentPublic[], modelId: string) => void;
+  onSend: (message: OutgoingMessage) => void;
   onStop: () => void;
   isStreaming: boolean;
   isInitialState: boolean;
-  greetingNode?: React.ReactNode;
 }
 
-export function ChatInput({
-  onSend,
-  onStop,
-  isStreaming,
-  isInitialState,
-  greetingNode,
-}: ChatInputProps) {
+/** Return why these files can't be attached, or null when they can. */
+function attachmentProblem(files: File[], alreadyAttached: number): string | null {
+  if (alreadyAttached + files.length > MAX_ATTACHMENTS) {
+    return `You can attach at most ${MAX_ATTACHMENTS} files per message.`;
+  }
+  for (const file of files) {
+    if (!ATTACHMENT_TYPES.includes(file.type)) {
+      return `Unsupported file "${file.name}". Only images (JPEG, PNG, WebP, GIF) and PDFs are allowed.`;
+    }
+    if (file.size > MAX_ATTACHMENT_BYTES) {
+      return `File "${file.name}" exceeds the 10 MiB size limit.`;
+    }
+  }
+  return null;
+}
+
+export function ChatInput({ onSend, onStop, isStreaming, isInitialState }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>("");
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [effort, setEffort] = useState<Effort | null>(null);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: modelsData } = useQuery({
-    queryKey: ["models"],
-    queryFn: () => llmApi.getModels(),
-  });
-
-  useEffect(() => {
-    if (modelsData && modelsData.length > 0) {
-      if (!selectedModel || !modelsData.some((m) => m.id === selectedModel)) {
-        setSelectedModel(modelsData[0].id);
-      }
-    }
-  }, [modelsData, selectedModel]);
-
-  const selectedModelObj = modelsData?.find((m) => m.id === selectedModel);
-  const currentModelName =
-    selectedModelObj?.display_name || (modelsData?.[0]?.display_name ?? "Select Model");
-  const modelSupportsFiles = selectedModelObj ? selectedModelObj.supports_files : true;
+  const { data: models = [] } = useModels();
+  // The user's pick, or the first model until they pick one that is still offered.
+  const selectedModel = models.find((m) => m.id === selectedModelId) ?? models[0];
+  const modelSupportsFiles = selectedModel?.supports_files ?? true;
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -81,54 +72,26 @@ export function ChatInput({
     }
   }, [input]);
 
-  const handleAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    setAttachmentError(null);
-    const files = Array.from(e.target.files || []);
+  const handleAttachmentChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    // Cleared now, so choosing the same file again still fires a change.
+    e.target.value = "";
     if (files.length === 0) return;
 
-    if (!modelSupportsFiles) {
-      setAttachmentError(`The selected model (${currentModelName}) does not accept file attachments.`);
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    if (attachments.length + files.length > 5) {
-      setAttachmentError("You can attach at most 5 files per message.");
-      if (fileInputRef.current) fileInputRef.current.value = "";
-      return;
-    }
-
-    const allowedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
-    const maxSizeBytes = 10 * 1024 * 1024; // 10 MiB
-
-    for (const file of files) {
-      if (!allowedTypes.includes(file.type)) {
-        setAttachmentError(`Unsupported file "${file.name}". Only images (JPEG, PNG, WebP, GIF) and PDFs are allowed.`);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
-      if (file.size > maxSizeBytes) {
-        setAttachmentError(`File "${file.name}" exceeds the 10 MiB size limit.`);
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        return;
-      }
-    }
+    const problem = modelSupportsFiles
+      ? attachmentProblem(files, attachments.length)
+      : `The selected model (${selectedModel?.display_name}) does not accept file attachments.`;
+    setAttachmentError(problem);
+    if (problem) return;
 
     setIsUploadingAttachments(true);
     try {
       const uploaded = await chatApi.uploadAttachments(files);
       setAttachments((prev) => [...prev, ...uploaded]);
-    } catch (err: any) {
-      console.error("Failed to upload attachments:", err);
-      const errorMsg =
-        err?.response?.data?.detail?.[0]?.msg ||
-        (typeof err?.response?.data?.detail === "string" ? err.response.data.detail : null) ||
-        err?.message ||
-        "Failed to upload attachments.";
-      setAttachmentError(errorMsg);
+    } catch (err) {
+      setAttachmentError(getErrorMessage(err, "Failed to upload attachments."));
     } finally {
       setIsUploadingAttachments(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
@@ -137,29 +100,28 @@ export function ChatInput({
     setAttachmentError(null);
   };
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
+  const handleSubmit = (e?: FormEvent) => {
+    e?.preventDefault();
     if ((!input.trim() && attachments.length === 0) || isStreaming || isUploadingAttachments) return;
+    if (!selectedModel) return;
 
     if (attachments.length > 0 && !modelSupportsFiles) {
-      setAttachmentError(`Model "${currentModelName}" cannot accept files. Please select a compatible model.`);
+      setAttachmentError(`Model "${selectedModel.display_name}" cannot accept files. Please select a compatible model.`);
       return;
     }
 
     setAttachmentError(null);
-    const sendText = input.trim();
-    const sendAttachments = [...attachments];
-
+    onSend({ prompt: input.trim(), attachments, modelId: selectedModel.id, effort });
     setInput("");
     setAttachments([]);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
-
-    onSend(sendText, sendAttachments, selectedModel);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+  const selectPrompt = (prompt: string) => {
+    setInput(prompt);
+    textareaRef.current?.focus();
+  };
+
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -177,19 +139,7 @@ export function ChatInput({
       className="absolute inset-0 pointer-events-none flex flex-col px-4 z-0 pt-12"
     >
       <div className="w-full max-w-2xl mx-auto pointer-events-auto flex flex-col">
-        <AnimatePresence>
-          {isInitialState &&
-            (React.isValidElement(greetingNode)
-              ? React.cloneElement(greetingNode as React.ReactElement<any>, {
-                  onSelectPrompt: (prompt: string) => {
-                    setInput(prompt);
-                    if (textareaRef.current) {
-                      textareaRef.current.focus();
-                    }
-                  },
-                })
-              : greetingNode)}
-        </AnimatePresence>
+        <AnimatePresence>{isInitialState && <ChatGreeting onSelectPrompt={selectPrompt} />}</AnimatePresence>
 
         <motion.div layoutId="input-box" className="relative group w-full">
           <form
@@ -205,6 +155,7 @@ export function ChatInput({
                 <button
                   type="button"
                   onClick={() => setAttachmentError(null)}
+                  aria-label="Dismiss"
                   className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 ml-2 cursor-pointer shrink-0"
                 >
                   <X className="h-3.5 w-3.5" />
@@ -214,29 +165,27 @@ export function ChatInput({
 
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1">
-                {attachments.map((att) => {
-                  const isImage = att.media_type.startsWith("image/");
-                  return (
-                    <div
-                      key={att.id}
-                      className="flex items-center gap-1.5 bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200/80 dark:hover:bg-white/15 border border-zinc-200 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-zinc-800 dark:text-zinc-200 transition-colors"
+                {attachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="flex items-center gap-1.5 bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200/80 dark:hover:bg-white/15 border border-zinc-200 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-zinc-800 dark:text-zinc-200 transition-colors"
+                  >
+                    {att.media_type.startsWith("image/") ? (
+                      <Paperclip className="h-3 w-3 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                    ) : (
+                      <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
+                    )}
+                    <span className="truncate max-w-[140px]">{att.filename}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(att.id)}
+                      aria-label={`Remove ${att.filename}`}
+                      className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white ml-0.5 cursor-pointer"
                     >
-                      {isImage ? (
-                        <Paperclip className="h-3 w-3 text-zinc-500 dark:text-zinc-400 shrink-0" />
-                      ) : (
-                        <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
-                      )}
-                      <span className="truncate max-w-[140px]">{att.filename}</span>
-                      <button
-                        type="button"
-                        onClick={() => removeAttachment(att.id)}
-                        className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white ml-0.5 cursor-pointer"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </div>
-                  );
-                })}
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -256,7 +205,7 @@ export function ChatInput({
                   type="file"
                   ref={fileInputRef}
                   onChange={handleAttachmentChange}
-                  accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                  accept={ATTACHMENT_TYPES.join(",")}
                   multiple
                   className="hidden"
                 />
@@ -266,6 +215,7 @@ export function ChatInput({
                       type="button"
                       variant="ghost"
                       size="icon"
+                      aria-label="Attach files"
                       onClick={() => fileInputRef.current?.click()}
                       disabled={isUploadingAttachments || isStreaming || !modelSupportsFiles}
                       className={cn(
@@ -282,72 +232,37 @@ export function ChatInput({
                   } />
                   <TooltipContent side="top" align="center">
                     <span>
-                      {!modelSupportsFiles
-                        ? "Selected model does not support file attachments"
-                        : "Attach images or PDFs (up to 5 files, max 10MB each)"}
+                      {modelSupportsFiles
+                        ? `Attach images or PDFs (up to ${MAX_ATTACHMENTS} files, max 10MB each)`
+                        : "Selected model does not support file attachments"}
                     </span>
                   </TooltipContent>
                 </Tooltip>
+                <EffortPicker value={effort} onChange={setEffort} disabled={isStreaming} />
               </div>
 
               <div className="flex items-center gap-1.5">
-                <DropdownMenu>
-                  <DropdownMenuTrigger render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      disabled={isStreaming}
-                      className="h-8 px-2.5 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 text-xs font-normal flex items-center gap-1 cursor-pointer transition-colors"
-                    >
-                      <span className="truncate max-w-[140px]">{currentModelName}</span>
-                      <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
-                    </Button>
-                  } />
-                  <DropdownMenuContent
-                    side="top"
-                    align="end"
-                    sideOffset={8}
-                    className="w-48 bg-white dark:bg-[#1c1c1f] border border-zinc-200 dark:border-white/10 rounded-xl p-1 shadow-2xl backdrop-blur-md z-50 text-zinc-900 dark:text-foreground"
-                  >
-                    {modelsData && modelsData.length > 0 ? (
-                      modelsData.map((model) => {
-                        const isSelected = model.id === selectedModel;
-                        return (
-                          <DropdownMenuItem
-                            key={model.id}
-                            onClick={() => setSelectedModel(model.id)}
-                            className={cn(
-                              "cursor-pointer flex items-center justify-between px-2.5 py-1.5 text-xs rounded-lg transition-colors",
-                              isSelected
-                                ? "text-blue-600 dark:text-white bg-blue-50 dark:bg-white/10 font-medium"
-                                : "text-zinc-700 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 focus:bg-zinc-100 dark:focus:bg-white/10 focus:text-zinc-900 dark:focus:text-white"
-                            )}
-                          >
-                            <span className="truncate">{model.display_name}</span>
-                            {isSelected && <Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
-                          </DropdownMenuItem>
-                        );
-                      })
-                    ) : (
-                      <div className="px-2.5 py-2 text-xs text-zinc-500">
-                        {currentModelName}
-                      </div>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                <ModelPicker
+                  models={models}
+                  selected={selectedModel}
+                  onSelect={setSelectedModelId}
+                  disabled={isStreaming}
+                />
 
                 {isStreaming ? (
                   <Button
                     type="button"
                     onClick={onStop}
-                    className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-500 text-white p-0 flex items-center justify-center transition-all shadow-none cursor-pointer"
+                    aria-label="Stop generation"
                     title="Stop generation"
+                    className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-500 text-white p-0 flex items-center justify-center transition-all shadow-none cursor-pointer"
                   >
                     <Square className="h-3 w-3 fill-current" />
                   </Button>
                 ) : (
                   <Button
                     type="submit"
+                    aria-label="Send message"
                     disabled={(!input.trim() && attachments.length === 0) || isUploadingAttachments}
                     className="h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
                   >

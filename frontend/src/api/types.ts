@@ -73,11 +73,15 @@ export interface PageMessagePublic {
   next_cursor: string | null;
 }
 
+/** How hard the model reasons before replying. */
+export type Effort = 'low' | 'medium' | 'high';
+
 export interface MessageRequest {
   chat_id?: number | null;
   model_id: string;
   prompt: string;
   attachment_ids?: number[];
+  effort?: Effort | null;
 }
 
 export interface ErrorDetail {

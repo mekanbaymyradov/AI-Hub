@@ -38,6 +38,15 @@ This starts four services:
 - `redis`
 - `scheduler`: runs the cron jobs
 
+To run the frontend too, on http://localhost:5173, add its profile:
+
+```bash
+docker compose -f docker-compose.dev.yaml --profile frontend up --watch
+```
+
+See the [frontend guide](frontend.md#run-the-frontend) for running it without
+Docker.
+
 ## Migrations
 
 Run Alembic from your machine, not inside the `app` container, for two reasons:

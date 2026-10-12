@@ -14,7 +14,7 @@ grep -q '^IMAGE_TAG=' .env || { echo "IMAGE_TAG= line missing from .env" >&2; ex
 export IMAGE_TAG="$tag"
 # The new compose file, with relative paths like .env still resolving here.
 incoming=(--project-directory . -f incoming/docker-compose.yaml)
-docker compose "${incoming[@]}" pull app scheduler
+docker compose "${incoming[@]}" pull app scheduler frontend
 docker compose "${incoming[@]}" run --rm app alembic upgrade head
 
 # cp, not mv: containers mount these files, and after a mv they'd keep reading

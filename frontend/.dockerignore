@@ -1,0 +1,5 @@
+# Installed in the image for Linux; a host copy may hold macOS binaries.
+node_modules
+dist
+# Local overrides like .env.local, which would end up in the production build.
+*.local

@@ -1,43 +1,26 @@
-import React from "react";
-import { Sun, Moon } from "lucide-react";
-import { useTheme } from "@/context/ThemeContext";
+import { Moon, Sun } from "lucide-react";
+import { useTheme } from "@/context/theme";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-interface ThemeToggleProps {
-  className?: string;
-  variant?: "ghost" | "outline" | "secondary" | "default";
-  size?: "default" | "sm" | "icon" | "icon-sm";
-}
-
-export function ThemeToggle({
-  className,
-  variant = "ghost",
-  size = "icon",
-}: ThemeToggleProps) {
+export function ThemeToggle({ className }: { className?: string }) {
   const { theme, toggleTheme } = useTheme();
+  const label = theme === "dark" ? "Switch to light mode" : "Switch to dark mode";
 
   return (
     <Button
       type="button"
-      variant={variant}
-      size={size}
+      variant="ghost"
+      size="icon"
       onClick={toggleTheme}
+      title={label}
+      aria-label={label}
       className={cn(
-        "relative rounded-xl transition-all duration-200 cursor-pointer",
-        "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:text-zinc-100 dark:hover:bg-zinc-800/80",
+        "cursor-pointer rounded-xl text-zinc-600 transition-all duration-200 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-100",
         className
       )}
-      title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-      aria-label="Toggle theme"
     >
-      {theme === "dark" ? (
-        <Sun className="h-4 w-4 text-current transition-transform duration-200 rotate-0 scale-100" />
-      ) : (
-        <Moon className="h-4 w-4 text-current transition-transform duration-200 rotate-0 scale-100" />
-      )}
+      {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </Button>
   );
 }
-
-export default ThemeToggle;

@@ -12,12 +12,6 @@ export const authApi = {
     return response.data;
   },
 
-  refreshToken: async (): Promise<Token> => {
-    const response = await apiClient.post<Token>('/auth/token/refresh');
-    setAccessToken(response.data.access_token);
-    return response.data;
-  },
-
   logout: async (): Promise<void> => {
     await apiClient.post('/auth/logout');
     setAccessToken(null);
