@@ -27,7 +27,7 @@ export interface UserUpdate {
   instructions?: string | null;
 }
 
-export type Provider = 'anthropic' | 'openai' | 'google' | 'groq';
+export type Provider = 'anthropic' | 'openai' | 'google' | 'groq' | 'mistral';
 
 export interface ModelPublic {
   id: string;

@@ -71,6 +71,16 @@ CATALOG: tuple[ModelSpec, ...] = (
         display_name="Qwen3.8 27B",
         supports_files=False,
     ),
+    ModelSpec(
+        provider=Provider.MISTRAL,
+        model_name="mistral-small-latest",
+        display_name="Mistral Small",
+    ),
+    ModelSpec(
+        provider=Provider.MISTRAL,
+        model_name="mistral-large-latest",
+        display_name="Mistral Large",
+    ),
 )
 
 

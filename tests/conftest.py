@@ -40,6 +40,7 @@ environ["ANTHROPIC_API_KEY"] = "test"
 environ["OPENAI_API_KEY"] = "test"
 environ["GOOGLE_API_KEY"] = "test"
 environ["GROQ_API_KEY"] = "test"
+environ["MISTRAL_API_KEY"] = "test"
 
 # Pytest only explains failed asserts in test modules; this covers the helpers too.
 # Registered before anything imports tests.utils, or the rewrite is skipped.
