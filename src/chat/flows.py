@@ -146,10 +146,10 @@ async def apply_chat_name(db: AsyncSession, *, chat: Chat, name: str) -> None:
     await db.commit()
 
 
-async def delete_chat(db: AsyncSession, *, chat: Chat) -> Sequence[str]:
-    """Delete the chat, returning the attachment keys the caller should drop from storage."""
-    keys = await service.get_attachment_keys(db, chat_id=chat.id)
-    await service.delete_chat(db, chat=chat)
+async def delete_chats(db: AsyncSession, *, chat_ids: Sequence[int]) -> Sequence[str]:
+    """Delete the chats, returning the attachment keys the caller should drop from storage."""
+    keys = await service.get_attachment_keys(db, chat_ids=chat_ids)
+    await service.delete_chats(db, chat_ids=chat_ids)
     await db.commit()
     return keys
 

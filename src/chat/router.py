@@ -8,7 +8,13 @@ from src.auth.dependencies import CurrentUser
 from src.auth.exceptions import NotAuthenticated
 from src.chat import flows
 from src.chat.config import chat_settings
-from src.chat.dependencies import Attachments, ChatDep, MessageChatDep, ModelDep
+from src.chat.dependencies import (
+    Attachments,
+    ChatDep,
+    ChatIdsDep,
+    MessageChatDep,
+    ModelDep,
+)
 from src.chat.exceptions import (
     AttachmentNotFound,
     AttachmentTooLarge,
@@ -49,19 +55,19 @@ async def list_chats(
 
 
 @chat_router.delete(
-    path="/{chat_id}",
+    path="",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a chat",
-    description="Its attachments are deleted from storage once the response is sent.",
+    summary="Delete chats",
+    description="Their attachments are deleted from storage once the response is sent.",
     responses=error_responses(NotAuthenticated, ChatNotFound),
 )
-async def delete_chat(
-    chat: ChatDep,
+async def delete_chats(
+    chat_ids: ChatIdsDep,
     db: DbSession,
     storage: StorageDep,
     background_tasks: BackgroundTasks,
 ) -> None:
-    keys = await flows.delete_chat(db, chat=chat)
+    keys = await flows.delete_chats(db, chat_ids=chat_ids)
     if keys:
         background_tasks.add_task(flows.delete_attachment_objects, storage, keys=keys)
 

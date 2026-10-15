@@ -158,15 +158,20 @@ async def test_rename_chat_changes_name(
     }
 
 
-# Delete chat
+# Delete chats
 
 
-async def test_delete_chat_removes_it(
+async def test_delete_chats_removes_them(
     client: AsyncClient, db_session: AsyncSession, user: User, token: str
 ):
     chat = await chat_service.create_chat(db_session, user_id=user.id, name="My chat")
+    chat2 = await chat_service.create_chat(
+        db_session, user_id=user.id, name="My second chat"
+    )
 
-    response = await client.delete(f"/chats/{chat.id}", headers=auth_header(token))
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [chat.id, chat2.id]}
+    )
 
     assert response.status_code == 204
     chats = await client.get("/chats", headers=auth_header(token))
@@ -195,10 +200,50 @@ async def test_delete_chat_deletes_its_attachment_files(
         s3, db_session, user_id=user.id, message_id=other_prompt.id
     )
 
-    response = await client.delete(f"/chats/{chat.id}", headers=auth_header(token))
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [chat.id]}
+    )
 
     assert response.status_code == 204
     assert stored_attachment_keys(s3) == [kept.key]
+
+
+async def test_delete_chat_cant_remove_others_chat(
+    client: AsyncClient, db_session: AsyncSession, other_user: User, token: str
+):
+    chat = await chat_service.create_chat(
+        db_session, user_id=other_user.id, name="Their chat"
+    )
+
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [chat.id]}
+    )
+
+    assert response.status_code == 404
+    error = response.json()["detail"][0]
+    assert error["type"] == "chat.chat_not_found"
+    assert error["loc"] == ["query", "chat_ids"]
+
+
+async def test_delete_chats_with_a_foreign_id_deletes_nothing(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    user: User,
+    other_user: User,
+    token: str,
+):
+    mine = await chat_service.create_chat(db_session, user_id=user.id, name="Mine")
+    theirs = await chat_service.create_chat(
+        db_session, user_id=other_user.id, name="Theirs"
+    )
+
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [mine.id, theirs.id]}
+    )
+
+    assert response.status_code == 404
+    chats = await client.get("/chats", headers=auth_header(token))
+    assert [c["id"] for c in chats.json()["items"]] == [mine.id]
 
 
 # Messages
@@ -704,7 +749,6 @@ async def test_send_message_rejects_used_attachment(
 @pytest.mark.parametrize(
     ("method", "path", "body"),
     [
-        pytest.param("DELETE", "/chats/{id}", None, id="delete"),
         pytest.param("PATCH", "/chats/{id}/rename", {"name": "Mine now"}, id="rename"),
         pytest.param("GET", "/chats/{id}/messages", None, id="list-messages"),
     ],

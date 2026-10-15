@@ -39,8 +39,18 @@ async def create_chat(db: AsyncSession, *, user_id: int, name: str) -> Chat:
     return chat
 
 
-async def delete_chat(db: AsyncSession, *, chat: Chat) -> None:
-    await db.delete(chat)
+async def get_chat_ids(
+    db: AsyncSession, *, chat_ids: Sequence[int], user_id: int
+) -> Sequence[int]:
+    """Return the ids among chat_ids that this user owns."""
+    result = await db.execute(
+        select(Chat.id).where(Chat.id.in_(chat_ids), Chat.user_id == user_id)
+    )
+    return result.scalars().all()
+
+
+async def delete_chats(db: AsyncSession, *, chat_ids: Sequence[int]) -> None:
+    await db.execute(delete(Chat).where(Chat.id.in_(chat_ids)))
 
 
 async def get_messages(db: AsyncSession, *, chat_id: int) -> Sequence[Message]:
@@ -93,12 +103,14 @@ async def get_attachments(
     return result.scalars().all()
 
 
-async def get_attachment_keys(db: AsyncSession, *, chat_id: int) -> Sequence[str]:
-    """Return the storage keys of every attachment in a chat."""
+async def get_attachment_keys(
+    db: AsyncSession, *, chat_ids: Sequence[int]
+) -> Sequence[str]:
+    """Return the storage keys of every attachment in these chats."""
     result = await db.execute(
         select(Attachment.key)
         .join(Attachment.message)
-        .where(Message.chat_id == chat_id)
+        .where(Message.chat_id.in_(chat_ids))
     )
     return result.scalars().all()
 

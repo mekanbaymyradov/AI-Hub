@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Query
 from pydantic_ai.models import Model
 
 from src.auth.dependencies import CurrentUser
@@ -53,6 +53,15 @@ async def get_chat(chat_id: int, db: DbSession, user: CurrentUser) -> Chat:
     return chat
 
 
+async def get_chat_ids(
+    chat_ids: Annotated[list[int], Query()], db: DbSession, user: CurrentUser
+) -> Sequence[int]:
+    owned = await service.get_chat_ids(db, chat_ids=chat_ids, user_id=user.id)
+    if len(owned) != len(set(chat_ids)):
+        raise ChatNotFound(loc=["query", "chat_ids"])
+    return owned
+
+
 async def resolve_attachments(
     message: MessageRequest,
     db: DbSession,
@@ -77,4 +86,5 @@ async def resolve_attachments(
 ModelDep = Annotated[Model, Depends(get_model)]
 MessageChatDep = Annotated[Chat | None, Depends(resolve_chat)]
 ChatDep = Annotated[Chat, Depends(get_chat)]
+ChatIdsDep = Annotated[Sequence[int], Depends(get_chat_ids)]
 Attachments = Annotated[Sequence[Attachment], Depends(resolve_attachments)]
