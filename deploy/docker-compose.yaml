@@ -110,7 +110,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.162.0
+    image: otel/opentelemetry-collector-contrib:0.162.0-386
     user: 0:0 # root, to read the Docker socket
     restart: unless-stopped
     # Only the token, not .env: the collector needs none of the app's secrets.
