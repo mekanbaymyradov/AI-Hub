@@ -54,7 +54,9 @@ export default function Chat() {
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const { data: models = [] } = useModels();
   const modelsRef = useRef(models);
-  modelsRef.current = models;
+  useEffect(() => {
+    modelsRef.current = models;
+  }, [models]);
 
   // The open chat lives in the URL, so a reload or a shared link reopens it.
   const navigate = useNavigate();

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
@@ -76,7 +76,10 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
 
   const chatsQuery = useChats();
   const loadMoreChatsRef = useLoadMore(chatsQuery);
-  const chats = chatsQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const chats = useMemo(
+    () => chatsQuery.data?.pages.flatMap((page) => page.items) ?? [],
+    [chatsQuery.data]
+  );
   const isNewChat = activeChatId === null;
 
   const [isChatMenuOpen, setIsChatMenuOpen] = useState(false);
@@ -105,23 +108,10 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   });
 
   // Chats visible in the UI (exits smoothly when added to deletingChatIds)
-  const visibleChats = chats.filter((chat) => !deletingChatIds.has(chat.id));
-
-  // Purge any stale deleting ids once the server query refetches without them
-  useEffect(() => {
-    if (deletingChatIds.size === 0) return;
-    const currentChatIds = new Set(chats.map((c) => c.id));
-    const hasStale = Array.from(deletingChatIds).some((id) => !currentChatIds.has(id));
-    if (hasStale) {
-      setDeletingChatIds((prev) => {
-        const next = new Set(prev);
-        for (const id of prev) {
-          if (!currentChatIds.has(id)) next.delete(id);
-        }
-        return next;
-      });
-    }
-  }, [chats, deletingChatIds]);
+  const visibleChats = useMemo(
+    () => chats.filter((chat) => !deletingChatIds.has(chat.id)),
+    [chats, deletingChatIds]
+  );
 
   const handleStartSelect = (chatId?: number) => {
     setOpen(true);
@@ -173,6 +163,13 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
           return next;
         });
       },
+      onSettled: () => {
+        setDeletingChatIds((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id) => next.delete(id));
+          return next;
+        });
+      },
     });
   };
 
@@ -213,6 +210,13 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
 
     deleteChat.mutate(id, {
       onError: () => {
+        setDeletingChatIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      },
+      onSettled: () => {
         setDeletingChatIds((prev) => {
           const next = new Set(prev);
           next.delete(id);

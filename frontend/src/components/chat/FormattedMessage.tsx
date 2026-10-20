@@ -243,17 +243,14 @@ function tokenizeLine(
       remaining.startsWith("#")
     ) {
       tokens.push({ type: "comment", value: remaining });
-      pos = len;
       break;
     }
     if (remaining.startsWith("//")) {
       tokens.push({ type: "comment", value: remaining });
-      pos = len;
       break;
     }
     if ((lang === "sql" || lang === "pgsql" || lang === "mysql") && remaining.startsWith("--")) {
       tokens.push({ type: "comment", value: remaining });
-      pos = len;
       break;
     }
 
