@@ -31,6 +31,8 @@ interface ChatInputProps {
   onStop: () => void;
   isStreaming: boolean;
   isInitialState: boolean;
+  selectedModelId?: string | null;
+  onSelectModelId?: (id: string) => void;
 }
 
 /** Return why these files can't be attached, or null when they can. */
@@ -49,13 +51,23 @@ function attachmentProblem(files: File[], alreadyAttached: number): string | nul
   return null;
 }
 
-export function ChatInput({ onSend, onStop, isStreaming, isInitialState }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  onStop,
+  isStreaming,
+  isInitialState,
+  selectedModelId: controlledModelId,
+  onSelectModelId,
+}: ChatInputProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [uncontrolledModelId, setUncontrolledModelId] = useState<string | null>(null);
   const [effort, setEffort] = useState<Effort | null>(null);
+
+  const selectedModelId = controlledModelId !== undefined ? controlledModelId : uncontrolledModelId;
+  const setSelectedModelId = onSelectModelId ?? setUncontrolledModelId;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);

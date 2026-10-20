@@ -1,7 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  Check,
+  CheckSquare,
+  ListChecks,
   LogOut,
   MessageSquare,
   Moon,
@@ -13,10 +17,11 @@ import {
   Sun,
   Trash2,
   User as UserIcon,
+  X,
 } from "lucide-react";
 
 import { getErrorMessage } from "@/api/errors";
-import { useChats, useDeleteChat, useRenameChat } from "@/api/queries";
+import { useChats, useDeleteChat, useDeleteChats, useRenameChat } from "@/api/queries";
 import { type ChatPublic } from "@/api/types";
 import { useAuth } from "@/context/auth";
 import { useTheme } from "@/context/theme";
@@ -64,7 +69,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSidebarProps) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, setOpen } = useSidebar();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
@@ -80,8 +85,17 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   const deleteDialog = useDialog<ChatPublic>();
   const [isLogoutOpen, setIsLogoutOpen] = useState(false);
 
+  // Multi-select state for deleting multiple chats
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [selectedChatIds, setSelectedChatIds] = useState<Set<number>>(new Set());
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+
+  // Chat ids currently undergoing smooth delete animation
+  const [deletingChatIds, setDeletingChatIds] = useState<Set<number>>(new Set());
+
   const renameChat = useRenameChat();
   const deleteChat = useDeleteChat();
+  const deleteChats = useDeleteChats();
   const logOut = useMutation({
     mutationFn: async () => {
       // Leave the chat first, so signing out lands on the home page rather than the login page.
@@ -89,6 +103,90 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
       await logout();
     },
   });
+
+  // Chats visible in the UI (exits smoothly when added to deletingChatIds)
+  const visibleChats = chats.filter((chat) => !deletingChatIds.has(chat.id));
+
+  // Purge any stale deleting ids once the server query refetches without them
+  useEffect(() => {
+    if (deletingChatIds.size === 0) return;
+    const currentChatIds = new Set(chats.map((c) => c.id));
+    const hasStale = Array.from(deletingChatIds).some((id) => !currentChatIds.has(id));
+    if (hasStale) {
+      setDeletingChatIds((prev) => {
+        const next = new Set(prev);
+        for (const id of prev) {
+          if (!currentChatIds.has(id)) next.delete(id);
+        }
+        return next;
+      });
+    }
+  }, [chats, deletingChatIds]);
+
+  const handleStartSelect = (chatId?: number) => {
+    setOpen(true);
+    setIsSelectionMode(true);
+    setSelectedChatIds(chatId ? new Set([chatId]) : new Set());
+  };
+
+  const handleToggleChat = (chatId: number) => {
+    setSelectedChatIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(chatId)) {
+        next.delete(chatId);
+      } else {
+        next.add(chatId);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    if (selectedChatIds.size === visibleChats.length) {
+      setSelectedChatIds(new Set());
+    } else {
+      setSelectedChatIds(new Set(visibleChats.map((c) => c.id)));
+    }
+  };
+
+  const handleCancelSelection = () => {
+    setIsSelectionMode(false);
+    setSelectedChatIds(new Set());
+  };
+
+  const handleConfirmBulkDelete = () => {
+    const ids = Array.from(selectedChatIds);
+    if (ids.length === 0) return;
+    setIsBulkDeleteOpen(false);
+    setIsSelectionMode(false);
+    setSelectedChatIds(new Set());
+    setDeletingChatIds((prev) => new Set([...prev, ...ids]));
+    if (activeChatId !== null && selectedChatIds.has(activeChatId)) {
+      onNewThread();
+    }
+
+    deleteChats.mutate(ids, {
+      onError: () => {
+        setDeletingChatIds((prev) => {
+          const next = new Set(prev);
+          ids.forEach((id) => next.delete(id));
+          return next;
+        });
+      },
+    });
+  };
+
+  // Pressing Escape exits selection mode
+  useEffect(() => {
+    if (!isSelectionMode || isBulkDeleteOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleCancelSelection();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isSelectionMode, isBulkDeleteOpen]);
 
   const openRename = (chat: ChatPublic) => {
     renameChat.reset();
@@ -108,10 +206,18 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   const handleDelete = () => {
     const chat = deleteDialog.item;
     if (!chat) return;
-    deleteChat.mutate(chat.id, {
-      onSuccess: () => {
-        if (chat.id === activeChatId) onNewThread();
-        deleteDialog.close();
+    const id = chat.id;
+    deleteDialog.close();
+    setDeletingChatIds((prev) => new Set(prev).add(id));
+    if (chat.id === activeChatId) onNewThread();
+
+    deleteChat.mutate(id, {
+      onError: () => {
+        setDeletingChatIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
       },
     });
   };
@@ -151,11 +257,14 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
           </Tooltip>
         </SidebarHeader>
 
-        <SidebarContent className="group-data-[state=expanded]:px-3 group-data-[state=expanded]:py-2 group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:mt-3">
-          <SidebarMenu className="gap-2 group-data-[state=collapsed]:items-center">
+        <SidebarContent className="group-data-[state=expanded]:px-3 group-data-[state=expanded]:py-2 group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:items-center group-data-[state=collapsed]:mt-3 flex flex-col h-full min-h-0">
+          <SidebarMenu className="gap-2 group-data-[state=collapsed]:items-center shrink-0">
             <SidebarMenuItem>
               <SidebarMenuButton
-                onClick={onNewThread}
+                onClick={() => {
+                  if (isSelectionMode) handleCancelSelection();
+                  onNewThread();
+                }}
                 tooltip="New thread"
                 className={cn(
                   "group/new-btn relative transition-all duration-200 overflow-hidden cursor-pointer active:scale-[0.97]",
@@ -201,8 +310,21 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                     } />
                   } />
                   <DropdownMenuContent side="right" align="start" sideOffset={10} className={cn(MENU_CONTENT, "w-64 rounded-2xl p-2")}>
-                    <div className="text-xs text-zinc-500 dark:text-muted-foreground font-normal px-2.5 py-1 mb-1 select-none">
-                      Recents
+                    <div className="flex items-center justify-between px-2.5 py-1 mb-1 select-none">
+                      <span className="text-xs text-zinc-500 dark:text-muted-foreground font-normal">Recents</span>
+                      {visibleChats.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsChatMenuOpen(false);
+                            handleStartSelect();
+                          }}
+                          className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                        >
+                          <ListChecks className="h-3 w-3" />
+                          <span>Select</span>
+                        </button>
+                      )}
                     </div>
                     <div className="max-h-[340px] overflow-y-auto space-y-0.5">
                       {isNewChat && (
@@ -210,7 +332,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                           <span className="truncate">{NEW_CHAT_LABEL}</span>
                         </DropdownMenuItem>
                       )}
-                      {chats.map((chat) => (
+                      {visibleChats.map((chat) => (
                         <DropdownMenuItem
                           key={chat.id}
                           onClick={() => onSelectChat(chat.id)}
@@ -229,28 +351,140 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
             </SidebarMenuItem>
           </SidebarMenu>
 
-          <SidebarGroup className="p-0 group-data-[state=expanded]:mt-4 group-data-[state=collapsed]:hidden">
-            <SidebarGroupLabel className="text-xs font-medium text-zinc-500 dark:text-muted-foreground mb-1 px-1">
-              Earlier
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
+          <SidebarGroup className="p-0 group-data-[state=expanded]:mt-4 group-data-[state=collapsed]:hidden flex-1 flex flex-col min-h-0">
+            {isSelectionMode ? (
+              <div className="flex items-center justify-between px-2 py-1.5 mb-1.5 rounded-lg bg-zinc-100/90 dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 text-xs select-none shrink-0 animate-in fade-in-50 duration-150">
+                <div className="flex items-center gap-1.5 pl-0.5">
+                  <span className="font-semibold text-zinc-900 dark:text-white">{selectedChatIds.size}</span>
+                  <span className="text-zinc-500 dark:text-zinc-400">selected</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleSelectAll}
+                    className="px-2 py-0.5 rounded text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
+                  >
+                    {selectedChatIds.size === visibleChats.length && visibleChats.length > 0 ? "Deselect all" : "Select all"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelSelection}
+                    aria-label="Cancel selection"
+                    className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between px-1 mb-1 shrink-0">
+                <SidebarGroupLabel className="p-0 text-xs font-medium text-zinc-500 dark:text-muted-foreground select-none">
+                  Earlier
+                </SidebarGroupLabel>
+                {visibleChats.length > 0 && (
+                  <Tooltip>
+                    <TooltipTrigger render={
+                      <button
+                        type="button"
+                        onClick={() => handleStartSelect()}
+                        aria-label="Select chats"
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                      >
+                        <ListChecks className="h-3.5 w-3.5" />
+                        <span>Select</span>
+                      </button>
+                    } />
+                    <TooltipContent side="top" align="end">
+                      Select multiple chats
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            )}
+
+            <SidebarGroupContent className="flex-1 overflow-y-auto min-h-0">
               <SidebarMenu className="gap-0.5">
-                {isNewChat && <ChatRow name={NEW_CHAT_LABEL} active onSelect={onNewThread} />}
-                {chats.map((chat) => (
-                  <ChatRow
-                    key={chat.id}
-                    name={chat.name}
-                    active={chat.id === activeChatId}
-                    onSelect={() => onSelectChat(chat.id)}
-                    onRename={() => openRename(chat)}
-                    onDelete={() => openDelete(chat)}
-                  />
-                ))}
+                {isNewChat && !isSelectionMode && (
+                  <SidebarMenuItem>
+                    <ChatRowContent name={NEW_CHAT_LABEL} active onSelect={onNewThread} />
+                  </SidebarMenuItem>
+                )}
+                <AnimatePresence initial={false}>
+                  {visibleChats.map((chat) => (
+                    <motion.li
+                      key={chat.id}
+                      layout="position"
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{
+                        opacity: 0,
+                        height: 0,
+                        x: -20,
+                        scale: 0.96,
+                        filter: "blur(2px)",
+                        backgroundColor: "rgba(239, 68, 68, 0.12)",
+                        transition: {
+                          opacity: { duration: 0.32, ease: "easeOut" },
+                          x: { duration: 0.32, ease: "easeOut" },
+                          scale: { duration: 0.32, ease: "easeOut" },
+                          filter: { duration: 0.32, ease: "easeOut" },
+                          backgroundColor: { duration: 0.18 },
+                          height: { duration: 0.34, ease: [0.4, 0, 0.2, 1], delay: 0.08 },
+                        },
+                      }}
+                      transition={{ layout: { duration: 0.28, ease: "easeOut" } }}
+                      data-slot="sidebar-menu-item"
+                      data-sidebar="menu-item"
+                      className="group/menu-item relative overflow-hidden list-none rounded-lg"
+                    >
+                      <ChatRowContent
+                        name={chat.name}
+                        active={chat.id === activeChatId}
+                        onSelect={() => onSelectChat(chat.id)}
+                        onRename={() => openRename(chat)}
+                        onDelete={() => openDelete(chat)}
+                        onStartSelect={() => handleStartSelect(chat.id)}
+                        selectionMode={isSelectionMode}
+                        selected={selectedChatIds.has(chat.id)}
+                        onToggleSelect={() => handleToggleChat(chat.id)}
+                      />
+                    </motion.li>
+                  ))}
+                </AnimatePresence>
                 {/* Older chats load when this comes into view. */}
                 <li ref={loadMoreChatsRef} aria-hidden="true" className="h-px" />
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+
+          {/* Docked Batch Action Bar during Selection Mode */}
+          {isSelectionMode && (
+            <div className="group-data-[state=collapsed]:hidden sticky bottom-0 z-20 shrink-0 mt-2 p-2 rounded-xl border border-zinc-200/90 dark:border-white/10 bg-white/95 dark:bg-[#1c1c1f]/95 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm animate-in slide-in-from-bottom-2 duration-150">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleCancelSelection}
+                className="h-8 px-2.5 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={selectedChatIds.size === 0}
+                onClick={() => {
+                  deleteChats.reset();
+                  setIsBulkDeleteOpen(true);
+                }}
+                className="h-8 gap-1.5 px-3 text-xs bg-red-600 hover:bg-red-500 text-white font-medium shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete{selectedChatIds.size > 0 ? ` (${selectedChatIds.size})` : ""}</span>
+              </Button>
+            </div>
+          )}
         </SidebarContent>
 
         <SidebarFooter className="group-data-[state=expanded]:p-3 group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:pb-3 group-data-[state=collapsed]:items-center">
@@ -336,6 +570,33 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
       />
 
       <ConfirmModal
+        open={isBulkDeleteOpen}
+        onClose={() => setIsBulkDeleteOpen(false)}
+        onConfirm={handleConfirmBulkDelete}
+        pending={deleteChats.isPending}
+        error={deleteChats.error && getErrorMessage(deleteChats.error, "Couldn't delete the selected chats.")}
+        icon={Trash2}
+        title={selectedChatIds.size === 1 ? "Delete Chat?" : `Delete ${selectedChatIds.size} Chats?`}
+        description={
+          selectedChatIds.size === 1 ? (
+            <>
+              Are you sure you want to delete this chat? This will permanently remove the conversation and its history.
+            </>
+          ) : (
+            <>
+              Are you sure you want to delete{" "}
+              <span className="text-zinc-900 dark:text-zinc-200 font-medium">
+                {selectedChatIds.size} chats
+              </span>
+              ? This will permanently remove these conversations and their message history.
+            </>
+          )
+        }
+        confirmLabel={selectedChatIds.size === 1 ? "Delete" : `Delete ${selectedChatIds.size} Chats`}
+        pendingLabel="Deleting..."
+      />
+
+      <ConfirmModal
         open={isLogoutOpen}
         onClose={() => setIsLogoutOpen(false)}
         onConfirm={() => logOut.mutate()}
@@ -358,61 +619,117 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   );
 }
 
-interface ChatRowProps {
+interface ChatRowContentProps {
   name: string;
   active: boolean;
   onSelect: () => void;
   // Without these the row has no menu, as for the not-yet-created new chat.
   onRename?: () => void;
   onDelete?: () => void;
+  onStartSelect?: () => void;
+  selectionMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: () => void;
 }
 
-function ChatRow({ name, active, onSelect, onRename, onDelete }: ChatRowProps) {
-  return (
-    <SidebarMenuItem>
+function ChatRowContent({
+  name,
+  active,
+  onSelect,
+  onRename,
+  onDelete,
+  onStartSelect,
+  selectionMode = false,
+  selected = false,
+  onToggleSelect,
+}: ChatRowContentProps) {
+  if (selectionMode) {
+    return (
       <div
+        role="checkbox"
+        aria-checked={selected}
+        tabIndex={0}
+        onClick={onToggleSelect}
+        onKeyDown={(e) => {
+          if (e.key === " " || e.key === "Enter") {
+            e.preventDefault();
+            onToggleSelect?.();
+          }
+        }}
         className={cn(
-          "group/chat-row flex items-center gap-1.5 w-full h-8 px-1.5 rounded-lg text-[13px] transition-colors",
-          active
-            ? "bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-white font-medium border border-blue-100 dark:border-transparent"
-            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5"
+          "group/chat-row flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] transition-colors cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
+          selected
+            ? "bg-blue-50/90 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100 border border-blue-200/80 dark:border-blue-800/60 font-medium"
+            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 border border-transparent"
         )}
       >
-        {onRename && onDelete ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger render={
-              <button
-                type="button"
-                aria-label={`Options for ${name}`}
-                className="opacity-0 group-hover/chat-row:opacity-100 data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
-              >
-                <MoreVertical className="h-3.5 w-3.5" />
-              </button>
-            } />
-            <DropdownMenuContent side="top" align="start" sideOffset={6} className={cn(MENU_CONTENT, "w-32")}>
-              <DropdownMenuItem onClick={onRename} className={MENU_ITEM}>
-                <Pencil className="h-3.5 w-3.5" />
-                <span>Rename</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={onDelete} className={MENU_ITEM_DANGER}>
-                <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : (
-          <div className="w-6 shrink-0" />
-        )}
-
-        <button
-          type="button"
-          onClick={onSelect}
-          aria-current={active ? "page" : undefined}
-          className="h-full flex-1 truncate rounded-md text-left select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+        <div
+          className={cn(
+            "h-4 w-4 rounded-[4px] flex items-center justify-center shrink-0 transition-all",
+            selected
+              ? "bg-blue-600 text-white shadow-xs"
+              : "border border-zinc-300 dark:border-zinc-600 bg-white dark:bg-zinc-800/80 group-hover/chat-row:border-zinc-400 dark:group-hover/chat-row:border-zinc-500"
+          )}
         >
+          {selected && <Check className="h-3 w-3 stroke-[3]" />}
+        </div>
+
+        <span className="flex-1 truncate text-left">
           {name}
-        </button>
+        </span>
       </div>
-    </SidebarMenuItem>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        "group/chat-row flex items-center gap-1.5 w-full h-8 px-1.5 rounded-lg text-[13px] transition-colors",
+        active
+          ? "bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-white font-medium border border-blue-100 dark:border-transparent"
+          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5"
+      )}
+    >
+      {onRename && onDelete ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger render={
+            <button
+              type="button"
+              aria-label={`Options for ${name}`}
+              className="opacity-0 group-hover/chat-row:opacity-100 data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
+            >
+              <MoreVertical className="h-3.5 w-3.5" />
+            </button>
+          } />
+          <DropdownMenuContent side="top" align="start" sideOffset={6} className={cn(MENU_CONTENT, "w-32")}>
+            <DropdownMenuItem onClick={onRename} className={MENU_ITEM}>
+              <Pencil className="h-3.5 w-3.5" />
+              <span>Rename</span>
+            </DropdownMenuItem>
+            {onStartSelect && (
+              <DropdownMenuItem onClick={onStartSelect} className={MENU_ITEM}>
+                <CheckSquare className="h-3.5 w-3.5" />
+                <span>Select</span>
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuItem onClick={onDelete} className={MENU_ITEM_DANGER}>
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <div className="w-6 shrink-0" />
+      )}
+
+      <button
+        type="button"
+        onClick={onSelect}
+        aria-current={active ? "page" : undefined}
+        className="h-full flex-1 truncate rounded-md text-left select-none cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40"
+      >
+        {name}
+      </button>
+    </div>
   );
 }

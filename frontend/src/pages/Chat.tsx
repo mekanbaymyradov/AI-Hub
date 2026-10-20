@@ -5,7 +5,8 @@ import { isAxiosError } from "axios";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { chatApi } from "@/api/chat";
-import { queryKeys, useChatMessages, useChats } from "@/api/queries";
+import { queryKeys, useChatMessages, useChats, useModels } from "@/api/queries";
+import { type ModelPublic } from "@/api/types";
 
 import { AppSidebar } from "@/components/chat/AppSidebar";
 import { ChatHeader } from "@/components/chat/ChatHeader";
@@ -18,6 +19,29 @@ import { type UIMessage } from "@/components/chat/types";
 let nextLocalId = 0;
 const localId = () => `local-${nextLocalId++}`;
 
+function getNextModel(
+  allModels: ModelPublic[],
+  currentModelId: string,
+  triedModelIds: Set<string>,
+  requireFileSupport: boolean
+): ModelPublic | null {
+  if (allModels.length <= 1) return null;
+
+  const currentIndex = allModels.findIndex((m) => m.id === currentModelId);
+  const reordered =
+    currentIndex >= 0
+      ? [...allModels.slice(currentIndex + 1), ...allModels.slice(0, currentIndex)]
+      : allModels;
+
+  return (
+    reordered.find(
+      (m) =>
+        !triedModelIds.has(m.id) &&
+        (!requireFileSupport || m.supports_files !== false)
+    ) ?? null
+  );
+}
+
 export default function Chat() {
   const queryClient = useQueryClient();
 
@@ -26,6 +50,11 @@ export default function Chat() {
   const isStreamingRef = useRef(false);
   const [activeTool, setActiveTool] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const { data: models = [] } = useModels();
+  const modelsRef = useRef(models);
+  modelsRef.current = models;
 
   // The open chat lives in the URL, so a reload or a shared link reopens it.
   const navigate = useNavigate();
@@ -115,60 +144,101 @@ export default function Chat() {
 
     setIsStreaming(true);
     isStreamingRef.current = true;
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
 
-    let streamBuffer = "";
+    const triedModelIds = new Set<string>([modelId]);
+    let currentModelId = modelId;
     let resolvedChatId = activeChatId;
+    const hasAttachments = attachments.length > 0;
+    let currentAttachmentIds = attachments.map((a) => a.id);
 
-    await chatApi.streamMessage(
-      {
-        chat_id: activeChatId,
-        model_id: modelId,
-        prompt: sendText,
-        attachment_ids: attachments.map((a) => a.id),
-        effort,
-      },
-      {
-        onChatId: (newChatId) => {
-          resolvedChatId = newChatId;
-          if (!activeChatId) {
-            createdChatIdRef.current = newChatId;
-            // Replace, so Back doesn't return to the empty new-chat screen.
-            navigate(`/chats/${newChatId}`, { replace: true });
-            queryClient.invalidateQueries({ queryKey: queryKeys.chats });
-          }
+    while (true) {
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
+      let streamBuffer = "";
+      let hasError = false;
+      let errorMessage = "";
+
+      await chatApi.streamMessage(
+        {
+          chat_id: resolvedChatId,
+          model_id: currentModelId,
+          prompt: sendText,
+          attachment_ids: currentAttachmentIds,
+          effort,
         },
-        onTool: (name) => {
-          // Text after the tool call continues in a new paragraph.
-          if (streamBuffer && !streamBuffer.endsWith("\n")) {
-            streamBuffer += "\n\n";
-          }
-          setActiveTool(name);
+        {
+          onChatId: (newChatId) => {
+            resolvedChatId = newChatId;
+            currentAttachmentIds = [];
+            if (!activeChatId) {
+              createdChatIdRef.current = newChatId;
+              // Replace, so Back doesn't return to the empty new-chat screen.
+              navigate(`/chats/${newChatId}`, { replace: true });
+              queryClient.invalidateQueries({ queryKey: queryKeys.chats });
+            }
+          },
+          onTool: (name) => {
+            // Text after the tool call continues in a new paragraph.
+            if (streamBuffer && !streamBuffer.endsWith("\n")) {
+              streamBuffer += "\n\n";
+            }
+            setActiveTool(name);
+          },
+          onChunk: (chunk) => {
+            setActiveTool(null);
+            streamBuffer += chunk;
+            updateMessage(replyId, { content: streamBuffer });
+          },
+          onError: (error) => {
+            hasError = true;
+            errorMessage = error;
+          },
         },
-        onChunk: (chunk) => {
+        controller.signal
+      );
+
+      if (controller.signal.aborted) {
+        setActiveTool(null);
+        setIsStreaming(false);
+        isStreamingRef.current = false;
+        break;
+      }
+
+      if (hasError) {
+        const nextModel = getNextModel(
+          modelsRef.current,
+          currentModelId,
+          triedModelIds,
+          hasAttachments
+        );
+        if (nextModel) {
+          triedModelIds.add(nextModel.id);
+          currentModelId = nextModel.id;
+          setSelectedModelId(nextModel.id);
+
           setActiveTool(null);
-          streamBuffer += chunk;
-          updateMessage(replyId, { content: streamBuffer });
-        },
-        onError: (error) => {
+          streamBuffer = "";
+          updateMessage(replyId, { content: "", error: undefined });
+          continue;
+        } else {
           setActiveTool(null);
           setIsStreaming(false);
           isStreamingRef.current = false;
-          updateMessage(replyId, { error });
-        },
-        onComplete: () => {
-          setActiveTool(null);
-          setIsStreaming(false);
-          isStreamingRef.current = false;
-          queryClient.invalidateQueries({ queryKey: queryKeys.chats });
-          if (resolvedChatId) {
-            queryClient.invalidateQueries({ queryKey: queryKeys.chatMessages(resolvedChatId) });
-          }
-        },
-      },
-      controller.signal
-    );
+          updateMessage(replyId, { error: errorMessage });
+          break;
+        }
+      }
+
+      setActiveTool(null);
+      setIsStreaming(false);
+      isStreamingRef.current = false;
+      queryClient.invalidateQueries({ queryKey: queryKeys.chats });
+      if (resolvedChatId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.chatMessages(resolvedChatId) });
+      }
+      break;
+    }
   };
 
   const isInitialState = activeChatId === null && messages.length === 0 && !isStreaming;
@@ -199,6 +269,8 @@ export default function Chat() {
             onStop={handleStopGeneration}
             isStreaming={isStreaming}
             isInitialState={isInitialState}
+            selectedModelId={selectedModelId}
+            onSelectModelId={setSelectedModelId}
           />
         </main>
       </div>
