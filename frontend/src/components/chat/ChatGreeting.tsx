@@ -66,10 +66,6 @@ export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatG
         )}
       </h2>
 
-      <p className="mt-2 text-sm sm:text-[15px] text-zinc-500 dark:text-zinc-400 font-normal leading-relaxed">
-        How can I help you today?
-      </p>
-
       <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
         {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }) => (
           <button
