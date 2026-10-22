@@ -19,7 +19,7 @@ Everything else has a working default.
 | `JWT_SECRET` | Signs access tokens. Any random value of 32+ bytes: `openssl rand -hex 32` |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Sign-in codes are emailed, so you can't sign in without them. Resend's test sender `onboarding@resend.dev` works without a domain, but only delivers to your own Resend account email. |
 | `S3_ENDPOINT_URL`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY`, `S3_PUBLIC_BASE_URL` | Cloudflare R2 or any S3-compatible store, with two buckets: `S3_PUBLIC_BUCKET` for avatars, served over `S3_PUBLIC_BASE_URL`, and `S3_PRIVATE_BUCKET` for attachments, with public access off |
-| At least one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GROQ_API_KEY` | Providers without a key are left out of the model list |
+| At least one of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY` | Providers without a key are left out of the model list |
 
 Optional: set `LOGFIRE_TOKEN` to a write token from your Logfire project. The
 `app` and `scheduler` containers then send traces tagged `environment=local`,

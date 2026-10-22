@@ -8,3 +8,4 @@ class Provider(AppEnum):
     OPENAI = "openai"
     GOOGLE = "google"
     GROQ = "groq"
+    MISTRAL = "mistral"

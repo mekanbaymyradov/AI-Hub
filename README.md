@@ -29,7 +29,7 @@ This project was highly inspired by:
 ## Features
 
 - Passwordless sign-in with emailed one-time codes and rotating refresh tokens
-- Chat with Anthropic, OpenAI, Google and Groq models through one API
+- Chat with Anthropic, OpenAI, Google, Groq and Mistral models through one API
 - Replies streamed over Server-Sent Events
 - Tool calling for the current time and weather, with the running tool shown in the chat
 - Web search: the provider's built-in search on Anthropic and Google, DuckDuckGo on the rest

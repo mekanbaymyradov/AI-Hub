@@ -10,6 +10,7 @@ class LLMSettings(AppBaseSettings):
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
+    mistral_api_key: SecretStr | None = None
 
 
 llm_settings = LLMSettings()
