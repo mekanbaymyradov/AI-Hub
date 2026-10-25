@@ -1,5 +1,5 @@
 # Stage: dependencies, shared by the dev server and the production build.
-FROM node:24.21.0-alpine AS deps
+FROM node:26.12.0-alpine AS deps
 
 WORKDIR /app
 # The image's own non-root user. Compose Watch syncs edits in as this user, so
