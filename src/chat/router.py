@@ -143,16 +143,16 @@ async def create_attachments(
     summary="Send a message and stream the reply",
     description=(
         "Streams the reply in the Vercel AI SDK's UI message stream protocol, "
-        "for `useChat`. Send only the new message; the server keeps the history, "
-        "and the body's `id` is ignored in favour of the path's chat.\n\n"
-        "Besides the protocol's own chunks, the stream can carry:\n\n"
+        "for `useChat`. Send only the new message; the server keeps the history.\n\n"
+        "Beyond the protocol's standard chunks:\n\n"
         '- `data-chat-name` (transient): `{"name": <title>}`, after the first '
-        "reply, once the chat is titled.\n"
-        "- `error`: `errorText` is an `ErrorResponse` body as JSON "
-        "(`llm.model_error` or `internal_error`) if the reply fails after "
+        f"completed reply, if the chat is still named `{NEW_CHAT_NAME}`.\n"
+        "- `error`: its `errorText` is an `ErrorResponse` body as JSON "
+        "(`llm.model_error` or `internal_error`), sent if the reply fails after "
         "streaming starts. The status is already 200 by then.\n\n"
         "Errors raised before streaming starts are the JSON responses below."
     ),
+    response_description="The reply, as a UI message stream.",
     responses={
         200: {"content": {"text/event-stream": {}}},
         **error_responses(

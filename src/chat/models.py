@@ -92,10 +92,20 @@ class MessageRequest(SubmitMessage):
     # SubmitMessage allows extra fields; a misspelled one should fail, not be dropped.
     model_config = ConfigDict(extra="forbid")
 
+    trigger: Literal["submit-message"] = Field(
+        "submit-message",
+        description="Only `submit-message`; regenerating a reply isn't supported.",
+    )
+    id: str = Field(
+        description="The `useChat` chat id. Ignored; the path's chat is used."
+    )
     messages: list[UIMessage] = Field(
         min_length=1,
         max_length=1,
-        description="Only the message being sent; the server keeps the history.",
+        description=(
+            "One user message with text parts only; send files as `attachmentIds`. "
+            "The server keeps the history."
+        ),
     )
     model_id: str = Field(description="An id from GET /llms/models.")
     attachment_ids: list[int] = Field(
