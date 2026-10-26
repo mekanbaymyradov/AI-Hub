@@ -55,3 +55,11 @@ export function useDeleteChat() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.chats }),
   });
 }
+
+export function useDeleteChats() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (chatIds: number[]) => chatApi.deleteChats(chatIds),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.chats }),
+  });
+}

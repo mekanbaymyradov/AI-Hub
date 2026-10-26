@@ -47,6 +47,15 @@ export const chatApi = {
     await apiClient.delete('/chats', { params: { chat_ids: chatId } });
   },
 
+  deleteChats: async (chatIds: number[]): Promise<void> => {
+    if (chatIds.length === 0) return;
+    try {
+      await apiClient.post('/chats/bulk-delete', { chat_ids: chatIds });
+    } catch {
+      await Promise.all(chatIds.map((id) => apiClient.delete(`/chats/${id}`)));
+    }
+  },
+
   getChatMessages: async (chatId: number, params?: { limit?: number; cursor?: string | null }): Promise<PageMessagePublic> => {
     const response = await apiClient.get<PageMessagePublic>(`/chats/${chatId}/messages`, { params });
     return response.data;
@@ -118,7 +127,7 @@ export const chatApi = {
               (JSON.parse(message.data) as ErrorResponse).detail[0]?.msg ??
                 'An error occurred during response streaming',
             );
-            break;
+            return;
           // Any other event is for a newer client; skip it.
         }
       }
