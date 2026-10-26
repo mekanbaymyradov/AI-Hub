@@ -73,8 +73,9 @@ CATALOG: tuple[ModelSpec, ...] = (
     ),
     ModelSpec(
         provider=Provider.MISTRAL,
-        model_name="mistral-small-latest",
-        display_name="Mistral Small",
+        model_name="ministral-8b-latest",
+        display_name="Ministral 8B",
+        supports_files=False,
     ),
 )
 

@@ -28,8 +28,19 @@ catalog is served at `GET /llms/models`.
 
 ## Streaming
 
-`POST /chats/messages` streams the reply over Server-Sent Events using
-FastAPI's `EventSourceResponse` (`src/chat/router.py`).
+A chat is created with `POST /chats`, and `POST /chats/{chat_id}/messages`
+streams the reply in the Vercel AI SDK's UI message stream protocol, through
+pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
+
+- **History:** the database is the only record of it. The client sends just
+  the new message; its text is stored before the run, and `ChatAdapter` drops
+  the request's copy so the model sees the stored history alone.
+- **Saving:** the reply is stored in the adapter's `on_complete`, which also
+  titles a chat still named `New chat` and streams the title as a transient
+  `data-chat-name` chunk.
+- **Errors:** `ChatEventStream.on_error` logs the failure and replaces the
+  adapter's raw error text with an `ErrorResponse` body, so provider details
+  never reach the client.
 
 ## Agent tools
 
@@ -43,7 +54,7 @@ FastAPI's `EventSourceResponse` (`src/chat/router.py`).
   for every Groq model, and they reject it.
 - **Effort:** a message's `effort` (`low`, `medium` or `high`) becomes the
   run's `thinking` setting, which pydantic-ai maps to each provider's own.
-  Reasoning is stored with the chat but never streamed or shown in the
+  Reasoning is streamed and stored with the chat, but left out of the
   transcript.
 
 - **Descriptions:** a tool's docstring is what the model reads, so it is
@@ -55,10 +66,10 @@ FastAPI's `EventSourceResponse` (`src/chat/router.py`).
 - **HTTP:** tools call out through one `httpx2` client opened in the app's
   lifespan and handed over in the agent's deps, so tests swap in a
   `MockTransport`.
-- **Streaming:** replies run with `run_stream_events()`, because `run_stream()`
-  ends the run at the first text and skips a tool call that follows it. Each
-  call sends a `tool` event with the tool's name, never its arguments. Tool
-  calls and results are stored with the chat but left out of its transcript.
+- **Streaming:** the adapter runs replies with `run_stream_events()`, so a tool
+  call that follows text still runs. Each call streams as a Vercel tool part
+  with its input and output. Tool calls and results are stored with the chat
+  but left out of its transcript.
 
 ## Attachments
 
