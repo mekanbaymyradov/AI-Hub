@@ -3,7 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage, TextUIPart, UIMessage
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -81,14 +82,32 @@ class Attachment(Base, TimestampMixin):
 
 
 # Pydantic Models
-class MessageRequest(BaseModel):
-    """A prompt sent to a model, in an existing chat or a new one."""
+class MessageRequest(SubmitMessage):
+    """A Vercel AI SDK chat request carrying only the message being sent.
 
-    chat_id: int | None = Field(
-        None, description="Chat to continue; omit to start a new one."
+    The server keeps the chat's history, so the client sends just the new
+    message, as the AI SDK's `prepareSendMessagesRequest` can be set to do.
+    """
+
+    # SubmitMessage allows extra fields; a misspelled one should fail, not be dropped.
+    model_config = ConfigDict(extra="forbid")
+
+    trigger: Literal["submit-message"] = Field(
+        "submit-message",
+        description="Only `submit-message`; regenerating a reply isn't supported.",
+    )
+    id: str = Field(
+        description="The `useChat` chat id. Ignored; the path's chat is used."
+    )
+    messages: list[UIMessage] = Field(
+        min_length=1,
+        max_length=1,
+        description=(
+            "One user message with text parts only; send files as `attachmentIds`. "
+            "The server keeps the history."
+        ),
     )
     model_id: str = Field(description="An id from GET /llms/models.")
-    prompt: str = Field(min_length=1)
     attachment_ids: list[int] = Field(
         default_factory=list,
         max_length=chat_settings.attachment_max_count,
@@ -98,6 +117,25 @@ class MessageRequest(BaseModel):
         None,
         description="How hard the model reasons before replying; omit for its default.",
     )
+
+    @field_validator("messages")
+    @classmethod
+    def check_text_prompt(cls, messages: list[UIMessage]) -> list[UIMessage]:
+        message = messages[0]
+        texts = [part.text for part in message.parts if isinstance(part, TextUIPart)]
+        # Files come as attachment ids instead: a URL from the client cannot be
+        # trusted, and a signed one would expire in the stored history.
+        if message.role != "user" or len(texts) != len(message.parts):
+            raise ValueError("Send one user message with text parts only.")
+        if not any(texts):
+            raise ValueError("The message has no text.")
+        return messages
+
+    @property
+    def prompt(self) -> str:
+        return "\n".join(
+            part.text for part in self.messages[0].parts if isinstance(part, TextUIPart)
+        )
 
 
 class ChatPublic(BaseModel):

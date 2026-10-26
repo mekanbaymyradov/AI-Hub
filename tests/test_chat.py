@@ -1,3 +1,4 @@
+import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from unittest.mock import ANY
@@ -12,8 +13,6 @@ from pydantic_ai.messages import (
     ModelMessage,
     ModelRequest,
     ModelResponse,
-    NativeToolCallPart,
-    NativeToolReturnPart,
     TextPart,
     ToolCallPart,
     ToolReturnPart,
@@ -21,7 +20,6 @@ from pydantic_ai.messages import (
 )
 from pydantic_ai.models.function import (
     AgentInfo,
-    BuiltinToolCallsReturns,
     DeltaToolCall,
     DeltaToolCalls,
     FunctionModel,
@@ -33,6 +31,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.auth.models import User
 from src.chat import service as chat_service
 from src.chat.config import chat_settings
+from src.chat.constants import NEW_CHAT_NAME
+from src.chat.models import Chat
 from src.config import settings
 from src.llm.agents import agent
 from src.llm.constants import TITLE_MODEL_ID
@@ -46,15 +46,22 @@ from tests.utils import (
     add_message,
     auth_header,
     send_message,
-    sse_events,
     store_attachment,
     stored_attachment_keys,
-    streamed_chat_id,
+    stream_chunks,
     streamed_text,
     upload_attachments,
 )
 
 pytestmark = pytest.mark.anyio
+
+
+@pytest.fixture
+async def new_chat(db_session: AsyncSession, user: User) -> Chat:
+    return await chat_service.create_chat(
+        db_session, user_id=user.id, name=NEW_CHAT_NAME
+    )
+
 
 # List chats
 
@@ -135,6 +142,24 @@ async def test_list_chats_rejects_invalid_cursor(client: AsyncClient, token: str
     assert error["loc"] == ["query", "cursor"]
 
 
+# Create chat
+
+
+async def test_create_chat_starts_unnamed(client: AsyncClient, token: str):
+    response = await client.post("/chats", headers=auth_header(token))
+
+    assert response.status_code == 201
+    chat = response.json()
+    assert chat == {
+        "id": ANY,
+        "name": NEW_CHAT_NAME,
+        "created_at": ANY,
+        "updated_at": ANY,
+    }
+    chats = await client.get("/chats", headers=auth_header(token))
+    assert [c["id"] for c in chats.json()["items"]] == [chat["id"]]
+
+
 # Rename chat
 
 
@@ -158,15 +183,20 @@ async def test_rename_chat_changes_name(
     }
 
 
-# Delete chat
+# Delete chats
 
 
-async def test_delete_chat_removes_it(
+async def test_delete_chats_removes_them(
     client: AsyncClient, db_session: AsyncSession, user: User, token: str
 ):
     chat = await chat_service.create_chat(db_session, user_id=user.id, name="My chat")
+    chat2 = await chat_service.create_chat(
+        db_session, user_id=user.id, name="My second chat"
+    )
 
-    response = await client.delete(f"/chats/{chat.id}", headers=auth_header(token))
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [chat.id, chat2.id]}
+    )
 
     assert response.status_code == 204
     chats = await client.get("/chats", headers=auth_header(token))
@@ -195,10 +225,50 @@ async def test_delete_chat_deletes_its_attachment_files(
         s3, db_session, user_id=user.id, message_id=other_prompt.id
     )
 
-    response = await client.delete(f"/chats/{chat.id}", headers=auth_header(token))
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [chat.id]}
+    )
 
     assert response.status_code == 204
     assert stored_attachment_keys(s3) == [kept.key]
+
+
+async def test_delete_chat_cant_remove_others_chat(
+    client: AsyncClient, db_session: AsyncSession, other_user: User, token: str
+):
+    chat = await chat_service.create_chat(
+        db_session, user_id=other_user.id, name="Their chat"
+    )
+
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [chat.id]}
+    )
+
+    assert response.status_code == 404
+    error = response.json()["detail"][0]
+    assert error["type"] == "chat.chat_not_found"
+    assert error["loc"] == ["query", "chat_ids"]
+
+
+async def test_delete_chats_with_a_foreign_id_deletes_nothing(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    user: User,
+    other_user: User,
+    token: str,
+):
+    mine = await chat_service.create_chat(db_session, user_id=user.id, name="Mine")
+    theirs = await chat_service.create_chat(
+        db_session, user_id=other_user.id, name="Theirs"
+    )
+
+    response = await client.delete(
+        "/chats", headers=auth_header(token), params={"chat_ids": [mine.id, theirs.id]}
+    )
+
+    assert response.status_code == 404
+    chats = await client.get("/chats", headers=auth_header(token))
+    assert [c["id"] for c in chats.json()["items"]] == [mine.id]
 
 
 # Messages
@@ -421,22 +491,28 @@ async def test_upload_attachments_rejects_too_many(
 # Send message
 
 
-async def test_send_message_starts_chat(client: AsyncClient, token: str):
-    response = await send_message(client, token, prompt="Hello")
+async def test_send_message_replies_and_names_chat(
+    client: AsyncClient, token: str, new_chat: Chat
+):
+    response = await send_message(client, token, chat_id=new_chat.id, prompt="Hello")
 
     assert response.status_code == 200
-    events = await sse_events(response)
-    chat_id = streamed_chat_id(events)
-    assert streamed_text(events) == REPLY
-    assert "error" not in [event.event for event in events]
+    chunks = await stream_chunks(response)
+    assert streamed_text(chunks) == REPLY
+    assert "error" not in [chunk["type"] for chunk in chunks]
+    # No title model in the fixture registry, so the prompt becomes the name.
+    assert {
+        "type": "data-chat-name",
+        "data": {"name": "Hello"},
+        "transient": True,
+    } in chunks
     messages = await client.get(
-        f"/chats/{chat_id}/messages", headers=auth_header(token)
+        f"/chats/{new_chat.id}/messages", headers=auth_header(token)
     )
     assert [
         (message["kind"], message["content"], message["model_id"])
         for message in messages.json()["items"]
     ] == [("request", "Hello", None), ("response", REPLY, MODEL_ID)]
-    # No title model in the fixture registry, so the prompt stays the name.
     chats = await client.get("/chats", headers=auth_header(token))
     assert [chat["name"] for chat in chats.json()["items"]] == ["Hello"]
 
@@ -461,7 +537,9 @@ async def test_send_message_continues_chat(
         )
 
     assert response.status_code == 200
-    assert streamed_chat_id(await sse_events(response)) == chat.id
+    chunks = await stream_chunks(response)
+    # Only a chat still named NEW_CHAT_NAME is given a title.
+    assert "data-chat-name" not in [chunk["type"] for chunk in chunks]
     seen = [
         part.content
         for message in messages[:3]
@@ -479,7 +557,7 @@ async def test_send_message_continues_chat(
 
 
 async def test_send_message_names_new_chat(
-    client: AsyncClient, llm_registry: LLMRegistry, token: str
+    client: AsyncClient, llm_registry: LLMRegistry, token: str, new_chat: Chat
 ):
     spec = llm_registry.spec(MODEL_ID)
     assert spec is not None
@@ -493,9 +571,15 @@ async def test_send_message_names_new_chat(
     )
     app.dependency_overrides[get_llm_registry] = lambda: registry
 
-    response = await send_message(client, token, prompt="Hello")
+    response = await send_message(client, token, chat_id=new_chat.id, prompt="Hello")
 
     assert response.status_code == 200
+    chunks = await stream_chunks(response)
+    assert {
+        "type": "data-chat-name",
+        "data": {"name": "Greeting"},
+        "transient": True,
+    } in chunks
     chats = await client.get("/chats", headers=auth_header(token))
     assert [chat["name"] for chat in chats.json()["items"]] == ["Greeting"]
 
@@ -506,12 +590,17 @@ async def test_send_message_sends_attachments(
     db_session: AsyncSession,
     user: User,
     token: str,
+    new_chat: Chat,
 ):
     attachment = await store_attachment(s3, db_session, user_id=user.id)
 
     with capture_run_messages() as messages:
         response = await send_message(
-            client, token, prompt="What is this?", attachment_ids=[attachment.id]
+            client,
+            token,
+            chat_id=new_chat.id,
+            prompt="What is this?",
+            attachment_ids=[attachment.id],
         )
 
     assert response.status_code == 200
@@ -521,34 +610,37 @@ async def test_send_message_sends_attachments(
     image = prompt.content[2]
     assert isinstance(image, ImageUrl)
     assert attachment.key in image.url
-    chat_id = streamed_chat_id(await sse_events(response))
-    stored = await client.get(f"/chats/{chat_id}/messages", headers=auth_header(token))
+    stored = await client.get(
+        f"/chats/{new_chat.id}/messages", headers=auth_header(token)
+    )
     [stored_prompt, _] = stored.json()["items"]
     assert [a["id"] for a in stored_prompt["attachments"]] == [attachment.id]
 
 
-async def test_send_message_runs_tool_after_text(client: AsyncClient, token: str):
+async def test_send_message_runs_tool_after_text(
+    client: AsyncClient, token: str, new_chat: Chat
+):
     async def reply(
         messages: list[ModelMessage], _info: AgentInfo
     ) -> AsyncIterator[str | DeltaToolCalls]:
         if len(messages) == 1:
-            # Text ahead of a call in one response: run_stream() would stop here.
+            # Text ahead of a call in one response: Agent.run_stream() would
+            # stop here.
             yield "Let me check. "
             yield {0: DeltaToolCall(name="get_current_time", json_args="{}")}
         else:
             yield "Done."
 
     with agent.override(model=FunctionModel(stream_function=reply)):
-        response = await send_message(client, token, prompt="What time is it?")
+        response = await send_message(
+            client, token, chat_id=new_chat.id, prompt="What time is it?"
+        )
 
     assert response.status_code == 200
-    events = await sse_events(response)
-    chat_id = streamed_chat_id(events)
-    assert [
-        (event.event, event.json()) for event in events if event.event == "tool"
-    ] == [("tool", {"name": "get_current_time"})]
-    assert streamed_text(events) == "Let me check. Done."
-    stored = await client.get(f"/chats/{chat_id}/messages", headers=auth_header(token))
+    assert streamed_text(await stream_chunks(response)) == "Let me check. Done."
+    stored = await client.get(
+        f"/chats/{new_chat.id}/messages", headers=auth_header(token)
+    )
     assert [message["content"] for message in stored.json()["items"]] == [
         "What time is it?",
         "Let me check. ",
@@ -556,30 +648,9 @@ async def test_send_message_runs_tool_after_text(client: AsyncClient, token: str
     ]
 
 
-async def test_send_message_streams_native_search(client: AsyncClient, token: str):
-    async def reply(
-        _messages: list[ModelMessage], _info: AgentInfo
-    ) -> AsyncIterator[str | BuiltinToolCallsReturns]:
-        # The provider runs its own search, so the call and its results arrive
-        # in the response instead of going through a tool of ours.
-        yield {0: NativeToolCallPart("web_search", {"query": "python release"})}
-        yield {1: NativeToolReturnPart("web_search", [{"title": "Python 3.14"}])}
-        yield "Python 3.14."
-
-    with agent.override(model=FunctionModel(stream_function=reply)):
-        response = await send_message(client, token, prompt="Latest Python?")
-
-    assert response.status_code == 200
-    events = await sse_events(response)
-    assert [event.json() for event in events if event.event == "tool"] == [
-        {"name": "web_search"}
-    ]
-    assert streamed_text(events) == "Python 3.14."
-
-
 @pytest.mark.parametrize("effort", ["high", None])
 async def test_send_message_passes_effort(
-    client: AsyncClient, token: str, effort: str | None
+    client: AsyncClient, token: str, new_chat: Chat, effort: str | None
 ):
     seen = []
 
@@ -594,13 +665,15 @@ async def test_send_message_passes_effort(
         stream_function=reply, profile=ModelProfile(supports_thinking=True)
     )
     with agent.override(model=model):
-        response = await send_message(client, token, effort=effort)
+        response = await send_message(client, token, chat_id=new_chat.id, effort=effort)
 
     assert response.status_code == 200
     assert seen == [effort]
 
 
-async def test_send_message_reports_model_failure(client: AsyncClient, token: str):
+async def test_send_message_reports_model_failure(
+    client: AsyncClient, token: str, new_chat: Chat
+):
     async def fail(
         _messages: list[ModelMessage], _info: AgentInfo
     ) -> AsyncIterator[str]:
@@ -608,17 +681,20 @@ async def test_send_message_reports_model_failure(client: AsyncClient, token: st
         raise ModelHTTPError(status_code=503, model_name="test")
 
     with agent.override(model=FunctionModel(stream_function=fail)):
-        response = await send_message(client, token, prompt="Hello")
+        response = await send_message(
+            client, token, chat_id=new_chat.id, prompt="Hello"
+        )
 
-    # Headers went out with the first event, so the failure arrives in the stream.
+    # Headers went out with the first chunk, so the failure arrives in the stream.
     assert response.status_code == 200
-    events = await sse_events(response)
-    chat_id = streamed_chat_id(events)
-    assert events[-1].event == "error"
-    assert events[-1].json() == {
+    chunks = await stream_chunks(response)
+    [error] = [chunk for chunk in chunks if chunk["type"] == "error"]
+    assert json.loads(error["errorText"]) == {
         "detail": [{"msg": "The model failed to reply.", "type": "llm.model_error"}]
     }
-    stored = await client.get(f"/chats/{chat_id}/messages", headers=auth_header(token))
+    stored = await client.get(
+        f"/chats/{new_chat.id}/messages", headers=auth_header(token)
+    )
     assert [
         (message["kind"], message["content"]) for message in stored.json()["items"]
     ] == [("request", "Hello")]
@@ -631,7 +707,7 @@ async def test_send_message_reports_model_failure(client: AsyncClient, token: st
             {"model_id": "groq:missing"},
             404,
             "llm.model_not_found",
-            ["body", "model_id"],
+            ["body", "modelId"],
             id="unknown-model",
         ),
         pytest.param(
@@ -639,23 +715,32 @@ async def test_send_message_reports_model_failure(client: AsyncClient, token: st
             {"model_id": "groq:text-only-model", "attachment_ids": [1]},
             422,
             "chat.model_cannot_accept_files",
-            ["body", "attachment_ids"],
+            ["body", "attachmentIds"],
             id="files-on-text-only-model",
+        ),
+        pytest.param(
+            {"prompt": ""},
+            422,
+            "value_error",
+            ["body", "messages"],
+            id="invalid-body",
         ),
     ],
 )
 async def test_send_message_rejects_before_streaming(
     client: AsyncClient,
     token: str,
+    new_chat: Chat,
     fields: dict,
     status: int,
     error_type: str,
     loc: list[str],
 ):
-    response = await send_message(client, token, **fields)
+    response = await send_message(client, token, chat_id=new_chat.id, **fields)
 
     assert response.status_code == status
-    error = response.json()["detail"][0]
+    # Unpacking also checks that the error is not repeated.
+    [error] = response.json()["detail"]
     assert error["type"] == error_type
     assert error["loc"] == loc
 
@@ -670,9 +755,9 @@ async def test_send_message_to_other_users_chat_is_not_found(
     response = await send_message(client, token, chat_id=chat.id)
 
     assert response.status_code == 404
-    error = response.json()["detail"][0]
+    [error] = response.json()["detail"]
     assert error["type"] == "chat.chat_not_found"
-    assert error["loc"] == ["body", "chat_id"]
+    assert error["loc"] == ["path", "chat_id"]
 
 
 async def test_send_message_rejects_used_attachment(
@@ -681,21 +766,23 @@ async def test_send_message_rejects_used_attachment(
     db_session: AsyncSession,
     user: User,
     token: str,
+    new_chat: Chat,
 ):
-    chat = await chat_service.create_chat(db_session, user_id=user.id, name="My chat")
     prompt = await add_message(
-        db_session, chat, ModelRequest(parts=[UserPromptPart("See this")])
+        db_session, new_chat, ModelRequest(parts=[UserPromptPart("See this")])
     )
     attachment = await store_attachment(
         s3, db_session, user_id=user.id, message_id=prompt.id
     )
 
-    response = await send_message(client, token, attachment_ids=[attachment.id])
+    response = await send_message(
+        client, token, chat_id=new_chat.id, attachment_ids=[attachment.id]
+    )
 
     assert response.status_code == 404
-    error = response.json()["detail"][0]
+    [error] = response.json()["detail"]
     assert error["type"] == "chat.attachment_not_found"
-    assert error["loc"] == ["body", "attachment_ids"]
+    assert error["loc"] == ["body", "attachmentIds"]
 
 
 # Access
@@ -704,7 +791,6 @@ async def test_send_message_rejects_used_attachment(
 @pytest.mark.parametrize(
     ("method", "path", "body"),
     [
-        pytest.param("DELETE", "/chats/{id}", None, id="delete"),
         pytest.param("PATCH", "/chats/{id}/rename", {"name": "Mine now"}, id="rename"),
         pytest.param("GET", "/chats/{id}/messages", None, id="list-messages"),
     ],

@@ -44,7 +44,7 @@ export const chatApi = {
   },
 
   deleteChat: async (chatId: number): Promise<void> => {
-    await apiClient.delete(`/chats/${chatId}`);
+    await apiClient.delete('/chats', { params: { chat_ids: chatId } });
   },
 
   deleteChats: async (chatIds: number[]): Promise<void> => {

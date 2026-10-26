@@ -1,14 +1,23 @@
-from collections.abc import AsyncIterable
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, UploadFile, status
-from fastapi.sse import EventSourceResponse, ServerSentEvent
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    Request,
+    UploadFile,
+    status,
+)
+from fastapi.responses import StreamingResponse
 
 from src.auth.dependencies import CurrentUser
 from src.auth.exceptions import NotAuthenticated
 from src.chat import flows
+from src.chat.adapter import ChatAdapter
 from src.chat.config import chat_settings
-from src.chat.dependencies import Attachments, ChatDep, MessageChatDep, ModelDep
+from src.chat.constants import NEW_CHAT_NAME, VERCEL_AI_SDK_VERSION
+from src.chat.dependencies import ChatDep, ChatIdsDep
 from src.chat.exceptions import (
     AttachmentNotFound,
     AttachmentTooLarge,
@@ -27,6 +36,7 @@ from src.chat.models import (
 from src.database import DbSession
 from src.exceptions import error_responses
 from src.http_client import HttpClientDep
+from src.llm.agents import agent
 from src.llm.dependencies import LLMRegistryDep
 from src.llm.exceptions import ModelNotFound
 from src.pagination import Page, PageParamsDep
@@ -48,20 +58,36 @@ async def list_chats(
     return await flows.list_chats(db, user_id=user.id, params=params)
 
 
+@chat_router.post(
+    path="",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ChatPublic,
+    summary="Start a chat",
+    description=(
+        f"Named `{NEW_CHAT_NAME}` until its first reply is titled. Send its "
+        "messages to POST /chats/{chat_id}/messages."
+    ),
+    responses=error_responses(NotAuthenticated),
+    dependencies=[Depends(user_rate_limit(times=20, seconds=60))],
+)
+async def create_chat(db: DbSession, user: CurrentUser):
+    return await flows.create_chat(db, user_id=user.id)
+
+
 @chat_router.delete(
-    path="/{chat_id}",
+    path="",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a chat",
-    description="Its attachments are deleted from storage once the response is sent.",
+    summary="Delete chats",
+    description="Their attachments are deleted from storage once the response is sent.",
     responses=error_responses(NotAuthenticated, ChatNotFound),
 )
-async def delete_chat(
-    chat: ChatDep,
+async def delete_chats(
+    chat_ids: ChatIdsDep,
     db: DbSession,
     storage: StorageDep,
     background_tasks: BackgroundTasks,
 ) -> None:
-    keys = await flows.delete_chat(db, chat=chat)
+    keys = await flows.delete_chats(db, chat_ids=chat_ids)
     if keys:
         background_tasks.add_task(flows.delete_attachment_objects, storage, keys=keys)
 
@@ -88,8 +114,8 @@ async def list_messages(
     description=(
         f"Images and PDFs, at most {chat_settings.attachment_max_count} files of "
         f"{chat_settings.attachment_max_bytes // 1_048_576} MiB each. Send the "
-        "returned ids as `attachment_ids` to POST /chats/messages; each id can be "
-        "used once."
+        "returned ids as `attachmentIds` to POST /chats/{chat_id}/messages; each "
+        "id can be used once."
     ),
     responses=error_responses(
         NotAuthenticated,
@@ -112,55 +138,61 @@ async def create_attachments(
 
 
 @chat_router.post(
-    path="/messages",
-    response_class=EventSourceResponse,
+    path="/{chat_id}/messages",
+    response_class=StreamingResponse,
     summary="Send a message and stream the reply",
     description=(
-        "Streams the reply as Server-Sent Events:\n\n"
-        '1. `chat`: `{"id": <chat id>}`, sent first, for new and existing chats.\n'
-        "2. Unnamed events whose data is a JSON string with the next piece of the "
-        "reply. The stream ends when the reply is complete.\n"
-        '   Between them, `tool`: `{"name": <tool name>}` when the model starts '
-        "using a tool, such as `get_weather`, so the client can show it is "
-        "working. A web search is `web_search` on models with built-in search "
-        "and `duckduckgo_search` on the rest.\n"
-        "3. `error`: an `ErrorResponse` body (`llm.model_error` or `internal_error`) "
-        "if the reply fails after streaming starts. The status is already 200 by "
-        "then.\n\n"
+        "Streams the reply in the Vercel AI SDK's UI message stream protocol, "
+        "for `useChat`. Send only the new message; the server keeps the history.\n\n"
+        "Beyond the protocol's standard chunks:\n\n"
+        '- `data-chat-name` (transient): `{"name": <title>}`, after the first '
+        f"completed reply, if the chat is still named `{NEW_CHAT_NAME}`.\n"
+        "- `error`: its `errorText` is an `ErrorResponse` body as JSON "
+        "(`llm.model_error` or `internal_error`), sent if the reply fails after "
+        "streaming starts. The status is already 200 by then.\n\n"
         "Errors raised before streaming starts are the JSON responses below."
     ),
-    responses=error_responses(
-        NotAuthenticated,
-        ChatNotFound,
-        ModelNotFound,
-        AttachmentNotFound,
-        ModelCannotAcceptFiles,
-    ),
+    response_description="The reply, as a UI message stream.",
+    responses={
+        200: {"content": {"text/event-stream": {}}},
+        **error_responses(
+            NotAuthenticated,
+            ChatNotFound,
+            ModelNotFound,
+            AttachmentNotFound,
+            ModelCannotAcceptFiles,
+        ),
+    },
     dependencies=[Depends(user_rate_limit(times=20, seconds=60))],
 )
 async def send_message(
     message: MessageRequest,
-    model: ModelDep,
-    chat: MessageChatDep,
-    attachments: Attachments,
+    chat: ChatDep,
     user: CurrentUser,
     db: DbSession,
     storage: StorageDep,
     registry: LLMRegistryDep,
     http: HttpClientDep,
-) -> AsyncIterable[ServerSentEvent]:
-    async for event in flows.send_message(
+    request: Request,
+) -> StreamingResponse:
+    adapter = ChatAdapter(
+        agent=agent,
+        run_input=message,
+        accept=request.headers.get("accept"),
+        sdk_version=VERCEL_AI_SDK_VERSION,
+        model_id=message.model_id,
+    )
+    events = await flows.send_message(
         db,
         storage,
         registry,
         http,
+        adapter=adapter,
         user=user,
         chat=chat,
         message=message,
-        model=model,
-        attachments=attachments,
-    ):
-        yield event
+    )
+    return adapter.streaming_response(events)
 
 
 @chat_router.patch(

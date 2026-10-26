@@ -1,4 +1,3 @@
-import asyncio
 from collections.abc import AsyncIterator, Sequence
 from typing import cast
 from uuid import uuid4
@@ -7,37 +6,30 @@ import httpx2
 import logfire
 from fastapi import UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.sse import ServerSentEvent
 from mypy_boto3_s3 import S3Client
-from pydantic_ai import AgentRunResultEvent
-from pydantic_ai.exceptions import AgentRunError
+from pydantic_ai import AgentRunResult
 from pydantic_ai.messages import (
-    AgentStreamEvent,
     DocumentUrl,
-    FunctionToolCallEvent,
     ImageUrl,
     ModelMessage,
     ModelMessagesTypeAdapter,
     ModelRequest,
-    NativeToolCallPart,
-    PartDeltaEvent,
-    PartStartEvent,
-    TextPart,
-    TextPartDelta,
-    ToolCallPart,
     UserContent,
     UserPromptPart,
 )
-from pydantic_ai.models import Model
 from pydantic_ai.settings import ModelSettings
+from pydantic_ai.ui.vercel_ai.response_types import BaseChunk, DataChunk
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth.models import User
 from src.chat import service
+from src.chat.adapter import ChatAdapter
 from src.chat.config import chat_settings
-from src.chat.constants import ALLOWED_MEDIA_TYPES, CHAT_NAME_LENGTH
+from src.chat.constants import ALLOWED_MEDIA_TYPES, CHAT_NAME_LENGTH, NEW_CHAT_NAME
 from src.chat.exceptions import (
+    AttachmentNotFound,
     AttachmentTooLarge,
+    ModelCannotAcceptFiles,
     TooManyAttachments,
     UnsupportedAttachmentType,
 )
@@ -51,17 +43,22 @@ from src.chat.models import (
     MessagePublic,
     MessageRequest,
 )
-from src.exceptions import AppError
-from src.llm.agents import agent, title_agent
+from src.llm.agents import title_agent
 from src.llm.constants import TITLE_MODEL_ID
-from src.llm.exceptions import ModelError
-from src.llm.models import AgentDeps
+from src.llm.exceptions import ModelNotFound
+from src.llm.models import AgentDeps, ModelSpec
 from src.llm.registry import LLMRegistry
 from src.pagination import Page, PageParams
 from src.storage import presigned_url
 
 
-async def _add_prompt(
+async def create_chat(db: AsyncSession, *, user_id: int) -> Chat:
+    chat = await service.create_chat(db, user_id=user_id, name=NEW_CHAT_NAME)
+    await db.commit()
+    return chat
+
+
+async def create_prompt(
     db: AsyncSession, *, chat: Chat, prompt: str, attachments: Sequence[Attachment]
 ) -> None:
     """Store the user's prompt ahead of the run, so a failed reply cannot lose it.
@@ -92,33 +89,11 @@ async def _add_prompt(
             )
 
     await service.touch_chat(db, chat_id=chat.id)
-
-
-async def create_chat(
-    db: AsyncSession, *, user_id: int, prompt: str, attachments: Sequence[Attachment]
-) -> Chat:
-    """Start a chat with its first prompt, named after the prompt until titled."""
-    chat = await service.create_chat(
-        db, user_id=user_id, name=prompt[:CHAT_NAME_LENGTH]
-    )
-    await _add_prompt(db, chat=chat, prompt=prompt, attachments=attachments)
-    await db.commit()
-    return chat
-
-
-async def create_prompt(
-    db: AsyncSession, *, chat: Chat, prompt: str, attachments: Sequence[Attachment]
-) -> None:
-    await _add_prompt(db, chat=chat, prompt=prompt, attachments=attachments)
     await db.commit()
 
 
 async def generate_chat_name(registry: LLMRegistry, *, prompt: str) -> str | None:
-    """Ask a cheap model to title a new chat, or return None to keep its placeholder.
-
-    Runs alongside the reply, which is using the request's session, so this must
-    not touch the database; the caller saves the name once the reply is stored.
-    """
+    """Ask a cheap model to title a new chat, or return None if it cannot."""
     spec = registry.spec(TITLE_MODEL_ID)
     if spec is None:
         return None
@@ -133,23 +108,24 @@ async def generate_chat_name(registry: LLMRegistry, *, prompt: str) -> str | Non
     return name[:CHAT_NAME_LENGTH] or None
 
 
-async def apply_chat_name(db: AsyncSession, *, chat: Chat, name: str) -> None:
-    """Give a new chat its generated name, unless the user renamed it meanwhile.
+async def apply_chat_name(db: AsyncSession, *, chat: Chat, name: str) -> bool:
+    """Give a new chat its name unless the user renamed it meanwhile, returning whether it did.
 
     chat.name still holds the placeholder the chat was created with, since a
     rename arrives through another request's session and this one never reloads
     the chat.
     """
-    await service.rename_chat_if_unchanged(
+    renamed = await service.rename_chat_if_unchanged(
         db, chat_id=chat.id, old_name=chat.name, new_name=name
     )
     await db.commit()
+    return renamed
 
 
-async def delete_chat(db: AsyncSession, *, chat: Chat) -> Sequence[str]:
-    """Delete the chat, returning the attachment keys the caller should drop from storage."""
-    keys = await service.get_attachment_keys(db, chat_id=chat.id)
-    await service.delete_chat(db, chat=chat)
+async def delete_chats(db: AsyncSession, *, chat_ids: Sequence[int]) -> Sequence[str]:
+    """Delete the chats, returning the attachment keys the caller should drop from storage."""
+    keys = await service.get_attachment_keys(db, chat_ids=chat_ids)
+    await service.delete_chats(db, chat_ids=chat_ids)
     await db.commit()
     return keys
 
@@ -270,6 +246,28 @@ def _attachment_parts(
     return parts
 
 
+async def _resolve_attachments(
+    db: AsyncSession,
+    *,
+    spec: ModelSpec,
+    user_id: int,
+    attachment_ids: Sequence[int],
+) -> Sequence[Attachment]:
+    if not attachment_ids:
+        return []
+
+    if not spec.supports_files:
+        raise ModelCannotAcceptFiles(loc=["body", "attachmentIds"])
+
+    attachments = await service.get_attachments(
+        db, attachment_ids=attachment_ids, user_id=user_id
+    )
+    if len(attachments) != len(set(attachment_ids)):
+        raise AttachmentNotFound(loc=["body", "attachmentIds"])
+
+    return attachments
+
+
 async def get_history(
     db: AsyncSession, storage: S3Client, *, chat_id: int
 ) -> list[ModelMessage]:
@@ -365,97 +363,63 @@ async def create_reply(
     await db.commit()
 
 
-def _event_to_sse(event: AgentStreamEvent) -> ServerSentEvent | None:
-    """Return what the client is sent for an agent event, or None to send nothing."""
-    match event:
-        case (
-            PartStartEvent(part=TextPart(content=text))
-            | PartDeltaEvent(delta=TextPartDelta(content_delta=text))
-        ) if text:
-            return ServerSentEvent(data=text)
-        # Only the name: the arguments can carry the user's text. A provider's
-        # built-in tool, like its web search, arrives as a part, not a call event.
-        case (
-            FunctionToolCallEvent(part=ToolCallPart(tool_name=name))
-            | PartStartEvent(part=NativeToolCallPart(tool_name=name))
-        ):
-            return ServerSentEvent(data={"name": name}, event="tool")
-        case _:
-            return None
-
-
 async def send_message(
     db: AsyncSession,
     storage: S3Client,
     registry: LLMRegistry,
     http: httpx2.AsyncClient,
     *,
+    adapter: ChatAdapter,
     user: User,
-    chat: Chat | None,
+    chat: Chat,
     message: MessageRequest,
-    model: Model,
-    attachments: Sequence[Attachment],
-) -> AsyncIterator[ServerSentEvent]:
-    """Store the prompt, then stream the reply to it and store that too.
+) -> AsyncIterator[BaseChunk]:
+    """Store the prompt, then return the reply's stream, which stores the reply once it completes.
 
-    A `chat` of None starts a new one. The prompt is stored before the run, so a
-    reply that fails or is cut off still leaves it in the chat. The response has
-    already started by the time anything here can fail, so a failure ends the
-    stream with an error event instead of an error response.
+    The prompt is stored before the stream starts, so a failure storing it is an
+    ordinary error response, and a reply that fails or is cut off still leaves
+    it in the chat. A failure after that ends the stream with an error chunk.
     """
-    name_task = None
-    try:
-        if chat is None:
-            chat = await create_chat(
-                db, user_id=user.id, prompt=message.prompt, attachments=attachments
-            )
-            name_task = asyncio.create_task(
-                generate_chat_name(registry, prompt=message.prompt)
-            )
-        else:
-            await create_prompt(
-                db, chat=chat, prompt=message.prompt, attachments=attachments
-            )
+    spec = registry.spec(message.model_id)
+    if spec is None:
+        raise ModelNotFound(loc=["body", "modelId"])
+    attachments = await _resolve_attachments(
+        db, spec=spec, user_id=user.id, attachment_ids=message.attachment_ids
+    )
 
-        yield ServerSentEvent(data={"id": chat.id}, event="chat")
+    await create_prompt(db, chat=chat, prompt=message.prompt, attachments=attachments)
+    history = await get_history(db, storage, chat_id=chat.id)
 
-        # With no user prompt given, the run resumes from the stored prompt that
-        # ends the history, and leaves it out of new_messages().
-        history = await get_history(db, storage, chat_id=chat.id)
+    async def on_complete(result: AgentRunResult[str]) -> AsyncIterator[BaseChunk]:
+        await create_reply(
+            db,
+            chat_id=chat.id,
+            messages=result.new_messages(),
+            model_id=message.model_id,
+        )
+        if chat.name != NEW_CHAT_NAME:
+            return
 
-        # Not run_stream(), which ends the run at the first text and so skips a
-        # tool call that follows it, as in "Let me check." and then a call.
-        async with agent.run_stream_events(
-            model=model,
-            message_history=history,
-            deps=AgentDeps(name=user.name, instructions=user.instructions, http=http),
-            # `thinking` takes no None, so an omitted effort sends no settings.
-            model_settings=(
-                ModelSettings(thinking=message.effort) if message.effort else None
-            ),
-        ) as events:
-            async for event in events:
-                # The last event, sent only when the run completed.
-                if isinstance(event, AgentRunResultEvent):
-                    await create_reply(
-                        db,
-                        chat_id=chat.id,
-                        messages=event.result.new_messages(),
-                        model_id=message.model_id,
-                    )
-                elif sse := _event_to_sse(event):
-                    yield sse
+        name = await generate_chat_name(registry, prompt=message.prompt)
+        name = name or message.prompt[:CHAT_NAME_LENGTH]
+        if await apply_chat_name(db, chat=chat, name=name):
+            # Transient: the title belongs to the chat, not to the reply message.
+            yield DataChunk(type="data-chat-name", data={"name": name}, transient=True)
 
-        if name_task is not None and (name := await name_task):
-            await apply_chat_name(db, chat=chat, name=name)
-
-    except Exception as exc:
-        error = ModelError() if isinstance(exc, AgentRunError) else AppError()
-        logfire.exception("Reply failed", model_id=message.model_id)
-        yield ServerSentEvent(data={"detail": [error.serialize()]}, event="error")
-    finally:
-        if name_task is not None:
-            name_task.cancel()
+    # With no user prompt given, the run resumes from the stored prompt that
+    # ends the history, and leaves it out of new_messages().
+    return adapter.run_stream(
+        model=registry.model(spec),
+        message_history=history,
+        # The path's chat id, not the client-sent `id`, labels the run's traces.
+        conversation_id=str(chat.id),
+        deps=AgentDeps(name=user.name, instructions=user.instructions, http=http),
+        # `thinking` takes no None, so an omitted effort sends no settings.
+        model_settings=(
+            ModelSettings(thinking=message.effort) if message.effort else None
+        ),
+        on_complete=on_complete,
+    )
 
 
 async def rename_chat(db: AsyncSession, *, chat: Chat, name: str) -> Chat:

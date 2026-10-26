@@ -2,7 +2,7 @@ import json
 from collections.abc import Sequence
 from uuid import uuid4
 
-from httpx2 import AsyncClient, EventSource, Response, ServerSentEvent
+from httpx2 import AsyncClient, EventSource, Response
 from mypy_boto3_s3 import S3Client
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -79,40 +79,42 @@ async def send_message(
     client: AsyncClient,
     token: str,
     *,
+    chat_id: int,
     prompt: str = "Hello",
-    chat_id: int | None = None,
     model_id: str = MODEL_ID,
     attachment_ids: Sequence[int] = (),
     effort: str | None = None,
 ) -> Response:
     return await client.post(
-        "/chats/messages",
+        f"/chats/{chat_id}/messages",
         headers=auth_header(token),
         json={
-            "prompt": prompt,
-            "chat_id": chat_id,
-            "model_id": model_id,
-            "attachment_ids": list(attachment_ids),
+            "trigger": "submit-message",
+            "id": str(uuid4()),
+            "messages": [
+                {
+                    "id": str(uuid4()),
+                    "role": "user",
+                    "parts": [{"type": "text", "text": prompt}],
+                }
+            ],
+            "modelId": model_id,
+            "attachmentIds": list(attachment_ids),
             "effort": effort,
         },
     )
 
 
-async def sse_events(response: Response) -> list[ServerSentEvent]:
-    return [event async for event in EventSource(response)]
+async def stream_chunks(response: Response) -> list[dict]:
+    """Return the UI message stream's chunks, without its closing [DONE]."""
+    events = [event async for event in EventSource(response)]
+    assert events[-1].data == "[DONE]"
+    return [json.loads(event.data) for event in events[:-1]]
 
 
-def streamed_chat_id(events: list[ServerSentEvent]) -> int:
-    """Return the id from the `chat` event that opens every reply stream."""
-    assert events[0].event == "chat"
-    return json.loads(events[0].data)["id"]
-
-
-def streamed_text(events: list[ServerSentEvent]) -> str:
-    """Join the reply chunks, however the stream happened to batch them."""
-    return "".join(
-        json.loads(event.data) for event in events if event.event == "message"
-    )
+def streamed_text(chunks: list[dict]) -> str:
+    """Join the reply's text deltas, however the stream happened to batch them."""
+    return "".join(c["delta"] for c in chunks if c["type"] == "text-delta")
 
 
 async def add_message(
