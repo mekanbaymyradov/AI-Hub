@@ -1,69 +1,84 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
+import { useChat } from "@ai-sdk/react";
 import { isAxiosError } from "axios";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
-import { chatApi } from "@/api/chat";
-import { queryKeys, useChatMessages, useChats, useModels } from "@/api/queries";
-import { type ModelPublic } from "@/api/types";
+import { chatTransport } from "@/api/chat";
+import { getErrorMessage } from "@/api/errors";
+import {
+  prependChatToCache,
+  queryKeys,
+  seedEmptyChatMessagesCache,
+  touchChatInCache,
+  updateChatNameInCache,
+  useChatMessages,
+  useChats,
+  useModels,
+} from "@/api/queries";
 
 import { AppSidebar } from "@/components/chat/AppSidebar";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatInput, type OutgoingMessage } from "@/components/chat/ChatInput";
 import { NamePromptModal } from "@/components/chat/NamePromptModal";
-import { type UIMessage } from "@/components/chat/types";
-
-// Ids for messages shown before the API has saved them; history reloads replace them with real ids.
-let nextLocalId = 0;
-const localId = () => `local-${nextLocalId++}`;
-
-function getNextModel(
-  allModels: ModelPublic[],
-  currentModelId: string,
-  triedModelIds: Set<string>,
-  requireFileSupport: boolean
-): ModelPublic | null {
-  if (allModels.length <= 1) return null;
-
-  const currentIndex = allModels.findIndex((m) => m.id === currentModelId);
-  const reordered =
-    currentIndex >= 0
-      ? [...allModels.slice(currentIndex + 1), ...allModels.slice(0, currentIndex)]
-      : allModels;
-
-  return (
-    reordered.find(
-      (m) =>
-        !triedModelIds.has(m.id) &&
-        (!requireFileSupport || m.supports_files !== false)
-    ) ?? null
-  );
-}
+import {
+  getActiveToolName,
+  messagePublicToChatUIMessage,
+  toRenderableUIMessage,
+  type ChatUIMessage,
+  type SendRequestMetadata,
+  type UIMessage,
+} from "@/components/chat/types";
 
 export default function Chat() {
   const queryClient = useQueryClient();
 
-  const [messages, setMessages] = useState<UIMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const isStreamingRef = useRef(false);
-  const [activeTool, setActiveTool] = useState<string | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
   const { data: models = [] } = useModels();
-  const modelsRef = useRef(models);
-  useEffect(() => {
-    modelsRef.current = models;
-  }, [models]);
 
   // The open chat lives in the URL, so a reload or a shared link reopens it.
   const navigate = useNavigate();
   const { chatId } = useParams();
   const activeChatId = chatId === undefined ? null : Number(chatId);
+
   // The chat the current stream just created. Moving to its URL must keep the reply that is still streaming.
   const createdChatIdRef = useRef<number | null>(null);
+  // Tracks the previous activeChatId so the reset effect only fires when the route chat actually changes.
+  const prevActiveChatIdRef = useRef<number | null>(activeChatId);
+  // Tracks which chat ID the active stream belongs to (for `data-chat-name` and cache invalidation).
+  const streamChatIdRef = useRef<number | null>(activeChatId);
+  // Tracks whether the current chat has new messages from this session that should refresh when leaving.
+  const dirtyChatIdRef = useRef<number | null>(null);
+
+  const {
+    messages: chatMessages,
+    setMessages,
+    sendMessage,
+    stop,
+    clearError,
+    status,
+    error,
+  } = useChat<ChatUIMessage>({
+    transport: chatTransport,
+    onData: (dataPart) => {
+      if (dataPart.type === "data-chat-name" && streamChatIdRef.current !== null) {
+        updateChatNameInCache(queryClient, streamChatIdRef.current, dataPart.data.name);
+      }
+    },
+    onFinish: () => {
+      if (streamChatIdRef.current !== null) {
+        dirtyChatIdRef.current = streamChatIdRef.current;
+      }
+    },
+  });
+
+  const isStreaming = status === "submitted" || status === "streaming";
+  const isStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
 
   const { data: chatsData } = useChats();
 
@@ -83,165 +98,158 @@ export default function Chat() {
   }, [chatNotFound, navigate]);
 
   const handleStopGeneration = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
-    setIsStreaming(false);
-    isStreamingRef.current = false;
-    setActiveTool(null);
-  }, []);
+    void stop();
+  }, [stop]);
 
   // Runs before the history effect below, so a cached chat's messages replace the cleared ones.
   useEffect(() => {
+    if (prevActiveChatIdRef.current === activeChatId) {
+      return;
+    }
+    prevActiveChatIdRef.current = activeChatId;
+
     if (activeChatId !== null && activeChatId === createdChatIdRef.current) {
       createdChatIdRef.current = null;
       return;
     }
-    handleStopGeneration();
+    createdChatIdRef.current = null;
+
+    if (dirtyChatIdRef.current !== null && dirtyChatIdRef.current !== activeChatId) {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chatMessages(dirtyChatIdRef.current),
+      });
+      dirtyChatIdRef.current = null;
+    }
+
+    streamChatIdRef.current = activeChatId;
+    void stop();
+    clearError();
     setMessages([]);
-  }, [activeChatId, handleStopGeneration]);
+  }, [activeChatId, clearError, queryClient, setMessages, stop]);
 
   useEffect(() => {
-    if (historyData && !isStreamingRef.current) {
-      // The first page holds the newest messages, and each page reads oldest first.
-      const history = historyData.pages.toReversed().flatMap((page) => page.items);
+    if (!historyData || isStreamingRef.current) return;
 
-      const uiMsgs: UIMessage[] = history.map((m) => ({
-        id: m.id.toString(),
-        role: m.kind === "response" ? "ai" : "user",
-        content: m.content,
-        attachments: m.attachments ?? [],
-      }));
+    // The first page holds the newest messages, and each page reads oldest first.
+    const history = historyData.pages.toReversed().flatMap((page) => page.items);
+    if (history.length === 0) return;
 
-      setMessages(uiMsgs);
-    }
-  }, [historyData]);
+    const historyMessages = history.map(messagePublicToChatUIMessage);
+
+    setMessages((prev) => {
+      if (prev.length === 0) return historyMessages;
+
+      const prevById = new Map(prev.map((m) => [m.id, m]));
+      const historyIds = new Set(historyMessages.map((m) => m.id));
+      const mergedHistory = historyMessages.map((m) => prevById.get(m.id) ?? m);
+      // Preserve any messages streamed during this session that aren't in the paged history yet.
+      const sessionTail = prev.filter((m) => !historyIds.has(m.id));
+      return [...mergedHistory, ...sessionTail];
+    });
+  }, [historyData, setMessages]);
 
   // Changing the URL is enough: the effect above stops the reply and clears the screen.
-  const handleSelectChat = useCallback((id: number) => {
-    if (id !== activeChatId) navigate(`/chats/${id}`);
-  }, [activeChatId, navigate]);
+  const handleSelectChat = useCallback(
+    (id: number) => {
+      if (id !== activeChatId) navigate(`/chats/${id}`);
+    },
+    [activeChatId, navigate]
+  );
 
   const handleNewThread = useCallback(() => {
     // Cleared here too: on "/" already, as after a first message that failed, the URL doesn't change.
-    handleStopGeneration();
+    if (dirtyChatIdRef.current !== null) {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.chatMessages(dirtyChatIdRef.current),
+      });
+      dirtyChatIdRef.current = null;
+    }
+    streamChatIdRef.current = null;
+    void stop();
+    clearError();
     setMessages([]);
     navigate("/");
-  }, [handleStopGeneration, navigate]);
-
-  const updateMessage = (id: string, change: Partial<UIMessage>) =>
-    setMessages((prev) => prev.map((msg) => (msg.id === id ? { ...msg, ...change } : msg)));
+  }, [clearError, navigate, queryClient, setMessages, stop]);
 
   const handleSend = async ({ prompt, attachments, modelId, effort }: OutgoingMessage) => {
     if (isStreaming) return;
 
     const sendText = prompt || "Attached files";
-    const replyId = localId();
-    setMessages((prev) => [
-      ...prev,
-      { id: localId(), role: "user", content: sendText, attachments },
-      { id: replyId, role: "ai", content: "" },
-    ]);
+    clearError();
+    streamChatIdRef.current = activeChatId;
 
-    setIsStreaming(true);
-    isStreamingRef.current = true;
-
-    const triedModelIds = new Set<string>([modelId]);
-    let currentModelId = modelId;
-    let resolvedChatId = activeChatId;
-    const hasAttachments = attachments.length > 0;
-    let currentAttachmentIds = attachments.map((a) => a.id);
-
-    while (true) {
-      const controller = new AbortController();
-      abortControllerRef.current = controller;
-
-      let streamBuffer = "";
-      let hasError = false;
-      let errorMessage = "";
-
-      await chatApi.streamMessage(
-        {
-          chat_id: resolvedChatId,
-          model_id: currentModelId,
-          prompt: sendText,
-          attachment_ids: currentAttachmentIds,
-          effort,
-        },
-        {
-          onChatId: (newChatId) => {
-            resolvedChatId = newChatId;
-            currentAttachmentIds = [];
-            if (!activeChatId) {
-              createdChatIdRef.current = newChatId;
-              // Replace, so Back doesn't return to the empty new-chat screen.
-              navigate(`/chats/${newChatId}`, { replace: true });
-              queryClient.invalidateQueries({ queryKey: queryKeys.chats });
-            }
-          },
-          onTool: (name) => {
-            // Text after the tool call continues in a new paragraph.
-            if (streamBuffer && !streamBuffer.endsWith("\n")) {
-              streamBuffer += "\n\n";
-            }
-            setActiveTool(name);
-          },
-          onChunk: (chunk) => {
-            setActiveTool(null);
-            streamBuffer += chunk;
-            updateMessage(replyId, { content: streamBuffer });
-          },
-          onError: (error) => {
-            hasError = true;
-            errorMessage = error;
-          },
-        },
-        controller.signal
-      );
-
-      if (controller.signal.aborted) {
-        setActiveTool(null);
-        setIsStreaming(false);
-        isStreamingRef.current = false;
-        break;
-      }
-
-      if (hasError) {
-        const nextModel = getNextModel(
-          modelsRef.current,
-          currentModelId,
-          triedModelIds,
-          hasAttachments
-        );
-        if (nextModel) {
-          triedModelIds.add(nextModel.id);
-          currentModelId = nextModel.id;
-          setSelectedModelId(nextModel.id);
-
-          setActiveTool(null);
-          streamBuffer = "";
-          updateMessage(replyId, { content: "", error: undefined });
-          continue;
-        } else {
-          setActiveTool(null);
-          setIsStreaming(false);
-          isStreamingRef.current = false;
-          updateMessage(replyId, { error: errorMessage });
-          break;
-        }
-      }
-
-      setActiveTool(null);
-      setIsStreaming(false);
-      isStreamingRef.current = false;
-      queryClient.invalidateQueries({ queryKey: queryKeys.chats });
-      if (resolvedChatId) {
-        queryClient.invalidateQueries({ queryKey: queryKeys.chatMessages(resolvedChatId) });
-      }
-      break;
+    if (activeChatId !== null) {
+      touchChatInCache(queryClient, activeChatId);
     }
+
+    const requestMetadata: SendRequestMetadata = {
+      chatId: activeChatId,
+      modelId,
+      attachmentIds: attachments.map((a) => a.id),
+      effort,
+      models,
+      onChatCreated: (newChat) => {
+        createdChatIdRef.current = newChat.id;
+        streamChatIdRef.current = newChat.id;
+        dirtyChatIdRef.current = newChat.id;
+        // Optimistically update the sidebar and seed the message cache before navigating,
+        // so moving to `/chats/${newChat.id}` causes zero extra network requests or flicker.
+        prependChatToCache(queryClient, newChat);
+        seedEmptyChatMessagesCache(queryClient, newChat.id);
+        // Replace, so Back doesn't return to the empty new-chat screen.
+        navigate(`/chats/${newChat.id}`, { replace: true });
+      },
+      onModelFallback: (nextModelId) => {
+        setSelectedModelId(nextModelId);
+      },
+    };
+
+    await sendMessage(
+      {
+        text: sendText,
+        metadata: { attachments },
+      },
+      {
+        metadata: requestMetadata,
+      }
+    );
   };
+
+  const lastChatMessage = chatMessages[chatMessages.length - 1];
+  const activeTool = isStreaming ? getActiveToolName(lastChatMessage) : null;
+  const streamErrorText =
+    status === "error" && error
+      ? getErrorMessage(error, "An error occurred during response streaming.")
+      : undefined;
+
+  const messages: UIMessage[] = useMemo(() => {
+    const rendered = chatMessages.map((msg, idx) => {
+      const isLastAssistant =
+        idx === chatMessages.length - 1 && msg.role === "assistant";
+      return toRenderableUIMessage(msg, isLastAssistant ? streamErrorText : undefined);
+    });
+
+    const lastMsg = chatMessages[chatMessages.length - 1];
+    if (lastMsg?.role === "user") {
+      if (isStreaming) {
+        // Show the assistant streaming placeholder immediately while POST /chats and stream headers are in flight.
+        rendered.push({
+          id: `${lastMsg.id}-pending`,
+          role: "ai",
+          content: "",
+        });
+      } else if (streamErrorText) {
+        rendered.push({
+          id: `${lastMsg.id}-error`,
+          role: "ai",
+          content: "",
+          error: streamErrorText,
+        });
+      }
+    }
+
+    return rendered;
+  }, [chatMessages, isStreaming, streamErrorText]);
 
   const isInitialState = activeChatId === null && messages.length === 0 && !isStreaming;
 
