@@ -23,6 +23,7 @@ from src.chat.exceptions import (
     AttachmentTooLarge,
     ChatNotFound,
     ModelCannotAcceptFiles,
+    NothingToRetry,
     TooManyAttachments,
     UnsupportedAttachmentType,
 )
@@ -32,6 +33,7 @@ from src.chat.models import (
     ChatRename,
     MessagePublic,
     MessageRequest,
+    RetryRequest,
 )
 from src.database import DbSession
 from src.exceptions import error_responses
@@ -203,3 +205,57 @@ async def send_message(
 )
 async def rename_chat(payload: ChatRename, chat: ChatDep, db: DbSession):
     return await flows.rename_chat(db, chat=chat, name=payload.name)
+
+
+@chat_router.post(
+    path="/{chat_id}/retry",
+    response_class=StreamingResponse,
+    summary="Regenerate the chat's last reply",
+    description=(
+        "Answers the chat's last prompt again, whether its reply failed or not, "
+        "streaming as POST /chats/{chat_id}/messages does, with the same extra "
+        "chunks. The old reply is replaced only once the new one completes, so a "
+        "retry that fails or is cut off keeps it.\n\n"
+        "Errors raised before streaming starts are the JSON responses below."
+    ),
+    response_description="The new reply, as a UI message stream.",
+    responses={
+        200: {"content": {"text/event-stream": {}}},
+        **error_responses(
+            NotAuthenticated,
+            ChatNotFound,
+            ModelNotFound,
+            ModelCannotAcceptFiles,
+            NothingToRetry,
+        ),
+    },
+    dependencies=[Depends(user_rate_limit(times=20, seconds=60))],
+)
+async def retry_reply(
+    retry: RetryRequest,
+    chat: ChatDep,
+    user: CurrentUser,
+    db: DbSession,
+    storage: StorageDep,
+    registry: LLMRegistryDep,
+    http: HttpClientDep,
+    request: Request,
+) -> StreamingResponse:
+    adapter = ChatAdapter(
+        agent=agent,
+        run_input=retry,
+        accept=request.headers.get("accept"),
+        sdk_version=VERCEL_AI_SDK_VERSION,
+        model_id=retry.model_id,
+    )
+    events = await flows.retry_reply(
+        db,
+        storage,
+        registry,
+        http,
+        adapter=adapter,
+        user=user,
+        chat=chat,
+        retry=retry,
+    )
+    return adapter.streaming_response(events)

@@ -43,3 +43,9 @@ class ModelCannotAcceptFiles(AppError):
     status = 422
     type = "chat.model_cannot_accept_files"
     msg = "This model does not accept attachments."
+
+
+class NothingToRetry(AppError):
+    status = 409
+    type = "chat.nothing_to_retry"
+    msg = "The chat has no message to retry."
