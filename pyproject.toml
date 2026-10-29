@@ -14,7 +14,7 @@ dependencies = [
     # Logfire 5 supports OpenTelemetry up to 1.44 (instrumentations 0.65b0), so
     # raise this bound together with Logfire's.
     "opentelemetry-instrumentation-botocore>=0.65b0,<0.66",
-    "psycopg[binary]>=3.3.5",
+    "psycopg[binary]>=3.3.6",
     "pydantic-ai-slim[duckduckgo]>=2.53.0",
     "pydantic-ai[groq,mistral]>=2.33.0",
     "pydantic-settings>=2.15.0",
