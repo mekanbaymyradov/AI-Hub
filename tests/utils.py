@@ -105,6 +105,26 @@ async def send_message(
     )
 
 
+async def retry_reply(
+    client: AsyncClient,
+    token: str,
+    *,
+    chat_id: int,
+    model_id: str = MODEL_ID,
+    messages: Sequence[dict] = (),
+) -> Response:
+    return await client.post(
+        f"/chats/{chat_id}/retry",
+        headers=auth_header(token),
+        json={
+            "trigger": "regenerate-message",
+            "id": str(uuid4()),
+            "messages": list(messages),
+            "modelId": model_id,
+        },
+    )
+
+
 async def stream_chunks(response: Response) -> list[dict]:
     """Return the UI message stream's chunks, without its closing [DONE]."""
     events = [event async for event in EventSource(response)]

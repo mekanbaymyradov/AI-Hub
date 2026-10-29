@@ -45,6 +45,7 @@ from tests.utils import (
     REPLY,
     add_message,
     auth_header,
+    retry_reply,
     send_message,
     store_attachment,
     stored_attachment_keys,
@@ -785,6 +786,203 @@ async def test_send_message_rejects_used_attachment(
     assert error["loc"] == ["body", "attachmentIds"]
 
 
+# Retry
+
+
+async def test_retry_replaces_last_reply(
+    client: AsyncClient, db_session: AsyncSession, user: User, token: str
+):
+    chat = await chat_service.create_chat(db_session, user_id=user.id, name="My chat")
+    for message in [
+        ModelRequest(parts=[UserPromptPart("First question")]),
+        ModelResponse(parts=[TextPart("First answer")]),
+        ModelRequest(parts=[UserPromptPart("Second question")]),
+        ModelResponse(parts=[TextPart("Bad answer")]),
+    ]:
+        await add_message(db_session, chat, message)
+
+    with capture_run_messages() as messages:
+        response = await retry_reply(client, token, chat_id=chat.id)
+
+    assert response.status_code == 200
+    chunks = await stream_chunks(response)
+    assert streamed_text(chunks) == REPLY
+    assert "data-chat-name" not in [chunk["type"] for chunk in chunks]
+    seen = [
+        part.content
+        for message in messages
+        for part in message.parts
+        if isinstance(part, UserPromptPart | TextPart)
+    ]
+    assert seen == ["First question", "First answer", "Second question", REPLY]
+    stored = await client.get(f"/chats/{chat.id}/messages", headers=auth_header(token))
+    assert [message["content"] for message in stored.json()["items"]] == [
+        "First question",
+        "First answer",
+        "Second question",
+        REPLY,
+    ]
+
+
+async def test_retry_replaces_reply_with_tool_calls(
+    client: AsyncClient, db_session: AsyncSession, token: str, new_chat: Chat
+):
+    for message in [
+        ModelRequest(parts=[UserPromptPart("What time is it?")]),
+        ModelResponse(parts=[ToolCallPart("get_current_time", {}, "call-1")]),
+        ModelRequest(parts=[ToolReturnPart("get_current_time", "12:00", "call-1")]),
+        ModelResponse(parts=[TextPart("It is noon.")]),
+    ]:
+        await add_message(db_session, new_chat, message)
+
+    with capture_run_messages() as messages:
+        response = await retry_reply(client, token, chat_id=new_chat.id)
+
+    assert response.status_code == 200
+    assert streamed_text(await stream_chunks(response)) == REPLY
+    # The tool's result is a request too, yet the run starts over from the prompt.
+    assert [part.part_kind for message in messages for part in message.parts] == [
+        "user-prompt",
+        "text",
+    ]
+    # The tool rows have no text, so only storage shows they are gone.
+    assert len(await chat_service.get_messages(db_session, chat_id=new_chat.id)) == 2
+
+
+async def test_retry_answers_unanswered_prompt_and_names_chat(
+    client: AsyncClient, db_session: AsyncSession, token: str, new_chat: Chat
+):
+    await add_message(
+        db_session, new_chat, ModelRequest(parts=[UserPromptPart("Hello")])
+    )
+
+    response = await retry_reply(client, token, chat_id=new_chat.id)
+
+    assert response.status_code == 200
+    chunks = await stream_chunks(response)
+    assert streamed_text(chunks) == REPLY
+    # No title model in the fixture registry, so the prompt becomes the name.
+    assert {
+        "type": "data-chat-name",
+        "data": {"name": "Hello"},
+        "transient": True,
+    } in chunks
+    stored = await client.get(
+        f"/chats/{new_chat.id}/messages", headers=auth_header(token)
+    )
+    assert [
+        (message["kind"], message["content"], message["model_id"])
+        for message in stored.json()["items"]
+    ] == [("request", "Hello", None), ("response", REPLY, MODEL_ID)]
+    chats = await client.get("/chats", headers=auth_header(token))
+    assert [chat["name"] for chat in chats.json()["items"]] == ["Hello"]
+
+
+async def test_retry_failure_keeps_old_reply(
+    client: AsyncClient, db_session: AsyncSession, token: str, new_chat: Chat
+):
+    await add_message(
+        db_session, new_chat, ModelRequest(parts=[UserPromptPart("Hello")])
+    )
+    await add_message(
+        db_session,
+        new_chat,
+        ModelResponse(parts=[TextPart("Old answer")]),
+        model_id=MODEL_ID,
+    )
+
+    async def fail(
+        _messages: list[ModelMessage], _info: AgentInfo
+    ) -> AsyncIterator[str]:
+        yield "Partial "
+        raise ModelHTTPError(status_code=503, model_name="test")
+
+    with agent.override(model=FunctionModel(stream_function=fail)):
+        response = await retry_reply(client, token, chat_id=new_chat.id)
+
+    assert response.status_code == 200
+    chunks = await stream_chunks(response)
+    [error] = [chunk for chunk in chunks if chunk["type"] == "error"]
+    assert json.loads(error["errorText"])["detail"][0]["type"] == "llm.model_error"
+    stored = await client.get(
+        f"/chats/{new_chat.id}/messages", headers=auth_header(token)
+    )
+    assert [message["content"] for message in stored.json()["items"]] == [
+        "Hello",
+        "Old answer",
+    ]
+
+
+async def test_retry_empty_chat_has_nothing_to_retry(
+    client: AsyncClient, token: str, new_chat: Chat
+):
+    response = await retry_reply(client, token, chat_id=new_chat.id)
+
+    assert response.status_code == 409
+    [error] = response.json()["detail"]
+    assert error["type"] == "chat.nothing_to_retry"
+
+
+@pytest.mark.parametrize(
+    ("fields", "status", "error_type", "loc"),
+    [
+        pytest.param(
+            {"model_id": "groq:missing"},
+            404,
+            "llm.model_not_found",
+            ["body", "modelId"],
+            id="unknown-model",
+        ),
+        pytest.param(
+            {"model_id": "groq:text-only-model"},
+            422,
+            "chat.model_cannot_accept_files",
+            ["body", "modelId"],
+            id="files-on-text-only-model",
+        ),
+        pytest.param(
+            {
+                "messages": [
+                    {
+                        "id": "m1",
+                        "role": "user",
+                        "parts": [{"type": "text", "text": "Hi"}],
+                    }
+                ]
+            },
+            422,
+            "too_long",
+            ["body", "messages"],
+            id="messages-sent",
+        ),
+    ],
+)
+async def test_retry_rejects_before_streaming(
+    client: AsyncClient,
+    s3: S3Client,
+    db_session: AsyncSession,
+    user: User,
+    token: str,
+    new_chat: Chat,
+    fields: dict,
+    status: int,
+    error_type: str,
+    loc: list[str],
+):
+    prompt = await add_message(
+        db_session, new_chat, ModelRequest(parts=[UserPromptPart("See this")])
+    )
+    await store_attachment(s3, db_session, user_id=user.id, message_id=prompt.id)
+
+    response = await retry_reply(client, token, chat_id=new_chat.id, **fields)
+
+    assert response.status_code == status
+    # Unpacking also checks that the error is not repeated.
+    [error] = response.json()["detail"]
+    assert error["type"] == error_type
+    assert error["loc"] == loc
+
+
 # Access
 
 
@@ -793,6 +991,12 @@ async def test_send_message_rejects_used_attachment(
     [
         pytest.param("PATCH", "/chats/{id}/rename", {"name": "Mine now"}, id="rename"),
         pytest.param("GET", "/chats/{id}/messages", None, id="list-messages"),
+        pytest.param(
+            "POST",
+            "/chats/{id}/retry",
+            {"trigger": "regenerate-message", "id": "chat", "modelId": MODEL_ID},
+            id="retry",
+        ),
     ],
 )
 async def test_other_users_chat_is_not_found(

@@ -17,7 +17,7 @@ from pydantic_ai.messages import (
     UserContent,
     UserPromptPart,
 )
-from pydantic_ai.settings import ModelSettings
+from pydantic_ai.settings import ModelSettings, ThinkingEffort
 from pydantic_ai.ui.vercel_ai.response_types import BaseChunk, DataChunk
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,6 +30,7 @@ from src.chat.exceptions import (
     AttachmentNotFound,
     AttachmentTooLarge,
     ModelCannotAcceptFiles,
+    NothingToRetry,
     TooManyAttachments,
     UnsupportedAttachmentType,
 )
@@ -42,6 +43,7 @@ from src.chat.models import (
     MessageCursor,
     MessagePublic,
     MessageRequest,
+    RetryRequest,
 )
 from src.llm.agents import title_agent
 from src.llm.constants import TITLE_MODEL_ID
@@ -269,15 +271,16 @@ async def _resolve_attachments(
 
 
 async def get_history(
-    db: AsyncSession, storage: S3Client, *, chat_id: int
+    db: AsyncSession, storage: S3Client, *, chat_id: int, through: int | None = None
 ) -> list[ModelMessage]:
     """Return the chat so far, in the form an agent run takes as its history.
 
     Attachments are added back from their own rows, with freshly signed URLs,
     since the stored message holds the prompt text alone. The prompt being
-    answered is already stored, so the history ends with it.
+    answered is already stored, so the history ends with it, or with message
+    `through` if given.
     """
-    rows = await service.get_messages(db, chat_id=chat_id)
+    rows = await service.get_messages(db, chat_id=chat_id, through=through)
     history = ModelMessagesTypeAdapter.validate_python([row.content for row in rows])
 
     for row, message in zip(rows, history, strict=True):
@@ -293,6 +296,14 @@ async def get_history(
     # idle in a transaction for as long as the model takes to answer.
     await db.commit()
     return history
+
+
+def _prompt_text(request: ModelRequest) -> str:
+    return "".join(
+        part.content
+        for part in request.parts
+        if isinstance(part, UserPromptPart) and isinstance(part.content, str)
+    )
 
 
 async def get_messages(
@@ -318,11 +329,7 @@ async def get_messages(
     transcript = []
     for row, message in zip(rows, messages, strict=True):
         if isinstance(message, ModelRequest):
-            content = "".join(
-                part.content
-                for part in message.parts
-                if isinstance(part, UserPromptPart) and isinstance(part.content, str)
-            )
+            content = _prompt_text(message)
         else:
             content = message.text or ""
 
@@ -346,13 +353,24 @@ async def get_messages(
 
 
 async def create_reply(
-    db: AsyncSession, *, chat_id: int, messages: list[ModelMessage], model_id: str
+    db: AsyncSession,
+    *,
+    chat_id: int,
+    messages: list[ModelMessage],
+    model_id: str,
+    replace_after: int | None = None,
 ) -> None:
     """Store the messages a run produced after its prompt, one row each.
 
     Only the reply records the model, so a chat continued with a different one
-    stays accurate about which model said what.
+    stays accurate about which model said what. With `replace_after`, the rows
+    after that message are deleted first, in the same transaction.
     """
+    if replace_after is not None:
+        # Deleted only now, so a retry that fails or is cut off keeps the old reply.
+        await service.delete_messages_after(
+            db, chat_id=chat_id, message_id=replace_after
+        )
     for content in ModelMessagesTypeAdapter.dump_python(messages, mode="json"):
         await service.create_message(
             db,
@@ -361,6 +379,59 @@ async def create_reply(
             model_id=model_id if content["kind"] == "response" else None,
         )
     await db.commit()
+
+
+def _stream_reply(
+    db: AsyncSession,
+    registry: LLMRegistry,
+    http: httpx2.AsyncClient,
+    *,
+    adapter: ChatAdapter,
+    spec: ModelSpec,
+    user: User,
+    chat: Chat,
+    history: list[ModelMessage],
+    prompt: str,
+    effort: ThinkingEffort | None,
+    replace_after: int | None = None,
+) -> AsyncIterator[BaseChunk]:
+    """Return the reply's stream, which stores the reply once it completes.
+
+    Args:
+        history: The chat through the prompt being answered, which it ends with.
+        prompt: The prompt's text, to title a chat still named NEW_CHAT_NAME.
+        replace_after: Passed to create_reply, to replace the rows after it.
+    """
+
+    async def on_complete(result: AgentRunResult[str]) -> AsyncIterator[BaseChunk]:
+        await create_reply(
+            db,
+            chat_id=chat.id,
+            messages=result.new_messages(),
+            model_id=spec.id,
+            replace_after=replace_after,
+        )
+        if chat.name != NEW_CHAT_NAME:
+            return
+
+        name = await generate_chat_name(registry, prompt=prompt)
+        name = name or prompt[:CHAT_NAME_LENGTH]
+        if await apply_chat_name(db, chat=chat, name=name):
+            # Transient: the title belongs to the chat, not to the reply message.
+            yield DataChunk(type="data-chat-name", data={"name": name}, transient=True)
+
+    # With no user prompt given, the run resumes from the stored prompt that
+    # ends the history, and leaves it out of new_messages().
+    return adapter.run_stream(
+        model=registry.model(spec),
+        message_history=history,
+        # The path's chat id, not the client-sent `id`, labels the run's traces.
+        conversation_id=str(chat.id),
+        deps=AgentDeps(name=user.name, instructions=user.instructions, http=http),
+        # `thinking` takes no None, so an omitted effort sends no settings.
+        model_settings=ModelSettings(thinking=effort) if effort else None,
+        on_complete=on_complete,
+    )
 
 
 async def send_message(
@@ -389,36 +460,62 @@ async def send_message(
 
     await create_prompt(db, chat=chat, prompt=message.prompt, attachments=attachments)
     history = await get_history(db, storage, chat_id=chat.id)
+    return _stream_reply(
+        db,
+        registry,
+        http,
+        adapter=adapter,
+        spec=spec,
+        user=user,
+        chat=chat,
+        history=history,
+        prompt=message.prompt,
+        effort=message.effort,
+    )
 
-    async def on_complete(result: AgentRunResult[str]) -> AsyncIterator[BaseChunk]:
-        await create_reply(
-            db,
-            chat_id=chat.id,
-            messages=result.new_messages(),
-            model_id=message.model_id,
-        )
-        if chat.name != NEW_CHAT_NAME:
-            return
 
-        name = await generate_chat_name(registry, prompt=message.prompt)
-        name = name or message.prompt[:CHAT_NAME_LENGTH]
-        if await apply_chat_name(db, chat=chat, name=name):
-            # Transient: the title belongs to the chat, not to the reply message.
-            yield DataChunk(type="data-chat-name", data={"name": name}, transient=True)
+async def retry_reply(
+    db: AsyncSession,
+    storage: S3Client,
+    registry: LLMRegistry,
+    http: httpx2.AsyncClient,
+    *,
+    adapter: ChatAdapter,
+    user: User,
+    chat: Chat,
+    retry: RetryRequest,
+) -> AsyncIterator[BaseChunk]:
+    """Return a new reply's stream for the chat's last prompt.
 
-    # With no user prompt given, the run resumes from the stored prompt that
-    # ends the history, and leaves it out of new_messages().
-    return adapter.run_stream(
-        model=registry.model(spec),
-        message_history=history,
-        # The path's chat id, not the client-sent `id`, labels the run's traces.
-        conversation_id=str(chat.id),
-        deps=AgentDeps(name=user.name, instructions=user.instructions, http=http),
-        # `thinking` takes no None, so an omitted effort sends no settings.
-        model_settings=(
-            ModelSettings(thinking=message.effort) if message.effort else None
-        ),
-        on_complete=on_complete,
+    The old reply, if any, is replaced only once the new one is stored, so a
+    retry that fails or is cut off keeps it.
+    """
+    spec = registry.spec(retry.model_id)
+    if spec is None:
+        raise ModelNotFound(loc=["body", "modelId"])
+
+    prompt = await service.get_last_prompt(db, chat_id=chat.id)
+    if prompt is None:
+        raise NothingToRetry()
+    if prompt.attachments and not spec.supports_files:
+        raise ModelCannotAcceptFiles(loc=["body", "modelId"])
+
+    # From the stored row, which holds the text alone; the history's copy of the
+    # prompt has its attachments mixed in.
+    [request] = ModelMessagesTypeAdapter.validate_python([prompt.content])
+    history = await get_history(db, storage, chat_id=chat.id, through=prompt.id)
+    return _stream_reply(
+        db,
+        registry,
+        http,
+        adapter=adapter,
+        spec=spec,
+        user=user,
+        chat=chat,
+        history=history,
+        prompt=_prompt_text(cast(ModelRequest, request)),
+        effort=retry.effort,
+        replace_after=prompt.id,
     )
 
 

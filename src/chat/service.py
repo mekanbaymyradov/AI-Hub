@@ -53,14 +53,44 @@ async def delete_chats(db: AsyncSession, *, chat_ids: Sequence[int]) -> None:
     await db.execute(delete(Chat).where(Chat.id.in_(chat_ids)))
 
 
-async def get_messages(db: AsyncSession, *, chat_id: int) -> Sequence[Message]:
-    result = await db.execute(
+async def get_messages(
+    db: AsyncSession, *, chat_id: int, through: int | None = None
+) -> Sequence[Message]:
+    """Return the chat's messages, stopping at message `through` if given."""
+    query = (
         select(Message)
         .where(Message.chat_id == chat_id)
         .order_by(Message.id)
         .options(selectinload(Message.attachments))
     )
+    if through is not None:
+        query = query.where(Message.id <= through)
+
+    result = await db.execute(query)
     return result.scalars().all()
+
+
+async def get_last_prompt(db: AsyncSession, *, chat_id: int) -> Message | None:
+    result = await db.execute(
+        select(Message)
+        .where(
+            Message.chat_id == chat_id,
+            # Matched on the part kind: a tool's result is also a request with no model.
+            Message.content.contains({"parts": [{"part_kind": "user-prompt"}]}),
+        )
+        .order_by(Message.id.desc())
+        .limit(1)
+        .options(selectinload(Message.attachments))
+    )
+    return result.scalar_one_or_none()
+
+
+async def delete_messages_after(
+    db: AsyncSession, *, chat_id: int, message_id: int
+) -> None:
+    await db.execute(
+        delete(Message).where(Message.chat_id == chat_id, Message.id > message_id)
+    )
 
 
 async def create_message(
