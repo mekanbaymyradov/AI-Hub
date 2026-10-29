@@ -5,11 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
-    "alembic>=1.20.0",
+    "alembic>=1.20.1",
     "boto3-stubs[s3]>=1.35",
-    "boto3>=1.43.108",
+    "boto3>=1.43.117",
     "fastapi[standard]>=0.141.1",
-    "httpx2>=2.13.1",
+    "httpx2>=2.16.0",
     "logfire[fastapi,httpx,sqlalchemy,redis]>=5.1.1,<6",
     # Logfire 5 supports OpenTelemetry up to 1.44 (instrumentations 0.65b0), so
     # raise this bound together with Logfire's.
@@ -17,7 +17,7 @@ dependencies = [
     "psycopg[binary]>=3.3.5",
     "pydantic-ai-slim[duckduckgo]>=2.53.0",
     "pydantic-ai[groq,mistral]>=2.33.0",
-    "pydantic-settings>=2.15.0",
+    "pydantic-settings>=2.16.1",
     "pydantic[email]>=2.13.5",
     "pyjwt>=2.15.1",
     "redis>=5.2",
@@ -53,8 +53,8 @@ dev = [
     "asgi-lifespan==2.*",
     "moto[s3]>=5.2.3",
     "pytest>=9.1.1",
-    "ruff>=0.16.10",
-    "ty>=0.0.84",
+    "ruff>=0.17.1",
+    "ty>=0.0.90",
 ]
 
 [tool.pytest]
