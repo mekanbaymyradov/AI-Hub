@@ -1,7 +1,16 @@
-import { skipToken, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  skipToken,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type InfiniteData,
+  type QueryClient,
+} from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { chatApi } from "./chat";
 import { llmApi } from "./llm";
+import { type ChatPublic, type PageChatPublic, type PageMessagePublic } from "./types";
 
 export const queryKeys = {
   models: ["models"],
@@ -34,17 +43,108 @@ export function useChatMessages(chatId: number | null) {
         : ({ pageParam }) => chatApi.getChatMessages(chatId, { cursor: pageParam }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.next_cursor,
+    staleTime: 30_000,
     // A missing chat won't appear on a retry, so the chat page can fall back right away.
     retry: (failureCount, error) =>
       !(isAxiosError(error) && error.response && error.response.status < 500) && failureCount < 3,
   });
 }
 
+/** Prepend a newly created chat to the top of the cached chat list without waiting for a refetch. */
+export function prependChatToCache(queryClient: QueryClient, chat: ChatPublic): void {
+  queryClient.setQueryData<InfiniteData<PageChatPublic, string | null>>(
+    queryKeys.chats,
+    (old) => {
+      if (!old || old.pages.length === 0) {
+        return {
+          pages: [{ items: [chat], next_cursor: null }],
+          pageParams: [null],
+        };
+      }
+      const filteredPages = old.pages.map((page) => ({
+        ...page,
+        items: page.items.filter((item) => item.id !== chat.id),
+      }));
+      filteredPages[0] = {
+        ...filteredPages[0],
+        items: [chat, ...filteredPages[0].items],
+      };
+      return { ...old, pages: filteredPages };
+    }
+  );
+}
+
+/** Move an active chat to the top of the cached chat list when a message is sent. */
+export function touchChatInCache(queryClient: QueryClient, chatId: number): void {
+  queryClient.setQueryData<InfiniteData<PageChatPublic, string | null>>(
+    queryKeys.chats,
+    (old) => {
+      if (!old || old.pages.length === 0) return old;
+      const existing = old.pages.flatMap((p) => p.items).find((c) => c.id === chatId);
+      if (!existing) return old;
+
+      const updatedChat: ChatPublic = {
+        ...existing,
+        updated_at: new Date().toISOString(),
+      };
+      const filteredPages = old.pages.map((page) => ({
+        ...page,
+        items: page.items.filter((item) => item.id !== chatId),
+      }));
+      filteredPages[0] = {
+        ...filteredPages[0],
+        items: [updatedChat, ...filteredPages[0].items],
+      };
+      return { ...old, pages: filteredPages };
+    }
+  );
+}
+
+/** Instantly update a chat's title in the cached chat list (e.g. from `data-chat-name` or rename). */
+export function updateChatNameInCache(
+  queryClient: QueryClient,
+  chatId: number,
+  name: string
+): void {
+  queryClient.setQueryData<InfiniteData<PageChatPublic, string | null>>(
+    queryKeys.chats,
+    (old) => {
+      if (!old) return old;
+      return {
+        ...old,
+        pages: old.pages.map((page) => ({
+          ...page,
+          items: page.items.map((chat) =>
+            chat.id === chatId ? { ...chat, name } : chat
+          ),
+        })),
+      };
+    }
+  );
+}
+
+/** Seed an empty message list for a brand-new chat so navigating to its URL skips a redundant fetch. */
+export function seedEmptyChatMessagesCache(
+  queryClient: QueryClient,
+  chatId: number
+): void {
+  queryClient.setQueryData<InfiniteData<PageMessagePublic, string | null>>(
+    queryKeys.chatMessages(chatId),
+    {
+      pages: [{ items: [], next_cursor: null }],
+      pageParams: [null],
+    }
+  );
+}
+
 export function useRenameChat() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) => chatApi.renameChat(id, { name }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.chats }),
+    onSuccess: (updated) => {
+      updateChatNameInCache(queryClient, updated.id, updated.name);
+      queryClient.invalidateQueries({ queryKey: queryKeys.chats });
+    },
   });
 }
 

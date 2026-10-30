@@ -76,11 +76,18 @@ export interface PageMessagePublic {
 /** How hard the model reasons before replying. */
 export type Effort = 'low' | 'medium' | 'high';
 
+export interface SubmitUserMessage {
+  id: string;
+  role: 'user';
+  parts: { type: 'text'; text: string }[];
+}
+
 export interface MessageRequest {
-  chat_id?: number | null;
-  model_id: string;
-  prompt: string;
-  attachment_ids?: number[];
+  trigger?: 'submit-message';
+  id: string;
+  messages: [SubmitUserMessage];
+  modelId: string;
+  attachmentIds?: number[];
   effort?: Effort | null;
 }
 

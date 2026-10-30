@@ -1,11 +1,11 @@
-import { memo } from "react";
-import { motion } from "framer-motion";
-import { AlertCircle, FileText, Loader2 } from "lucide-react";
+import { memo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { AlertCircle, Brain, ChevronRight, FileText, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FormattedMessage } from "./FormattedMessage";
 import { type UIMessage } from "./types";
 
-// Named after the API's `tool` events; native and DuckDuckGo search share a label.
+// Named after the API's tool chunks; native and DuckDuckGo search share a label.
 const TOOL_LABELS: Record<string, string> = {
   get_weather: "Checking the weather…",
   get_current_time: "Checking the time…",
@@ -28,9 +28,22 @@ export const ChatMessageItem = memo(
     isLastMessage = false,
     activeTool = null,
   }: ChatMessageItemProps) {
+    const [userReasoningOpen, setUserReasoningOpen] = useState<boolean | null>(null);
     const isUser = message.role === "user";
+    const isReasoningStreaming = Boolean(
+      !isUser && isStreaming && isLastMessage && message.isReasoningStreaming
+    );
+    // Auto-expand while actively thinking, then auto-collapse once the answer starts unless toggled.
+    const isReasoningOpen = userReasoningOpen ?? (isReasoningStreaming && !message.content);
+
     const showStreamingDots =
-      !isUser && isStreaming && isLastMessage && !message.content && !activeTool;
+      !isUser &&
+      isStreaming &&
+      isLastMessage &&
+      !message.content &&
+      !message.reasoning &&
+      !activeTool &&
+      !message.error;
 
     return (
       <motion.div
@@ -87,6 +100,48 @@ export const ChatMessageItem = memo(
               <img src="/favicon.svg" alt="AI-Hub" className="size-5 object-contain" />
             </span>
             <div className="flex-1 min-w-0 mt-1 text-[15px] text-zinc-800 dark:text-zinc-300 leading-relaxed">
+              {message.reasoning && (
+                <div className="mb-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setUserReasoningOpen(!isReasoningOpen)}
+                    aria-expanded={isReasoningOpen}
+                    className="inline-flex items-center gap-1.5 py-1 px-2 -ml-2 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer select-none"
+                  >
+                    <Brain
+                      className={cn(
+                        "h-3.5 w-3.5 shrink-0",
+                        isReasoningStreaming
+                          ? "text-blue-600 dark:text-blue-400 animate-pulse"
+                          : "text-zinc-400 dark:text-zinc-500"
+                      )}
+                    />
+                    <span>{isReasoningStreaming ? "Thinking…" : "Thought process"}</span>
+                    <ChevronRight
+                      className={cn(
+                        "h-3.5 w-3.5 text-zinc-400 transition-transform duration-200",
+                        isReasoningOpen && "rotate-90"
+                      )}
+                    />
+                  </button>
+                  <AnimatePresence initial={false}>
+                    {isReasoningOpen && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: "auto", opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeInOut" }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-1 mb-1.5 border-l-2 border-zinc-200 dark:border-zinc-700/80 pl-3.5 py-1 text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">
+                          {message.reasoning}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
               {message.content ? (
                 <FormattedMessage
                   content={message.content}
@@ -104,12 +159,14 @@ export const ChatMessageItem = memo(
                   ))}
                 </div>
               ) : null}
+
               {message.error && (
                 <div className="my-2.5 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-500 dark:text-red-300 text-xs flex items-start gap-2">
                   <AlertCircle className="h-4 w-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
                   <div className="flex-1 leading-relaxed">{message.error}</div>
                 </div>
               )}
+
               {activeTool && (
                 <div className="flex items-center gap-2 h-6 px-1 text-sm text-zinc-500 dark:text-zinc-400">
                   <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
@@ -126,6 +183,8 @@ export const ChatMessageItem = memo(
     return (
       prev.message.id === next.message.id &&
       prev.message.content === next.message.content &&
+      prev.message.reasoning === next.message.reasoning &&
+      prev.message.isReasoningStreaming === next.message.isReasoningStreaming &&
       prev.message.error === next.message.error &&
       prev.message.attachments === next.message.attachments &&
       prev.isStreaming === next.isStreaming &&

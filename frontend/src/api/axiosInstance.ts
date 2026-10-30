@@ -5,6 +5,9 @@ import { type Token } from "./types";
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   withCredentials: true,
+  paramsSerializer: {
+    indexes: null,
+  },
 });
 
 let currentAccessToken: string | null = null;
