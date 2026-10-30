@@ -4,7 +4,12 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from pydantic_ai.ui.vercel_ai.request_types import SubmitMessage, TextUIPart, UIMessage
+from pydantic_ai.ui.vercel_ai.request_types import (
+    RegenerateMessage,
+    SubmitMessage,
+    TextUIPart,
+    UIMessage,
+)
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -94,7 +99,10 @@ class MessageRequest(SubmitMessage):
 
     trigger: Literal["submit-message"] = Field(
         "submit-message",
-        description="Only `submit-message`; regenerating a reply isn't supported.",
+        description=(
+            "Only `submit-message`; send `regenerate-message` to "
+            "POST /chats/{chat_id}/retry."
+        ),
     )
     id: str = Field(
         description="The `useChat` chat id. Ignored; the path's chat is used."
@@ -174,6 +182,31 @@ class MessagePublic(BaseModel):
 
 class ChatRename(BaseModel):
     name: str = Field(min_length=1, max_length=255)
+
+
+class RetryRequest(RegenerateMessage):
+    # RegenerateMessage allows extra fields; a misspelled one should fail, not be dropped.
+    model_config = ConfigDict(extra="forbid")
+
+    trigger: Literal["regenerate-message"] = Field(
+        "regenerate-message", description="Only `regenerate-message`."
+    )
+    id: str = Field(
+        description="The `useChat` chat id. Ignored; the path's chat is used."
+    )
+    messages: list[UIMessage] = Field(
+        default_factory=list,
+        max_length=0,
+        description="Leave empty; the server keeps the history.",
+    )
+    message_id: str | None = Field(
+        None, description="Ignored; the chat's last reply is regenerated."
+    )
+    model_id: str = Field(description="An id from GET /llms/models.")
+    effort: Literal["low", "medium", "high"] | None = Field(
+        None,
+        description="How hard the model reasons before replying; omit for its default.",
+    )
 
 
 class ChatCursor(Cursor):
