@@ -123,6 +123,10 @@
     }
   body {
     @apply bg-background text-foreground;
+  }
+  /* clip, not hidden: hidden turns body into a scroll container, which breaks sticky and anchor scrolling. */
+  html, body {
+    overflow-x: clip;
     }
   html {
     @apply font-sans;

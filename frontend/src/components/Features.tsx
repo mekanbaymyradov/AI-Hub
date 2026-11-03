@@ -42,7 +42,7 @@ function ModelsDemo() {
 
   return (
     <div className="w-full max-w-lg space-y-4">
-      <div className="mx-auto flex w-fit flex-wrap justify-center rounded-full border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-900">
+      <div className="mx-auto flex w-fit flex-wrap justify-center rounded-2xl sm:rounded-full border border-zinc-200 bg-white p-1 dark:border-zinc-800 dark:bg-zinc-900">
         {PROVIDERS.map((provider, i) => (
           <div key={provider.name} className="relative px-2.5 py-1.5 text-[11px] font-medium sm:px-3 sm:text-xs">
             {i === active && (
@@ -106,7 +106,7 @@ function PrivacyDemo() {
   ];
 
   return (
-    <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-4 font-mono text-xs shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
+    <div className="w-full max-w-md rounded-2xl border border-zinc-200 bg-white p-3.5 sm:p-4 font-mono text-[11px] sm:text-xs shadow-xs dark:border-zinc-800 dark:bg-zinc-900">
       <div className="flex items-center justify-between">
         <span className="flex items-center gap-2 text-zinc-900 dark:text-white">
           <span className="size-1.5 rounded-full bg-emerald-500" />
@@ -154,7 +154,7 @@ function SelfHostDemo() {
   const shown = useTick(COMMANDS.length + SERVICES.length + 4, 550) + 1;
 
   return (
-    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 font-mono text-xs shadow-lg">
+    <div className="w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 font-mono text-[11px] sm:text-xs shadow-lg">
       <div className="flex items-center gap-1.5 border-b border-zinc-800 px-4 py-2.5">
         <span className="size-2.5 rounded-full bg-zinc-700" />
         <span className="size-2.5 rounded-full bg-zinc-700" />
@@ -288,7 +288,7 @@ export default function Features() {
                     setAutoAdvance(false);
                   }}
                   className={cn(
-                    'relative w-full overflow-hidden rounded-2xl p-5 text-left transition-colors',
+                    'relative w-full overflow-hidden rounded-2xl p-4 sm:p-5 text-left transition-colors',
                     i === active
                       ? 'bg-white shadow-sm ring-1 ring-zinc-200 dark:bg-zinc-900 dark:ring-zinc-800'
                       : 'hover:bg-zinc-100/70 dark:hover:bg-zinc-900/50',
@@ -357,7 +357,7 @@ export default function Features() {
               />
               <div
                 aria-hidden
-                className="relative flex h-80 items-center justify-center overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50/80 px-4 sm:px-8 dark:border-zinc-800/60 dark:bg-zinc-950/60"
+                className="relative flex min-h-[22rem] sm:min-h-80 h-auto py-6 sm:py-0 items-center justify-center overflow-hidden rounded-2xl border border-zinc-100 bg-zinc-50/80 px-3 sm:px-8 dark:border-zinc-800/60 dark:bg-zinc-950/60"
               >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div

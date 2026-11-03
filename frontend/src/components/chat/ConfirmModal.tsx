@@ -47,13 +47,13 @@ export function ConfirmModal({
         </p>
       )}
 
-      <div className="flex justify-end gap-2 pt-2">
+      <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2">
         <Button
           type="button"
           variant="ghost"
           onClick={onClose}
           disabled={pending}
-          className="h-9 cursor-pointer rounded-lg px-4 text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
         >
           Cancel
         </Button>
@@ -61,7 +61,7 @@ export function ConfirmModal({
           type="button"
           onClick={onConfirm}
           disabled={pending}
-          className="h-9 cursor-pointer rounded-lg bg-red-600 px-4 text-xs font-medium text-white shadow-xs transition-colors hover:bg-red-500"
+          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg bg-red-600 px-4 text-xs font-medium text-white shadow-xs transition-colors hover:bg-red-500"
         >
           {pending ? pendingLabel : confirmLabel}
         </Button>

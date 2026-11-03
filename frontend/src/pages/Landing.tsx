@@ -12,9 +12,9 @@ export default function Landing() {
   const isDark = theme === "dark";
 
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
       <Navbar />
-      <main>
+      <main className="w-full max-w-full overflow-x-hidden">
         <HeroGeometric
           title1="Build your workspace"
           title2="with AI-Hub"

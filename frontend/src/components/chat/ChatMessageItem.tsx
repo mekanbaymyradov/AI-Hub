@@ -99,8 +99,8 @@ export const ChatMessageItem = memo(
         className={cn("flex w-full mb-8", isUser ? "justify-end" : "justify-start")}
       >
         {isUser ? (
-          <div className="group/user flex flex-col items-end max-w-[75%]">
-            <div className="w-fit max-w-full self-end bg-blue-600 dark:bg-zinc-800 text-white dark:text-zinc-100 px-5 py-3.5 rounded-[24px] text-[15px] leading-relaxed shadow-sm shadow-blue-500/10 dark:shadow-none border border-transparent dark:border-zinc-700/60 flex flex-col gap-2.5">
+          <div className="group/user flex flex-col items-end max-w-[90%] sm:max-w-[80%] md:max-w-[75%] min-w-0">
+            <div className="w-fit max-w-full min-w-0 self-end bg-blue-600 dark:bg-zinc-800 text-white dark:text-zinc-100 px-4 py-3 sm:px-5 sm:py-3.5 rounded-[20px] sm:rounded-[24px] text-[14px] sm:text-[15px] leading-relaxed shadow-sm shadow-blue-500/10 dark:shadow-none border border-transparent dark:border-zinc-700/60 flex flex-col gap-2.5">
               {!!message.attachments?.length && (
                 <div className="flex flex-wrap gap-2 pt-0.5">
                   {message.attachments.map((att) => {
@@ -111,7 +111,7 @@ export const ChatMessageItem = memo(
                         href={att.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="relative group/att block rounded-xl overflow-hidden border border-white/20 hover:border-white/40 transition-all max-w-[220px] max-h-[160px] bg-black/40"
+                        className="relative group/att block rounded-xl overflow-hidden border border-white/20 hover:border-white/40 transition-all max-w-[180px] sm:max-w-[220px] max-h-[160px] bg-black/40"
                         title={att.filename}
                       >
                         <img
@@ -139,13 +139,13 @@ export const ChatMessageItem = memo(
                   })}
                 </div>
               )}
-              <div className="whitespace-pre-wrap">{message.content}</div>
+              <div className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.content}</div>
             </div>
 
             <div
               className={cn(
-                "flex items-center gap-1.5 mt-1.5 mr-1",
-                !isFailedPrompt && "opacity-0 group-hover/user:opacity-100 transition-opacity"
+                "flex flex-wrap items-center gap-1.5 mt-1.5 mr-1",
+                !isFailedPrompt && "opacity-0 pointer-coarse:opacity-100 group-hover/user:opacity-100 transition-opacity"
               )}
             >
               {isFailedPrompt && onRetry && (
@@ -225,11 +225,11 @@ export const ChatMessageItem = memo(
             </div>
           </div>
         ) : (
-          <div className="flex gap-4 w-full">
-            <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 mt-1 dark:border-white/10 dark:bg-zinc-900">
-              <img src="/favicon.svg" alt="AI-Hub" className="size-5 object-contain" />
+          <div className="flex gap-2.5 sm:gap-4 w-full min-w-0 max-w-full overflow-hidden">
+            <span className="flex size-7 sm:size-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 mt-1 dark:border-white/10 dark:bg-zinc-900">
+              <img src="/favicon.svg" alt="AI-Hub" className="size-4 sm:size-5 object-contain" />
             </span>
-            <div className="flex-1 min-w-0 mt-1 text-[15px] text-zinc-800 dark:text-zinc-300 leading-relaxed">
+            <div className="flex-1 min-w-0 max-w-full overflow-hidden mt-1 text-[14px] sm:text-[15px] text-zinc-800 dark:text-zinc-300 leading-relaxed">
               {message.reasoning && (
                 <div className="mb-2.5">
                   <button
@@ -263,7 +263,7 @@ export const ChatMessageItem = memo(
                         transition={{ duration: 0.2, ease: "easeInOut" }}
                         className="overflow-hidden"
                       >
-                        <div className="mt-1 mb-1.5 border-l-2 border-zinc-200 dark:border-zinc-700/80 pl-3.5 py-1 text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap">
+                        <div className="mt-1 mb-1.5 border-l-2 border-zinc-200 dark:border-zinc-700/80 pl-3.5 py-1 text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                           {message.reasoning}
                         </div>
                       </motion.div>
@@ -315,7 +315,7 @@ export const ChatMessageItem = memo(
               )}
 
               {!isStreaming && !message.error && message.content && (
-                <div className="flex items-center gap-2 mt-2 text-zinc-400 dark:text-zinc-500">
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-zinc-400 dark:text-zinc-500">
                   <button
                     type="button"
                     onClick={handleCopy}

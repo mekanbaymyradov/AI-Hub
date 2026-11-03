@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useMemo, useState } from "react";
+import { useRef, useMemo, useState, useEffect } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { motion } from "framer-motion";
@@ -201,7 +201,7 @@ interface HeroGeometricProps extends React.ComponentPropsWithoutRef<"div"> {
 }
 
 const HERO_HEADLINE_CLASS =
-    "pb-[0.08em] text-[12cqi] md:text-[8cqi] lg:text-[6cqi] leading-[0.96] tracking-tighter font-bold text-zinc-900 dark:text-white";
+    "pb-[0.08em] text-3xl min-[400px]:text-4xl sm:text-6xl md:text-[8cqi] lg:text-[6cqi] leading-[0.96] tracking-tighter font-bold text-zinc-900 dark:text-white break-words text-center";
 
 export default function HeroGeometric({
     title1,
@@ -216,17 +216,24 @@ export default function HeroGeometric({
 }: HeroGeometricProps) {
     const [canvasReady, setCanvasReady] = useState(false);
 
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setCanvasReady(true);
+        }, 500);
+        return () => clearTimeout(timer);
+    }, []);
+
     return (
         <div
-            className={cn("relative w-full min-h-screen flex flex-col items-center overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors duration-200", className)}
+            className={cn("relative w-full min-h-dvh flex flex-col items-center overflow-hidden bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white transition-colors duration-200", className)}
             style={{
-                containerType: "size",
+                containerType: "inline-size",
                 ...props.style
             }}
             {...props}
         >
             {}
-            <div className="absolute top-0 left-0 w-full h-full z-0 pointer-events-none">
+            <div className="absolute inset-0 w-full h-full z-0 pointer-events-none overflow-hidden">
                 <WebGLErrorBoundary>
                     <Canvas
                         camera={{ position: [0, 0, 1] }}
@@ -254,12 +261,12 @@ export default function HeroGeometric({
 
             {}
             {(title1 || title2 || description) && (
-                <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center pt-8 pb-8 md:pt-20 md:pb-20">
-                    <div className="w-full max-w-[1200px] px-6 flex flex-col items-center">
+                <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center pt-24 pb-12 sm:pt-28 sm:pb-16 md:pt-32 md:pb-24">
+                    <div className="w-full max-w-[1200px] px-4 sm:px-6 flex flex-col items-center">
                         {}
                         <div className="flex flex-col items-center text-center gap-2 md:gap-4 mb-8 md:mb-12">
                             {title1 && (
-                                <div className="overflow-hidden">
+                                <div className="overflow-hidden max-w-full flex justify-center">
                                     <motion.h1
                                         initial={{ y: "100%", opacity: 0 }}
                                         animate={canvasReady ? { y: "0%", opacity: 1 } : { y: "100%", opacity: 0 }}
@@ -271,7 +278,7 @@ export default function HeroGeometric({
                                 </div>
                             )}
                             {title2 && (
-                                <div className="overflow-hidden">
+                                <div className="overflow-hidden max-w-full flex justify-center">
                                     <motion.h1
                                         initial={{ y: "100%", opacity: 0 }}
                                         animate={canvasReady ? { y: "0%", opacity: 1 } : { y: "100%", opacity: 0 }}
@@ -286,12 +293,12 @@ export default function HeroGeometric({
 
                         {}
                         {description && (
-                            <div className="max-w-[480px] text-center mb-8">
+                            <div className="max-w-[480px] px-2 text-center mb-8">
                                 <motion.p
                                     initial={{ opacity: 0, y: 20 }}
                                     animate={canvasReady ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }}
                                     transition={{ duration: 0.8, delay: 0.6, ease: "easeOut" }}
-                                    className="text-lg md:text-[1.35rem] leading-relaxed text-zinc-600 dark:text-zinc-400 font-normal"
+                                    className="text-base sm:text-lg md:text-[1.35rem] leading-relaxed text-zinc-600 dark:text-zinc-400 font-normal"
                                 >
                                     {description}
                                 </motion.p>

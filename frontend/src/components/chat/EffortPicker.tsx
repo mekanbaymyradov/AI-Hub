@@ -39,7 +39,7 @@ export function EffortPicker({ value, onChange, disabled }: EffortPickerProps) {
           disabled={disabled}
           aria-label={`Reasoning effort: ${current.label}`}
           className={cn(
-            "h-8 px-2.5 rounded-full text-xs font-normal flex items-center gap-1.5 cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-white/10",
+            "h-8 px-2 sm:px-2.5 rounded-full text-xs font-normal flex items-center gap-1 sm:gap-1.5 cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-white/10",
             // Highlighted when set, so a non-default effort is never forgotten.
             value
               ? "text-blue-600 dark:text-blue-400"
@@ -47,8 +47,8 @@ export function EffortPicker({ value, onChange, disabled }: EffortPickerProps) {
           )}
         >
           <Brain className="h-3.5 w-3.5 shrink-0" />
-          <span>{current.label}</span>
-          <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />
+          <span className="hidden sm:inline">{current.label}</span>
+          <ChevronDown className="h-3 w-3 opacity-60 shrink-0 hidden sm:inline" />
         </Button>
       } />
       <DropdownMenuContent

@@ -69,10 +69,21 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSidebarProps) {
-  const { toggleSidebar, setOpen } = useSidebar();
+  const { toggleSidebar, setOpen, isMobile, setOpenMobile } = useSidebar();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
+
+  const handleSelectChat = (id: number) => {
+    if (isMobile) setOpenMobile(false);
+    onSelectChat(id);
+  };
+
+  const handleNewThread = () => {
+    if (isMobile) setOpenMobile(false);
+    if (isSelectionMode) handleCancelSelection();
+    onNewThread();
+  };
 
   const chatsQuery = useChats();
   const loadMoreChatsRef = useLoadMore(chatsQuery);
@@ -152,7 +163,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
     setSelectedChatIds(new Set());
     setDeletingChatIds((prev) => new Set([...prev, ...ids]));
     if (activeChatId !== null && selectedChatIds.has(activeChatId)) {
-      onNewThread();
+      handleNewThread();
     }
 
     deleteChats.mutate(ids, {
@@ -267,7 +278,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
               <SidebarMenuButton
                 onClick={() => {
                   if (isSelectionMode) handleCancelSelection();
-                  onNewThread();
+                  handleNewThread();
                 }}
                 tooltip="New thread"
                 className={cn(
@@ -332,14 +343,14 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                     </div>
                     <div className="max-h-[340px] overflow-y-auto space-y-0.5">
                       {isNewChat && (
-                        <DropdownMenuItem onClick={onNewThread} className={cn(MENU_ITEM_SELECTED, "px-3 py-2 text-[13px] rounded-xl")}>
+                        <DropdownMenuItem onClick={handleNewThread} className={cn(MENU_ITEM_SELECTED, "px-3 py-2 text-[13px] rounded-xl")}>
                           <span className="truncate">{NEW_CHAT_LABEL}</span>
                         </DropdownMenuItem>
                       )}
                       {visibleChats.map((chat) => (
                         <DropdownMenuItem
                           key={chat.id}
-                          onClick={() => onSelectChat(chat.id)}
+                          onClick={() => handleSelectChat(chat.id)}
                           className={cn(chat.id === activeChatId ? MENU_ITEM_SELECTED : MENU_ITEM, "px-3 py-2 text-[13px] rounded-xl")}
                         >
                           <span className="truncate">{chat.name}</span>
@@ -410,7 +421,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
               <SidebarMenu className="gap-0.5">
                 {isNewChat && !isSelectionMode && (
                   <SidebarMenuItem>
-                    <ChatRowContent name={NEW_CHAT_LABEL} active onSelect={onNewThread} />
+                    <ChatRowContent name={NEW_CHAT_LABEL} active onSelect={handleNewThread} />
                   </SidebarMenuItem>
                 )}
                 <AnimatePresence initial={false}>
@@ -444,7 +455,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                       <ChatRowContent
                         name={chat.name}
                         active={chat.id === activeChatId}
-                        onSelect={() => onSelectChat(chat.id)}
+                        onSelect={() => handleSelectChat(chat.id)}
                         onRename={() => openRename(chat)}
                         onDelete={() => openDelete(chat)}
                         onStartSelect={() => handleStartSelect(chat.id)}
@@ -522,7 +533,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   </div>
                 </div>
 
-                <DropdownMenuItem onClick={() => setIsProfileOpen(true)} className={cn(MENU_ITEM, "py-2")}>
+                <DropdownMenuItem onClick={() => { if (isMobile) setOpenMobile(false); setIsProfileOpen(true); }} className={cn(MENU_ITEM, "py-2")}>
                   <UserIcon className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
@@ -535,7 +546,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   <span className="text-[10px] text-zinc-400 uppercase font-mono">{theme}</span>
                 </DropdownMenuItem>
 
-                <DropdownMenuItem onClick={() => setIsLogoutOpen(true)} className={cn(MENU_ITEM_DANGER, "py-2")}>
+                <DropdownMenuItem onClick={() => { if (isMobile) setOpenMobile(false); setIsLogoutOpen(true); }} className={cn(MENU_ITEM_DANGER, "py-2")}>
                   <LogOut className="h-3.5 w-3.5" />
                   <span>Log out</span>
                 </DropdownMenuItem>
@@ -700,7 +711,7 @@ function ChatRowContent({
             <button
               type="button"
               aria-label={`Options for ${name}`}
-              className="opacity-0 group-hover/chat-row:opacity-100 data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
+              className="opacity-0 pointer-coarse:opacity-100 group-hover/chat-row:opacity-100data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>

@@ -61,9 +61,9 @@ export function ChatMessageList({
   }, [messages, isStreaming, activeTool]);
 
   return (
-    <div className="flex-1 overflow-hidden">
-      <ScrollArea className="h-full px-4" ref={scrollAreaRef}>
-        <div className="max-w-3xl mx-auto pb-44 pt-6">
+    <div className="flex-1 w-full min-w-0 overflow-hidden">
+      <ScrollArea className="h-full w-full px-3 sm:px-4" ref={scrollAreaRef}>
+        <div className="w-full max-w-3xl mx-auto min-w-0 pb-36 sm:pb-44 pt-4 sm:pt-6">
           {activeChatId !== null && isLoadingHistory && messages.length === 0 ? (
             <div className="flex items-center justify-center py-24 text-zinc-500 dark:text-zinc-400">
               <Loader2 className="h-6 w-6 animate-spin mr-2 text-blue-600" />

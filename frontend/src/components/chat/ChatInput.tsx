@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { ChatGreeting } from "./ChatGreeting";
 import { EffortPicker } from "./EffortPicker";
 import { ModelPicker } from "./ModelPicker";
@@ -65,6 +66,7 @@ export function ChatInput({
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [uncontrolledModelId, setUncontrolledModelId] = useState<string | null>(null);
   const [effort, setEffort] = useState<Effort | null>(null);
+  const isMobile = useIsMobile();
 
   const selectedModelId = controlledModelId !== undefined ? controlledModelId : uncontrolledModelId;
   const setSelectedModelId = onSelectModelId ?? setUncontrolledModelId;
@@ -145,18 +147,22 @@ export function ChatInput({
       layout
       initial={false}
       animate={{
-        justifyContent: isInitialState ? "center" : "flex-end",
-        paddingBottom: isInitialState ? "0px" : "32px",
+        justifyContent: isInitialState ? (isMobile ? "flex-start" : "center") : "flex-end",
+        paddingBottom: isInitialState ? (isMobile ? "24px" : "0px") : isMobile ? "12px" : "32px",
       }}
-      className="absolute inset-0 pointer-events-none flex flex-col px-4 z-0 pt-12"
+      className={cn("absolute inset-0 flex flex-col px-3 sm:px-4 z-0 pt-12 overflow-y-auto", isInitialState ? "pointer-events-auto" : "pointer-events-none")}
     >
-      <div className="w-full max-w-2xl mx-auto pointer-events-auto flex flex-col">
+      {/* Phones leave only a thin gap under the composer, so cover it instead of showing messages scroll through. */}
+      {!isInitialState && isMobile && (
+        <div className="absolute inset-x-0 bottom-0 h-12 bg-zinc-50 dark:bg-[#0a0a0a]" />
+      )}
+      <div className={cn("w-full max-w-2xl mx-auto flex flex-col pointer-events-auto", isInitialState && isMobile ? "mt-4 mb-6" : "")}>
         <AnimatePresence>{isInitialState && <ChatGreeting onSelectPrompt={selectPrompt} />}</AnimatePresence>
 
         <motion.div layoutId="input-box" className="relative group w-full">
           <form
             onSubmit={handleSubmit}
-            className="relative flex flex-col bg-white dark:bg-[#171717] border border-zinc-200/90 dark:border-white/10 rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl"
+            className="relative flex flex-col bg-white dark:bg-[#171717] border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl"
           >
             {attachmentError && (
               <div className="flex items-center justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
@@ -207,7 +213,7 @@ export function ChatInput({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Send a message..."
-              className="min-h-[52px] max-h-[220px] w-full resize-none border-0 shadow-none focus-visible:ring-0 px-4 pt-4 pb-12 text-[15px] bg-transparent text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+              className="min-h-[50px] sm:min-h-[52px] max-h-[200px] sm:max-h-[220px] w-full resize-none border-0 shadow-none focus-visible:ring-0 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-12 text-base sm:text-[15px] bg-transparent text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
               rows={1}
             />
 

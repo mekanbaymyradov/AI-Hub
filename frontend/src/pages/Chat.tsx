@@ -290,15 +290,15 @@ export default function Chat() {
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full bg-zinc-50/70 dark:bg-[#0a0a0a] text-zinc-900 dark:text-foreground font-sans overflow-hidden transition-colors duration-200">
+      <div className="flex h-full w-full bg-zinc-50/70 dark:bg-[#0a0a0a] text-zinc-900 dark:text-foreground font-sans overflow-hidden transition-colors duration-200">
         <AppSidebar
           activeChatId={activeChatId}
           onSelectChat={handleSelectChat}
           onNewThread={handleNewThread}
         />
 
-        <main className="flex flex-col flex-1 min-w-0 relative">
-          <ChatHeader chatTitle={currentChatTitle} />
+        <main className="flex flex-col flex-1 min-w-0 h-full overflow-hidden relative">
+          <ChatHeader chatTitle={currentChatTitle} onNewThread={handleNewThread} />
 
           <ChatMessageList
             messages={messages}
