@@ -39,7 +39,7 @@ const INSTRUCTION_SUGGESTIONS = [
 ];
 
 // 16px on phones, since iOS zooms into any focused field smaller than that.
-const FIELD = "h-10 rounded-xl border-line-1 bg-zinc-50 text-base sm:text-smtext-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:bg-zinc-900 dark:text-white";
+const FIELD = "h-10 rounded-xl border-line-1 bg-zinc-50 text-base sm:text-sm text-fg-1 focus-visible:ring-1 focus-visible:ring-blue-500 dark:bg-zinc-900";
 
 interface ProfileSettingsModalProps {
   open: boolean;
