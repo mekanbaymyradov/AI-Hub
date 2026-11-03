@@ -1,6 +1,6 @@
-import { useRef, useLayoutEffect } from "react";
+import { useRef, useLayoutEffect, useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
-import { Loader2 } from "lucide-react";
+import { ArrowDown, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLoadMore, type PageLoader } from "@/hooks/use-load-more";
 import { type ModelPublic } from "@/api/types";
@@ -34,18 +34,39 @@ export function ChatMessageList({
   const loadOlderRef = useLoadMore(olderMessages);
   // What the list looked like at the last render, to tell older messages
   // arriving at the top from the conversation moving on at the bottom.
-  const previous = useRef<{ firstId?: string; lastId?: string; scrollHeight: number }>({
-    scrollHeight: 0,
-  });
+  const previous = useRef<{
+    firstId?: string;
+    lastId?: string;
+    lastPromptId?: string;
+    scrollHeight: number;
+  }>({ scrollHeight: 0 });
+  // Follow the reply only while the reader is at the bottom, so scrolling up to reread isn't undone.
+  const pinnedRef = useRef(true);
+  const [showJump, setShowJump] = useState(false);
+
+  const getViewport = () =>
+    scrollAreaRef.current?.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
+
+  useEffect(() => {
+    const viewport = getViewport();
+    if (!viewport) return;
+    const onScroll = () => {
+      const pinned = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight < 80;
+      pinnedRef.current = pinned;
+      setShowJump(!pinned);
+    };
+    viewport.addEventListener("scroll", onScroll, { passive: true });
+    return () => viewport.removeEventListener("scroll", onScroll);
+  }, []);
 
   useLayoutEffect(() => {
-    const viewport = scrollAreaRef.current?.querySelector<HTMLElement>(
-      '[data-slot="scroll-area-viewport"]'
-    );
+    const viewport = getViewport();
     if (!viewport) return;
 
     const firstId = messages[0]?.id;
     const lastId = messages[messages.length - 1]?.id;
+    // A new prompt, whether just sent or from another chat being opened.
+    const lastPromptId = messages.findLast((m) => m.role === "user")?.id;
     const olderLoaded =
       previous.current.firstId !== undefined &&
       firstId !== previous.current.firstId &&
@@ -54,11 +75,17 @@ export function ChatMessageList({
     if (olderLoaded) {
       // Keep the reader on the message they were reading.
       viewport.scrollTop += viewport.scrollHeight - previous.current.scrollHeight;
-    } else {
+    } else if (pinnedRef.current || lastPromptId !== previous.current.lastPromptId) {
+      pinnedRef.current = true;
       viewport.scrollTo({ top: viewport.scrollHeight });
     }
-    previous.current = { firstId, lastId, scrollHeight: viewport.scrollHeight };
+    previous.current = { firstId, lastId, lastPromptId, scrollHeight: viewport.scrollHeight };
   }, [messages, isStreaming, activeTool]);
+
+  const jumpToLatest = () => {
+    const viewport = getViewport();
+    viewport?.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+  };
 
   return (
     <div className="flex-1 w-full min-w-0 overflow-hidden">
@@ -110,6 +137,16 @@ export function ChatMessageList({
           )}
         </div>
       </ScrollArea>
+      {showJump && messages.length > 0 && (
+        <button
+          type="button"
+          onClick={jumpToLatest}
+          aria-label="Jump to latest message"
+          className="absolute z-10 left-1/2 -translate-x-1/2 bottom-36 sm:bottom-44 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-md hover:text-zinc-900 dark:border-white/10 dark:bg-[#171717] dark:text-zinc-300 dark:hover:text-white cursor-pointer"
+        >
+          <ArrowDown className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
