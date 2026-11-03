@@ -3,6 +3,7 @@ import { AuthProvider } from "@/context/AuthProvider";
 import { useAuth } from "@/context/auth";
 import { ThemeProvider } from "@/context/ThemeProvider";
 import { Auth } from "@/components/Auth";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import Chat  from "@/pages/Chat";
 import Landing from "@/pages/Landing";
 
@@ -19,20 +20,22 @@ function AppRoutes() {
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
-      <Routes>
-        <Route
-          path="/"
-          element={isAuthenticated ? <Chat /> : <Landing />}
-        />
-        <Route
-          path="/chats/:chatId"
-          element={isAuthenticated ? <Chat /> : <Navigate to="/login" replace />}
-        />
-        <Route
-          path="/login"
-          element={isAuthenticated ? <Navigate to="/" replace /> : <Auth />}
-        />
-      </Routes>
+      <ErrorBoundary>
+        <Routes>
+          <Route
+            path="/"
+            element={isAuthenticated ? <Chat /> : <Landing />}
+          />
+          <Route
+            path="/chats/:chatId"
+            element={isAuthenticated ? <Chat /> : <Navigate to="/login" replace />}
+          />
+          <Route
+            path="/login"
+            element={isAuthenticated ? <Navigate to="/" replace /> : <Auth />}
+          />
+        </Routes>
+      </ErrorBoundary>
     </div>
   );
 }

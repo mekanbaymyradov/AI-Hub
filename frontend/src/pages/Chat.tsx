@@ -7,6 +7,7 @@ import { isAxiosError } from "axios";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { chatTransport } from "@/api/chat";
 import { getErrorMessage } from "@/api/errors";
+import { type Effort } from "@/api/types";
 import {
   prependChatToCache,
   queryKeys,
@@ -18,6 +19,7 @@ import {
   useModels,
 } from "@/api/queries";
 
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppSidebar } from "@/components/chat/AppSidebar";
 import { ChatHeader } from "@/components/chat/ChatHeader";
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
@@ -36,6 +38,8 @@ export default function Chat() {
   const queryClient = useQueryClient();
 
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  // Kept here rather than in ChatInput so a retry answers with the same effort.
+  const [effort, setEffort] = useState<Effort | null>(null);
   const { data: models = [] } = useModels();
 
   // The open chat lives in the URL, so a reload or a shared link reopens it.
@@ -232,7 +236,7 @@ export default function Chat() {
         chatId: activeChatId,
         modelId: modelToUse,
         attachmentIds: [],
-        effort: null,
+        effort,
         models,
       };
 
@@ -240,7 +244,7 @@ export default function Chat() {
         metadata: requestMetadata,
       });
     },
-    [isStreaming, activeChatId, selectedModelId, models, clearError, queryClient, regenerate]
+    [isStreaming, activeChatId, selectedModelId, effort, models, clearError, queryClient, regenerate]
   );
 
   const lastChatMessage = chatMessages[chatMessages.length - 1];
@@ -300,17 +304,20 @@ export default function Chat() {
         <main className="flex flex-col flex-1 min-w-0 h-full overflow-hidden relative">
           <ChatHeader chatTitle={currentChatTitle} onNewThread={handleNewThread} />
 
-          <ChatMessageList
-            messages={messages}
-            isLoadingHistory={messagesQuery.isLoading}
-            activeChatId={activeChatId}
-            isStreaming={isStreaming}
-            activeTool={activeTool}
-            olderMessages={messagesQuery}
-            models={models}
-            lastPromptHasAttachments={lastPromptHasAttachments}
-            onRetry={handleRetry}
-          />
+          {/* A crash in a message leaves the sidebar and input usable. */}
+          <ErrorBoundary>
+            <ChatMessageList
+              messages={messages}
+              isLoadingHistory={messagesQuery.isLoading}
+              activeChatId={activeChatId}
+              isStreaming={isStreaming}
+              activeTool={activeTool}
+              olderMessages={messagesQuery}
+              models={models}
+              lastPromptHasAttachments={lastPromptHasAttachments}
+              onRetry={handleRetry}
+            />
+          </ErrorBoundary>
 
           <ChatInput
             onSend={handleSend}
@@ -319,6 +326,8 @@ export default function Chat() {
             isInitialState={isInitialState}
             selectedModelId={selectedModelId}
             onSelectModelId={setSelectedModelId}
+            effort={effort}
+            onEffortChange={setEffort}
           />
         </main>
       </div>

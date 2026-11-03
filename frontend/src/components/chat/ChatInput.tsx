@@ -34,6 +34,8 @@ interface ChatInputProps {
   isInitialState: boolean;
   selectedModelId?: string | null;
   onSelectModelId?: (id: string) => void;
+  effort: Effort | null;
+  onEffortChange: (effort: Effort | null) => void;
 }
 
 /** Return why these files can't be attached, or null when they can. */
@@ -59,13 +61,14 @@ export function ChatInput({
   isInitialState,
   selectedModelId: controlledModelId,
   onSelectModelId,
+  effort,
+  onEffortChange,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [uncontrolledModelId, setUncontrolledModelId] = useState<string | null>(null);
-  const [effort, setEffort] = useState<Effort | null>(null);
   const isMobile = useIsMobile();
 
   const selectedModelId = controlledModelId !== undefined ? controlledModelId : uncontrolledModelId;
@@ -256,7 +259,7 @@ export function ChatInput({
                     </span>
                   </TooltipContent>
                 </Tooltip>
-                <EffortPicker value={effort} onChange={setEffort} disabled={isStreaming} />
+                <EffortPicker value={effort} onChange={onEffortChange} disabled={isStreaming} />
               </div>
 
               <div className="flex items-center gap-1.5">
