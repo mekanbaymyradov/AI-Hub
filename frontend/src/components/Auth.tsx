@@ -107,7 +107,7 @@ export function Auth() {
         }}
       />
 
-      <header className="relative flex items-center justify-between px-5 py-4 sm:px-8">
+      <header className="relative flex items-center justify-between px-4 py-3.5 sm:px-8 sm:py-4">
         <Link
           to="/"
           aria-label="AI-Hub home"
@@ -120,7 +120,7 @@ export function Auth() {
 
       {/* The bottom padding lifts the card slightly above center, where the eye expects it. */}
       <main className="relative flex flex-1 items-center justify-center px-4 pb-20">
-        <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-6 shadow-xl shadow-zinc-900/5 sm:p-8 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20">
+        <div className="w-full max-w-sm rounded-3xl border border-zinc-200 bg-white p-5 sm:p-8 shadow-xl shadow-zinc-900/5 dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-black/20">
           <AnimatePresence mode="wait" initial={false}>
             {step === "email" ? (
               <motion.form
@@ -199,7 +199,7 @@ export function Auth() {
                   </p>
                 </div>
 
-                <div className="mt-6 grid grid-cols-6 gap-2">
+                <div className="mt-6 grid grid-cols-6 gap-1.5 sm:gap-2">
                   {otp.map((digit, index) => (
                     <input
                       key={index}
@@ -218,7 +218,7 @@ export function Auth() {
                       aria-invalid={error !== null}
                       autoFocus={index === 0}
                       className={cn(
-                        "h-12 w-full min-w-0 rounded-xl border bg-zinc-50 text-center text-xl font-semibold text-zinc-900 outline-none transition-all dark:bg-zinc-950 dark:text-white",
+                        "h-11 sm:h-12 w-full min-w-0 rounded-xl border bg-zinc-50 text-center text-lg sm:text-xl font-semibold text-zinc-900 outline-none transition-all dark:bg-zinc-950 dark:text-white",
                         error
                           ? "border-red-500 ring-2 ring-red-500/20"
                           : "border-zinc-200 focus:border-blue-500 focus:bg-white focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-800 dark:focus:bg-zinc-900",

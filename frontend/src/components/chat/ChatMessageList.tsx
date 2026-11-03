@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLoadMore, type PageLoader } from "@/hooks/use-load-more";
+import { type ModelPublic } from "@/api/types";
 import { ChatMessageItem } from "./ChatMessageItem";
 import { type UIMessage } from "./types";
 
@@ -13,6 +14,9 @@ interface ChatMessageListProps {
   isStreaming: boolean;
   activeTool: string | null;
   olderMessages: PageLoader;
+  models?: ModelPublic[];
+  lastPromptHasAttachments?: boolean;
+  onRetry?: (targetModelId?: string) => void;
 }
 
 export function ChatMessageList({
@@ -22,6 +26,9 @@ export function ChatMessageList({
   isStreaming,
   activeTool,
   olderMessages,
+  models,
+  lastPromptHasAttachments,
+  onRetry,
 }: ChatMessageListProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const loadOlderRef = useLoadMore(olderMessages);
@@ -54,9 +61,9 @@ export function ChatMessageList({
   }, [messages, isStreaming, activeTool]);
 
   return (
-    <div className="flex-1 overflow-hidden">
-      <ScrollArea className="h-full px-4" ref={scrollAreaRef}>
-        <div className="max-w-3xl mx-auto pb-44 pt-6">
+    <div className="flex-1 w-full min-w-0 overflow-hidden">
+      <ScrollArea className="h-full w-full px-3 sm:px-4" ref={scrollAreaRef}>
+        <div className="w-full max-w-3xl mx-auto min-w-0 pb-36 sm:pb-44 pt-4 sm:pt-6">
           {activeChatId !== null && isLoadingHistory && messages.length === 0 ? (
             <div className="flex items-center justify-center py-24 text-zinc-500 dark:text-zinc-400">
               <Loader2 className="h-6 w-6 animate-spin mr-2 text-blue-600" />
@@ -74,6 +81,15 @@ export function ChatMessageList({
               <AnimatePresence initial={false}>
                 {messages.map((msg, index) => {
                   const isLastMessage = index === messages.length - 1;
+                  const nextMsg = messages[index + 1];
+                  const isFailedPrompt = Boolean(
+                    msg.role === "user" &&
+                    nextMsg?.role === "ai" &&
+                    Boolean(nextMsg.error) &&
+                    (index === messages.length - 2 || index === messages.length - 1)
+                  );
+                  const failedModelId = isFailedPrompt ? nextMsg?.modelId : undefined;
+
                   return (
                     <ChatMessageItem
                       key={msg.id}
@@ -81,6 +97,11 @@ export function ChatMessageList({
                       isStreaming={isStreaming}
                       isLastMessage={isLastMessage}
                       activeTool={isLastMessage ? activeTool : null}
+                      models={models}
+                      lastPromptHasAttachments={lastPromptHasAttachments}
+                      onRetry={onRetry}
+                      isFailedPrompt={isFailedPrompt}
+                      failedModelId={failedModelId}
                     />
                   );
                 })}

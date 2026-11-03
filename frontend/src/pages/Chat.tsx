@@ -56,6 +56,7 @@ export default function Chat() {
     messages: chatMessages,
     setMessages,
     sendMessage,
+    regenerate,
     stop,
     clearError,
     status,
@@ -199,9 +200,6 @@ export default function Chat() {
         // Replace, so Back doesn't return to the empty new-chat screen.
         navigate(`/chats/${newChat.id}`, { replace: true });
       },
-      onModelFallback: (nextModelId) => {
-        setSelectedModelId(nextModelId);
-      },
     };
 
     await sendMessage(
@@ -215,12 +213,47 @@ export default function Chat() {
     );
   };
 
+  const handleRetry = useCallback(
+    async (targetModelId?: string) => {
+      if (isStreaming || activeChatId === null) return;
+
+      const modelToUse = targetModelId || selectedModelId || models[0]?.id;
+      if (!modelToUse) return;
+
+      clearError();
+      streamChatIdRef.current = activeChatId;
+      touchChatInCache(queryClient, activeChatId);
+
+      if (targetModelId && targetModelId !== selectedModelId) {
+        setSelectedModelId(targetModelId);
+      }
+
+      const requestMetadata: SendRequestMetadata = {
+        chatId: activeChatId,
+        modelId: modelToUse,
+        attachmentIds: [],
+        effort: null,
+        models,
+      };
+
+      await regenerate({
+        metadata: requestMetadata,
+      });
+    },
+    [isStreaming, activeChatId, selectedModelId, models, clearError, queryClient, regenerate]
+  );
+
   const lastChatMessage = chatMessages[chatMessages.length - 1];
   const activeTool = isStreaming ? getActiveToolName(lastChatMessage) : null;
   const streamErrorText =
     status === "error" && error
       ? getErrorMessage(error, "An error occurred during response streaming.")
       : undefined;
+
+  const lastPromptHasAttachments = useMemo(() => {
+    const lastUserMsg = [...chatMessages].reverse().find((m) => m.role === "user");
+    return Boolean(lastUserMsg?.metadata?.attachments && lastUserMsg.metadata.attachments.length > 0);
+  }, [chatMessages]);
 
   const messages: UIMessage[] = useMemo(() => {
     const rendered = chatMessages.map((msg, idx) => {
@@ -237,6 +270,7 @@ export default function Chat() {
           id: `${lastMsg.id}-pending`,
           role: "ai",
           content: "",
+          modelId: selectedModelId,
         });
       } else if (streamErrorText) {
         rendered.push({
@@ -244,26 +278,27 @@ export default function Chat() {
           role: "ai",
           content: "",
           error: streamErrorText,
+          modelId: selectedModelId,
         });
       }
     }
 
     return rendered;
-  }, [chatMessages, isStreaming, streamErrorText]);
+  }, [chatMessages, isStreaming, streamErrorText, selectedModelId]);
 
   const isInitialState = activeChatId === null && messages.length === 0 && !isStreaming;
 
   return (
     <SidebarProvider>
-      <div className="flex h-screen w-full bg-zinc-50/70 dark:bg-[#0a0a0a] text-zinc-900 dark:text-foreground font-sans overflow-hidden transition-colors duration-200">
+      <div className="flex h-full w-full bg-zinc-50/70 dark:bg-[#0a0a0a] text-zinc-900 dark:text-foreground font-sans overflow-hidden transition-colors duration-200">
         <AppSidebar
           activeChatId={activeChatId}
           onSelectChat={handleSelectChat}
           onNewThread={handleNewThread}
         />
 
-        <main className="flex flex-col flex-1 min-w-0 relative">
-          <ChatHeader chatTitle={currentChatTitle} />
+        <main className="flex flex-col flex-1 min-w-0 h-full overflow-hidden relative">
+          <ChatHeader chatTitle={currentChatTitle} onNewThread={handleNewThread} />
 
           <ChatMessageList
             messages={messages}
@@ -272,6 +307,9 @@ export default function Chat() {
             isStreaming={isStreaming}
             activeTool={activeTool}
             olderMessages={messagesQuery}
+            models={models}
+            lastPromptHasAttachments={lastPromptHasAttachments}
+            onRetry={handleRetry}
           />
 
           <ChatInput

@@ -26,7 +26,7 @@ export function ModelPicker({ models, selected, onSelect, disabled }: ModelPicke
           type="button"
           variant="ghost"
           disabled={disabled}
-          className="h-8 px-2.5 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 text-xs font-normal flex items-center gap-1 cursor-pointer transition-colors"
+          className="h-8 px-2 sm:px-2.5 rounded-full text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 text-xs font-normal flex items-center gap-1 cursor-pointer transition-colors"
         >
           <span className="truncate max-w-[140px]">{selected?.display_name ?? "Select Model"}</span>
           <ChevronDown className="h-3 w-3 opacity-60 shrink-0" />

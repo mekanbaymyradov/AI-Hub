@@ -38,7 +38,8 @@ const INSTRUCTION_SUGGESTIONS = [
   },
 ];
 
-const FIELD = "h-10 rounded-xl border-zinc-200 bg-zinc-50 text-sm text-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-white/10 dark:bg-zinc-900 dark:text-white";
+// 16px on phones, since iOS zooms into any focused field smaller than that.
+const FIELD = "h-10 rounded-xl border-zinc-200 bg-zinc-50 text-base sm:text-smtext-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-white/10 dark:bg-zinc-900 dark:text-white";
 
 interface ProfileSettingsModalProps {
   open: boolean;
@@ -51,7 +52,7 @@ export function ProfileSettingsModal({ open, onClose }: ProfileSettingsModalProp
     <Modal
       open={open}
       onClose={onClose}
-      className="max-h-[90vh] max-w-xl space-y-6 overflow-y-auto p-6 sm:rounded-3xl sm:p-8 dark:bg-[#18181b]"
+      className="max-h-[90dvh] max-w-xl space-y-6 overflow-y-auto p-4 sm:p-8 rounded-2xl sm:rounded-3xl dark:bg-[#18181b]"
     >
       <div className="flex items-center justify-between border-b border-zinc-100 pb-4 dark:border-white/10">
         <div className="flex items-center gap-2.5">
@@ -107,11 +108,11 @@ function AvatarSection({ user }: { user: UserPublic }) {
   };
 
   return (
-    <div className="flex items-center gap-5 rounded-2xl border border-zinc-200/70 bg-zinc-50 p-4 dark:border-white/5 dark:bg-zinc-900/60">
+    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-5 rounded-2xl border border-zinc-200/70 bg-zinc-50 p-4 text-center sm:text-left dark:border-white/5 dark:bg-zinc-900/60">
       <div className="relative shrink-0">
         <UserAvatar
           user={user}
-          className="h-20 w-20 border-2 border-white bg-zinc-200 shadow-sm dark:border-zinc-700"
+          className="h-16 w-16 sm:h-20 sm:w-20 border-2 border-white bg-zinc-200 shadow-sm dark:border-zinc-700"
           fallbackClassName="text-xl"
         />
         {busy && (
@@ -129,7 +130,7 @@ function AvatarSection({ user }: { user: UserPublic }) {
           accept="image/jpeg,image/png,image/webp,image/gif"
           className="hidden"
         />
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
           <Button
             type="button"
             variant="outline"
@@ -271,7 +272,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
         </div>
       </div>
 
-      <div className="flex items-center justify-between border-t border-zinc-100 pt-3 dark:border-white/5">
+      <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-3 border-t border-zinc-100 pt-3 dark:border-white/5">
         <div className="text-xs font-medium">
           {saved && (
             <span className="flex items-center gap-1.5 text-emerald-500 dark:text-emerald-400">
@@ -280,7 +281,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
           )}
           {error && <span className="text-red-500">{error}</span>}
         </div>
-        <div className="flex gap-2.5">
+        <div className="flex items-center justify-end gap-2.5 w-full sm:w-auto">
           <Button
             type="button"
             variant="ghost"

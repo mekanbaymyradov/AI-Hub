@@ -47,16 +47,16 @@ export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatG
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -12, filter: "blur(4px)" }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="text-center mb-6 sm:mb-8 px-4 max-w-xl mx-auto select-none"
+      className="text-center mb-4 sm:mb-8 px-4 max-w-xl mx-auto select-none"
     >
       <div className="flex flex-col items-center mb-4">
-        <div className="relative flex items-center justify-center w-12 h-12 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-md shadow-zinc-200/50 dark:shadow-black/40 mb-3 transition-transform hover:scale-105">
-          <img src="/favicon.svg" alt="" className="w-6 h-6 object-contain" />
+        <div className="relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-md shadow-zinc-200/50 dark:shadow-black/40 mb-2 sm:mb-3 transition-transform hover:scale-105">
+          <img src="/favicon.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
           <div className="absolute -inset-1 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 blur-xs -z-10" />
         </div>
       </div>
 
-      <h2 className="text-2xl sm:text-3xl md:text-[32px] font-semibold tracking-tight text-zinc-900 dark:text-white leading-tight">
+      <h2 className="text-xl sm:text-3xl md:text-[32px] font-semibold tracking-tight text-zinc-900 dark:text-white leading-tight">
         {timeGreeting(new Date().getHours())}
         {user && (
           <>
@@ -66,7 +66,7 @@ export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatG
         )}
       </h2>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 mt-5">
+      <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-5">
         {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }) => (
           <button
             key={label}

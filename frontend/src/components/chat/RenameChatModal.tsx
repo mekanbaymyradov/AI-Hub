@@ -51,7 +51,7 @@ function RenameForm({
         onFocus={(e) => e.target.select()}
         placeholder="Chat name"
         aria-label="Chat name"
-        className="h-10 rounded-xl border-zinc-200 bg-zinc-50 text-sm text-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-white/10 dark:bg-[#121214] dark:text-white"
+        className="h-10 rounded-xl border-zinc-200 bg-zinc-50 text-base sm:text-sm text-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-white/10 dark:bg-[#121214] dark:text-white"
       />
       {error && (
         <p role="alert" className="mt-2 text-xs font-medium text-red-500">
@@ -59,20 +59,20 @@ function RenameForm({
         </p>
       )}
 
-      <div className="mt-5 flex justify-end gap-2">
+      <div className="mt-5 flex flex-col-reverse sm:flex-row justify-end gap-2">
         <Button
           type="button"
           variant="ghost"
           onClick={onClose}
           disabled={pending}
-          className="h-9 cursor-pointer rounded-lg px-4 text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
         >
           Cancel
         </Button>
         <Button
           type="submit"
           disabled={!name.trim() || pending}
-          className="h-9 cursor-pointer rounded-lg bg-blue-600 px-4 text-xs font-medium text-white shadow-xs transition-colors hover:bg-blue-500"
+          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg bg-blue-600 px-4 text-xs font-medium text-white shadow-xs transition-colors hover:bg-blue-500"
         >
           {pending ? "Saving..." : "Save"}
         </Button>
