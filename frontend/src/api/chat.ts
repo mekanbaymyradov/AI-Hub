@@ -1,5 +1,4 @@
 import {
-  APICallError,
   DefaultChatTransport,
   isTextUIPart,
   type ChatTransport,
@@ -11,16 +10,16 @@ import {
   type SendRequestMetadata,
 } from "@/components/chat/types";
 import { apiClient, getAccessToken, refreshAccessToken } from "./axiosInstance";
-import { getErrorMessage, getErrorType } from "./errors";
+import { getErrorMessage } from "./errors";
 import {
   type AttachmentPublic,
   type ChatPublic,
   type ChatRename,
   type Effort,
   type MessageRequest,
-  type ModelPublic,
   type PageChatPublic,
   type PageMessagePublic,
+  type RetryRequest,
 } from "./types";
 
 interface AttemptRequestMetadata {
@@ -28,46 +27,7 @@ interface AttemptRequestMetadata {
   modelId: string;
   attachmentIds: number[];
   effort: Effort | null;
-}
-
-function getNextModel(
-  allModels: ModelPublic[],
-  currentModelId: string,
-  triedModelIds: Set<string>,
-  requireFileSupport: boolean
-): ModelPublic | null {
-  if (allModels.length <= 1) return null;
-
-  const currentIndex = allModels.findIndex((m) => m.id === currentModelId);
-  const reordered =
-    currentIndex >= 0
-      ? [...allModels.slice(currentIndex + 1), ...allModels.slice(0, currentIndex)]
-      : allModels;
-
-  return (
-    reordered.find(
-      (m) =>
-        !triedModelIds.has(m.id) &&
-        (!requireFileSupport || m.supports_files !== false)
-    ) ?? null
-  );
-}
-
-/** Whether a failure can be recovered by falling back to another model in the catalog. */
-function isRetryableModelFailure(error: unknown): boolean {
-  const errorType = getErrorType(error);
-  if (
-    errorType === "llm.model_error" ||
-    errorType === "llm.model_not_found" ||
-    errorType === "chat.model_cannot_accept_files" ||
-    errorType === "internal_error"
-  ) {
-    return true;
-  }
-  if (APICallError.isInstance(error)) {
-    return error.statusCode != null && error.statusCode >= 500;
-  }
-  return false;
+  trigger?: "submit-message" | "regenerate-message";
 }
 
 async function chatFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
@@ -96,15 +56,33 @@ async function chatFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
 type SendMessagesOptions = Parameters<ChatTransport<ChatUIMessage>["sendMessages"]>[0];
 type ChatStreamChunk = UIMessageChunk;
 
-class ResilientChatTransport extends DefaultChatTransport<ChatUIMessage> {
+class AppChatTransport extends DefaultChatTransport<ChatUIMessage> {
   constructor() {
     super({
       api: `${API_BASE_URL}/chats`,
       credentials: "include",
       fetch: chatFetch,
-      // The server keeps the chat's history, so send only the new user message with text parts.
-      prepareSendMessagesRequest: ({ id, messages, requestMetadata }) => {
+      // The server keeps the chat's history, so send only the new user message or a retry request.
+      prepareSendMessagesRequest: ({ id, messages, requestMetadata, trigger, messageId }) => {
         const meta = requestMetadata as AttemptRequestMetadata;
+        const effectiveTrigger = meta.trigger ?? trigger;
+
+        if (effectiveTrigger === "regenerate-message") {
+          const body: RetryRequest = {
+            trigger: "regenerate-message",
+            id,
+            messages: [],
+            ...(messageId ? { messageId } : {}),
+            modelId: meta.modelId,
+            ...(meta.effort ? { effort: meta.effort } : {}),
+          };
+
+          return {
+            api: `${API_BASE_URL}/chats/${meta.chatId}/retry`,
+            body,
+          };
+        }
+
         const lastUserMessage =
           [...messages].reverse().find((m) => m.role === "user") ??
           messages[messages.length - 1];
@@ -146,14 +124,11 @@ class ResilientChatTransport extends DefaultChatTransport<ChatUIMessage> {
       return super.sendMessages(options);
     }
 
-    const runSuperSend = (attemptMeta: AttemptRequestMetadata) =>
-      super.sendMessages({
-        ...options,
-        metadata: attemptMeta,
-      });
-
     let resolvedChatId = meta.chatId;
     if (resolvedChatId === null) {
+      if (options.trigger === "regenerate-message") {
+        throw new Error("Cannot regenerate reply without an active chat.");
+      }
       try {
         const created = await chatApi.createChat();
         resolvedChatId = created.id;
@@ -167,166 +142,22 @@ class ResilientChatTransport extends DefaultChatTransport<ChatUIMessage> {
       }
     }
 
-    const triedModelIds = new Set<string>([meta.modelId]);
-    let currentModelId = meta.modelId;
-    const hasAttachments = meta.attachmentIds.length > 0;
-    let currentAttachmentIds = [...meta.attachmentIds];
-
-    const openModelStream = async (): Promise<ReadableStreamDefaultReader<ChatStreamChunk>> => {
-      while (true) {
-        try {
-          const stream = await runSuperSend({
-            chatId: resolvedChatId,
-            modelId: currentModelId,
-            attachmentIds: currentAttachmentIds,
-            effort: meta.effort,
-          });
-          // Once HTTP 200 headers arrive, the server has stored the prompt and claimed its attachments.
-          currentAttachmentIds = [];
-          return stream.getReader();
-        } catch (error) {
-          if (options.abortSignal?.aborted) {
-            throw error;
-          }
-          const nextModel = isRetryableModelFailure(error)
-            ? getNextModel(meta.models, currentModelId, triedModelIds, hasAttachments)
-            : null;
-          if (nextModel) {
-            triedModelIds.add(nextModel.id);
-            currentModelId = nextModel.id;
-            meta.onModelFallback?.(nextModel.id);
-            continue;
-          }
-          throw new Error(
-            getErrorMessage(error, "An error occurred during response streaming."),
-            { cause: error }
-          );
-        }
-      }
+    const attemptMeta: AttemptRequestMetadata = {
+      chatId: resolvedChatId,
+      modelId: meta.modelId,
+      attachmentIds: meta.attachmentIds,
+      effort: meta.effort,
+      trigger: options.trigger,
     };
 
-    let activeReader = await openModelStream();
-    let hasSentStart = false;
-
-    return new ReadableStream<ChatStreamChunk>({
-      async pull(controller) {
-        while (true) {
-          if (options.abortSignal?.aborted) {
-            await activeReader.cancel().catch(() => {});
-            controller.close();
-            return;
-          }
-
-          let readResult: ReadableStreamReadResult<ChatStreamChunk>;
-          try {
-            readResult = await activeReader.read();
-          } catch (error) {
-            if (options.abortSignal?.aborted) {
-              controller.close();
-              return;
-            }
-            const nextModel = isRetryableModelFailure(error)
-              ? getNextModel(meta.models, currentModelId, triedModelIds, hasAttachments)
-              : null;
-            if (nextModel) {
-              triedModelIds.add(nextModel.id);
-              currentModelId = nextModel.id;
-              meta.onModelFallback?.(nextModel.id);
-              controller.enqueue({ type: "reset-step" });
-              try {
-                activeReader = await openModelStream();
-                continue;
-              } catch (fallbackError) {
-                controller.enqueue({
-                  type: "error",
-                  errorText: getErrorMessage(
-                    fallbackError,
-                    "An error occurred during response streaming."
-                  ),
-                });
-                controller.close();
-                return;
-              }
-            }
-            controller.enqueue({
-              type: "error",
-              errorText: getErrorMessage(
-                error,
-                "An error occurred during response streaming."
-              ),
-            });
-            controller.close();
-            return;
-          }
-
-          const { value: chunk, done } = readResult;
-          if (done) {
-            controller.close();
-            return;
-          }
-
-          if (chunk.type === "start") {
-            if (hasSentStart) {
-              // Keep the original assistant message ID across fallback attempts.
-              continue;
-            }
-            hasSentStart = true;
-            controller.enqueue(chunk);
-            return;
-          }
-
-          if (chunk.type === "error") {
-            const streamError = new Error(chunk.errorText);
-            await activeReader.cancel().catch(() => {});
-
-            const nextModel = isRetryableModelFailure(streamError)
-              ? getNextModel(meta.models, currentModelId, triedModelIds, hasAttachments)
-              : null;
-
-            if (nextModel) {
-              triedModelIds.add(nextModel.id);
-              currentModelId = nextModel.id;
-              meta.onModelFallback?.(nextModel.id);
-              controller.enqueue({ type: "reset-step" });
-              try {
-                activeReader = await openModelStream();
-                continue;
-              } catch (fallbackError) {
-                controller.enqueue({
-                  type: "error",
-                  errorText: getErrorMessage(
-                    fallbackError,
-                    "An error occurred during response streaming."
-                  ),
-                });
-                controller.close();
-                return;
-              }
-            }
-
-            controller.enqueue({
-              type: "error",
-              errorText: getErrorMessage(
-                streamError,
-                "An error occurred during response streaming."
-              ),
-            });
-            controller.close();
-            return;
-          }
-
-          controller.enqueue(chunk);
-          return;
-        }
-      },
-      async cancel(reason) {
-        await activeReader.cancel(reason).catch(() => {});
-      },
+    return super.sendMessages({
+      ...options,
+      metadata: attemptMeta,
     });
   }
 }
 
-export const chatTransport = new ResilientChatTransport();
+export const chatTransport = new AppChatTransport();
 
 export const chatApi = {
   getChats: async (params?: { limit?: number; cursor?: string | null }): Promise<PageChatPublic> => {

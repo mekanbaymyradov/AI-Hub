@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { Copy, Check, AlertCircle } from "lucide-react";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface FormattedMessageProps {
   content: string;
@@ -346,12 +347,10 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
-    try {
-      await navigator.clipboard.writeText(code);
+    const ok = await copyToClipboard(code);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy code:", err);
     }
   };
 

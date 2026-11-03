@@ -3,6 +3,7 @@ import { AnimatePresence } from "framer-motion";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLoadMore, type PageLoader } from "@/hooks/use-load-more";
+import { type ModelPublic } from "@/api/types";
 import { ChatMessageItem } from "./ChatMessageItem";
 import { type UIMessage } from "./types";
 
@@ -13,6 +14,9 @@ interface ChatMessageListProps {
   isStreaming: boolean;
   activeTool: string | null;
   olderMessages: PageLoader;
+  models?: ModelPublic[];
+  lastPromptHasAttachments?: boolean;
+  onRetry?: (targetModelId?: string) => void;
 }
 
 export function ChatMessageList({
@@ -22,6 +26,9 @@ export function ChatMessageList({
   isStreaming,
   activeTool,
   olderMessages,
+  models,
+  lastPromptHasAttachments,
+  onRetry,
 }: ChatMessageListProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const loadOlderRef = useLoadMore(olderMessages);
@@ -74,6 +81,15 @@ export function ChatMessageList({
               <AnimatePresence initial={false}>
                 {messages.map((msg, index) => {
                   const isLastMessage = index === messages.length - 1;
+                  const nextMsg = messages[index + 1];
+                  const isFailedPrompt = Boolean(
+                    msg.role === "user" &&
+                    nextMsg?.role === "ai" &&
+                    Boolean(nextMsg.error) &&
+                    (index === messages.length - 2 || index === messages.length - 1)
+                  );
+                  const failedModelId = isFailedPrompt ? nextMsg?.modelId : undefined;
+
                   return (
                     <ChatMessageItem
                       key={msg.id}
@@ -81,6 +97,11 @@ export function ChatMessageList({
                       isStreaming={isStreaming}
                       isLastMessage={isLastMessage}
                       activeTool={isLastMessage ? activeTool : null}
+                      models={models}
+                      lastPromptHasAttachments={lastPromptHasAttachments}
+                      onRetry={onRetry}
+                      isFailedPrompt={isFailedPrompt}
+                      failedModelId={failedModelId}
                     />
                   );
                 })}

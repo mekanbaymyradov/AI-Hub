@@ -25,7 +25,6 @@ export interface SendRequestMetadata {
   effort: Effort | null;
   models: ModelPublic[];
   onChatCreated?: (chat: ChatPublic) => void;
-  onModelFallback?: (nextModelId: string) => void;
 }
 
 export interface UIMessage {
@@ -39,6 +38,8 @@ export interface UIMessage {
   // Why the reply stopped early; shown under whatever content arrived.
   error?: string;
   attachments?: AttachmentPublic[];
+  /** Model id that generated this response, if available. */
+  modelId?: string | null;
 }
 
 /** Convert a stored API message into a Vercel AI SDK ChatUIMessage. */
@@ -99,5 +100,6 @@ export function toRenderableUIMessage(
     isReasoningStreaming,
     error: errorText,
     attachments: msg.metadata?.attachments,
+    modelId: msg.metadata?.modelId,
   };
 }

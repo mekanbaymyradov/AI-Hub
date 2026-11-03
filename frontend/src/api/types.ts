@@ -91,6 +91,15 @@ export interface MessageRequest {
   effort?: Effort | null;
 }
 
+export interface RetryRequest {
+  trigger: 'regenerate-message';
+  id: string;
+  messages: [];
+  messageId?: string | null;
+  modelId: string;
+  effort?: Effort | null;
+}
+
 export interface ErrorDetail {
   loc?: (string | number)[];
   msg: string;
