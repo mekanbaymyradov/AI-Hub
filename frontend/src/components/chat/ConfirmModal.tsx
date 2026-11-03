@@ -34,9 +34,9 @@ export function ConfirmModal({
       <div className="space-y-1.5">
         <div className="flex items-center gap-2 text-red-500">
           <Icon className="h-4 w-4" />
-          <ModalTitle className="text-base font-semibold text-zinc-900 dark:text-white">{title}</ModalTitle>
+          <ModalTitle className="text-base font-semibold text-fg-1">{title}</ModalTitle>
         </div>
-        <ModalDescription className="text-xs leading-relaxed text-zinc-500 dark:text-zinc-400">
+        <ModalDescription className="text-xs leading-relaxed text-fg-7">
           {description}
         </ModalDescription>
       </div>
@@ -53,7 +53,7 @@ export function ConfirmModal({
           variant="ghost"
           onClick={onClose}
           disabled={pending}
-          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
         >
           Cancel
         </Button>

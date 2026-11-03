@@ -49,8 +49,8 @@ export function NamePromptModal() {
           if (e.key === "Escape" && !saving) skip();
         }}
       >
-        <ModalTitle className="text-lg font-semibold text-zinc-900 dark:text-white">Hey, what should I call you?</ModalTitle>
-        <ModalDescription className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+        <ModalTitle className="text-lg font-semibold text-fg-1">Hey, what should I call you?</ModalTitle>
+        <ModalDescription className="mt-1 text-sm text-fg-7">
           You can change it anytime in Profile Settings.
         </ModalDescription>
 
@@ -66,7 +66,7 @@ export function NamePromptModal() {
           maxLength={NAME_MAX_LENGTH}
           aria-label="Your name"
           aria-invalid={error !== null}
-          className="mt-5 h-11 rounded-xl border-zinc-200 bg-zinc-50 px-3.5 text-center text-zinc-900 dark:border-white/10 dark:bg-[#121214] dark:text-white"
+          className="mt-5 h-11 rounded-xl border-line-1 bg-field dark:bg-field px-3.5 text-center text-fg-1"
         />
         {error && (
           <p role="alert" className="mt-2 text-sm font-medium text-red-500">
@@ -80,7 +80,7 @@ export function NamePromptModal() {
             variant="ghost"
             onClick={skip}
             disabled={saving}
-            className="h-10 rounded-xl text-sm text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="h-10 rounded-xl text-sm text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
           >
             Skip
           </Button>

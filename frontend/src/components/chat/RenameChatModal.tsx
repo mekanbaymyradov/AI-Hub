@@ -17,8 +17,8 @@ export function RenameChatModal({ open, chat, onClose, onRename, pending, error 
   return (
     <Modal open={open} onClose={onClose} dismissible={!pending} className="space-y-4">
       <div className="space-y-1">
-        <ModalTitle className="text-base font-semibold text-zinc-900 dark:text-white">Rename Chat</ModalTitle>
-        <ModalDescription className="text-xs text-zinc-500 dark:text-zinc-400">
+        <ModalTitle className="text-base font-semibold text-fg-1">Rename Chat</ModalTitle>
+        <ModalDescription className="text-xs text-fg-7">
           Enter a new name for this conversation.
         </ModalDescription>
       </div>
@@ -51,7 +51,7 @@ function RenameForm({
         onFocus={(e) => e.target.select()}
         placeholder="Chat name"
         aria-label="Chat name"
-        className="h-10 rounded-xl border-zinc-200 bg-zinc-50 text-base sm:text-sm text-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-white/10 dark:bg-[#121214] dark:text-white"
+        className="h-10 rounded-xl border-line-1 bg-field dark:bg-field text-base sm:text-sm text-fg-1 focus-visible:ring-1 focus-visible:ring-blue-500"
       />
       {error && (
         <p role="alert" className="mt-2 text-xs font-medium text-red-500">
@@ -65,7 +65,7 @@ function RenameForm({
           variant="ghost"
           onClick={onClose}
           disabled={pending}
-          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+          className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
         >
           Cancel
         </Button>

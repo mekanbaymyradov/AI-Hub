@@ -50,13 +50,13 @@ export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatG
       className="text-center mb-4 sm:mb-8 px-4 max-w-xl mx-auto select-none"
     >
       <div className="flex flex-col items-center mb-4">
-        <div className="relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white dark:bg-zinc-900 border border-zinc-200/80 dark:border-white/10 shadow-md shadow-zinc-200/50 dark:shadow-black/40 mb-2 sm:mb-3 transition-transform hover:scale-105">
+        <div className="relative flex items-center justify-center w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-tile border border-line-3 shadow-md shadow-zinc-200/50 dark:shadow-black/40 mb-2 sm:mb-3 transition-transform hover:scale-105">
           <img src="/favicon.svg" alt="" className="w-5 h-5 sm:w-6 sm:h-6 object-contain" />
           <div className="absolute -inset-1 rounded-2xl bg-blue-500/10 dark:bg-blue-500/20 blur-xs -z-10" />
         </div>
       </div>
 
-      <h2 className="text-xl sm:text-3xl md:text-[32px] font-semibold tracking-tight text-zinc-900 dark:text-white leading-tight">
+      <h2 className="text-xl sm:text-3xl md:text-[32px] font-semibold tracking-tight text-fg-1 leading-tight">
         {timeGreeting(new Date().getHours())}
         {user && (
           <>
@@ -72,9 +72,9 @@ export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatG
             key={label}
             type="button"
             onClick={() => onSelectPrompt(prompt)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-white/80 dark:bg-zinc-900/80 hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white border border-zinc-200/80 dark:border-white/10 hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all shadow-2xs cursor-pointer group"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-tile/80 hover:bg-fill-3 text-fg-6 hover:text-fg-1 border border-line-3 hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all shadow-2xs cursor-pointer group"
           >
-            <Icon className="w-3.5 h-3.5 text-zinc-400 dark:text-zinc-500 group-hover:text-blue-500 transition-colors" />
+            <Icon className="w-3.5 h-3.5 text-fg-8 group-hover:text-blue-500 transition-colors" />
             <span>{label}</span>
           </button>
         ))}

@@ -39,7 +39,7 @@ const INSTRUCTION_SUGGESTIONS = [
 ];
 
 // 16px on phones, since iOS zooms into any focused field smaller than that.
-const FIELD = "h-10 rounded-xl border-zinc-200 bg-zinc-50 text-base sm:text-smtext-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:border-white/10 dark:bg-zinc-900 dark:text-white";
+const FIELD = "h-10 rounded-xl border-line-1 bg-zinc-50 text-base sm:text-smtext-zinc-900 focus-visible:ring-1 focus-visible:ring-blue-500 dark:bg-zinc-900 dark:text-white";
 
 interface ProfileSettingsModalProps {
   open: boolean;
@@ -52,19 +52,19 @@ export function ProfileSettingsModal({ open, onClose }: ProfileSettingsModalProp
     <Modal
       open={open}
       onClose={onClose}
-      className="max-h-[90dvh] max-w-xl space-y-6 overflow-y-auto p-4 sm:p-8 rounded-2xl sm:rounded-3xl dark:bg-[#18181b]"
+      className="max-h-[90dvh] max-w-xl space-y-6 overflow-y-auto p-4 sm:p-8 rounded-2xl sm:rounded-3xl bg-sheet"
     >
       <div className="flex items-center justify-between border-b border-zinc-100 pb-4 dark:border-white/10">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/60 dark:text-blue-400">
             <UserIcon className="h-4 w-4" />
           </div>
-          <ModalTitle className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">Profile</ModalTitle>
+          <ModalTitle className="text-lg font-semibold tracking-tight text-fg-1">Profile</ModalTitle>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="cursor-pointer rounded-xl p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-white/10 dark:hover:text-white"
+          className="cursor-pointer rounded-xl p-1.5 text-zinc-400 transition-colors hover:bg-fill-1 hover:text-fg-1"
           aria-label="Close"
         >
           <X className="h-4 w-4" />
@@ -137,7 +137,7 @@ function AvatarSection({ user }: { user: UserPublic }) {
             size="sm"
             onClick={() => inputRef.current?.click()}
             disabled={busy}
-            className="h-8 cursor-pointer rounded-xl border-zinc-200 bg-white px-3 text-xs text-zinc-800 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200 dark:hover:bg-zinc-700/80"
+            className="h-8 cursor-pointer rounded-xl border-zinc-200 bg-white px-3 text-xs text-fg-3 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700/80"
           >
             <Camera className="mr-1.5 h-3.5 w-3.5" />
             Upload photo
@@ -156,7 +156,7 @@ function AvatarSection({ user }: { user: UserPublic }) {
             </Button>
           )}
         </div>
-        <span className="text-xs text-zinc-500 dark:text-zinc-400">JPG, PNG, or WebP up to 2MB</span>
+        <span className="text-xs text-fg-7">JPG, PNG, or WebP up to 2MB</span>
         {error && <span className="text-xs font-medium text-red-500">{error}</span>}
       </div>
     </div>
@@ -191,7 +191,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
     <form onSubmit={handleSubmit} className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
-          <label htmlFor="profile-name" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="profile-name" className="text-xs font-medium text-fg-4">
             Name
           </label>
           <Input
@@ -205,21 +205,21 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
         </div>
 
         <div className="space-y-1.5">
-          <label htmlFor="profile-email" className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
+          <label htmlFor="profile-email" className="text-xs font-medium text-fg-7">
             Email
           </label>
           <Input
             id="profile-email"
             value={user.email}
             disabled
-            className="h-10 cursor-not-allowed rounded-xl border-zinc-200 bg-zinc-100 text-sm text-zinc-500 dark:border-white/5 dark:bg-zinc-900/60 dark:text-zinc-400"
+            className="h-10 cursor-not-allowed rounded-xl border-zinc-200 bg-zinc-100 text-sm text-fg-7 dark:border-white/5 dark:bg-zinc-900/60"
           />
         </div>
       </div>
 
       <div className="space-y-1.5">
         <div className="flex items-center justify-between">
-          <label htmlFor="profile-instructions" className="text-xs font-medium text-zinc-700 dark:text-zinc-300">
+          <label htmlFor="profile-instructions" className="text-xs font-medium text-fg-4">
             Instructions
           </label>
           <span
@@ -227,7 +227,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
               "font-mono text-[11px] tabular-nums transition-colors",
               instructions.length >= INSTRUCTIONS_MAX_LENGTH - 100
                 ? "font-medium text-amber-500"
-                : "text-zinc-400 dark:text-zinc-500"
+                : "text-fg-8"
             )}
           >
             {instructions.length}/{INSTRUCTIONS_MAX_LENGTH}
@@ -243,7 +243,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
           className={cn(FIELD, "h-auto min-h-[110px] resize-none")}
         />
         <div className="space-y-2 pt-1">
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500 dark:text-zinc-400">
+          <div className="flex items-center gap-1.5 text-xs text-fg-7">
             <Sparkles className="h-3 w-3 text-blue-500" />
             <span>Suggestions</span>
           </div>
@@ -261,7 +261,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
                     "cursor-pointer rounded-lg border px-2.5 py-1 text-left text-xs transition-all select-none",
                     isSelected
                       ? "border-blue-500 bg-blue-50 font-medium text-blue-600 shadow-xs dark:border-blue-500/60 dark:bg-blue-950/60 dark:text-blue-400"
-                      : "border-zinc-200 bg-zinc-50 text-zinc-600 hover:border-zinc-300 hover:bg-zinc-100 hover:text-zinc-900 dark:border-white/10 dark:bg-zinc-900/50 dark:text-zinc-400 dark:hover:border-white/20 dark:hover:bg-zinc-800/80 dark:hover:text-zinc-200"
+                      : "border-line-1 bg-zinc-50 text-fg-6 hover:border-zinc-300 hover:bg-zinc-100 hover:text-fg-2 dark:bg-zinc-900/50 dark:hover:border-white/20 dark:hover:bg-zinc-800/80"
                   )}
                 >
                   {item.label}
@@ -287,7 +287,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
             variant="ghost"
             onClick={onClose}
             disabled={saving}
-            className="h-10 cursor-pointer rounded-xl px-4 text-xs font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-300 dark:hover:bg-white/10 dark:hover:text-white"
+            className="h-10 cursor-pointer rounded-xl px-4 text-xs font-medium text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
           >
             Cancel
           </Button>
