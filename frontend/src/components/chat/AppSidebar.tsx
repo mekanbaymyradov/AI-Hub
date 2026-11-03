@@ -68,6 +68,19 @@ interface AppSidebarProps {
   onNewThread: () => void;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Return the sidebar heading for a chat last active at `iso`, counted in local calendar days. */
+function dateGroup(iso: string, now: Date): string {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const daysAgo = Math.ceil((startOfToday - new Date(iso).getTime()) / DAY_MS);
+  if (daysAgo <= 0) return "Today";
+  if (daysAgo === 1) return "Yesterday";
+  if (daysAgo <= 7) return "Previous 7 days";
+  if (daysAgo <= 30) return "Previous 30 days";
+  return "Older";
+}
+
 export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSidebarProps) {
   const { toggleSidebar, setOpen, isMobile, setOpenMobile } = useSidebar();
   const { user, logout } = useAuth();
@@ -119,6 +132,8 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   });
 
   // Chats visible in the UI (exits smoothly when added to deletingChatIds)
+  // Fixed for the render, so every row is bucketed against the same moment.
+  const now = new Date();
   const visibleChats = useMemo(
     () => chats.filter((chat) => !deletingChatIds.has(chat.id)),
     [chats, deletingChatIds]
@@ -394,7 +409,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
             ) : (
               <div className="flex items-center justify-between px-1 mb-1 shrink-0">
                 <SidebarGroupLabel className="p-0 text-xs font-medium text-zinc-500 dark:text-muted-foreground select-none">
-                  Earlier
+                  Chats
                 </SidebarGroupLabel>
                 {visibleChats.length > 0 && (
                   <Tooltip>
@@ -425,46 +440,65 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   </SidebarMenuItem>
                 )}
                 <AnimatePresence initial={false}>
-                  {visibleChats.map((chat) => (
-                    <motion.li
-                      key={chat.id}
-                      layout="position"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{
-                        opacity: 0,
-                        height: 0,
-                        x: -20,
-                        scale: 0.96,
-                        filter: "blur(2px)",
-                        backgroundColor: "rgba(239, 68, 68, 0.12)",
-                        transition: {
-                          opacity: { duration: 0.32, ease: "easeOut" },
-                          x: { duration: 0.32, ease: "easeOut" },
-                          scale: { duration: 0.32, ease: "easeOut" },
-                          filter: { duration: 0.32, ease: "easeOut" },
-                          backgroundColor: { duration: 0.18 },
-                          height: { duration: 0.34, ease: [0.4, 0, 0.2, 1], delay: 0.08 },
-                        },
-                      }}
-                      transition={{ layout: { duration: 0.28, ease: "easeOut" } }}
-                      data-slot="sidebar-menu-item"
-                      data-sidebar="menu-item"
-                      className="group/menu-item relative overflow-hidden list-none rounded-lg"
-                    >
-                      <ChatRowContent
-                        name={chat.name}
-                        active={chat.id === activeChatId}
-                        onSelect={() => handleSelectChat(chat.id)}
-                        onRename={() => openRename(chat)}
-                        onDelete={() => openDelete(chat)}
-                        onStartSelect={() => handleStartSelect(chat.id)}
-                        selectionMode={isSelectionMode}
-                        selected={selectedChatIds.has(chat.id)}
-                        onToggleSelect={() => handleToggleChat(chat.id)}
-                      />
-                    </motion.li>
-                  ))}
+                  {visibleChats.flatMap((chat, index) => {
+                    const group = dateGroup(chat.updated_at, now);
+                    const startsGroup =
+                      index === 0 || dateGroup(visibleChats[index - 1].updated_at, now) !== group;
+                    const row = (
+                      <motion.li
+                        key={chat.id}
+                        layout="position"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{
+                          opacity: 0,
+                          height: 0,
+                          x: -20,
+                          scale: 0.96,
+                          filter: "blur(2px)",
+                          backgroundColor: "rgba(239, 68, 68, 0.12)",
+                          transition: {
+                            opacity: { duration: 0.32, ease: "easeOut" },
+                            x: { duration: 0.32, ease: "easeOut" },
+                            scale: { duration: 0.32, ease: "easeOut" },
+                            filter: { duration: 0.32, ease: "easeOut" },
+                            backgroundColor: { duration: 0.18 },
+                            height: { duration: 0.34, ease: [0.4, 0, 0.2, 1], delay: 0.08 },
+                          },
+                        }}
+                        transition={{ layout: { duration: 0.28, ease: "easeOut" } }}
+                        data-slot="sidebar-menu-item"
+                        data-sidebar="menu-item"
+                        className="group/menu-item relative overflow-hidden list-none rounded-lg"
+                      >
+                        <ChatRowContent
+                          name={chat.name}
+                          active={chat.id === activeChatId}
+                          onSelect={() => handleSelectChat(chat.id)}
+                          onRename={() => openRename(chat)}
+                          onDelete={() => openDelete(chat)}
+                          onStartSelect={() => handleStartSelect(chat.id)}
+                          selectionMode={isSelectionMode}
+                          selected={selectedChatIds.has(chat.id)}
+                          onToggleSelect={() => handleToggleChat(chat.id)}
+                        />
+                      </motion.li>
+                    );
+                    if (!startsGroup) return [row];
+                    return [
+                      <motion.li
+                        key={`group-${group}`}
+                        layout="position"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="list-none px-2 pt-3 pb-1 text-[11px] font-medium text-zinc-400 dark:text-zinc-500 select-none first:pt-1"
+                      >
+                        {group}
+                      </motion.li>,
+                      row,
+                    ];
+                  })}
                 </AnimatePresence>
                 {/* Older chats load when this comes into view. */}
                 <li ref={loadMoreChatsRef} aria-hidden="true" className="h-px" />
