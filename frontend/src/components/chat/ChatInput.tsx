@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
 
@@ -68,6 +77,7 @@ export function ChatInput({
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [uncontrolledModelId, setUncontrolledModelId] = useState<string | null>(null);
   const isMobile = useIsMobile();
 
@@ -89,11 +99,10 @@ export function ChatInput({
     }
   }, [input]);
 
-  const handleAttachmentChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    // Cleared now, so choosing the same file again still fires a change.
-    e.target.value = "";
-    if (files.length === 0) return;
+  const canAttach = !isUploadingAttachments && !isStreaming;
+
+  const attachFiles = async (files: File[]) => {
+    if (files.length === 0 || !canAttach) return;
 
     const problem = modelSupportsFiles
       ? attachmentProblem(files, attachments.length)
@@ -110,6 +119,41 @@ export function ChatInput({
     } finally {
       setIsUploadingAttachments(false);
     }
+  };
+
+  const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    // Cleared now, so choosing the same file again still fires a change.
+    e.target.value = "";
+    void attachFiles(files);
+  };
+
+  // Text pastes as usual; only pasted files become attachments.
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    void attachFiles(files);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLFormElement>) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    setIsDraggingFiles(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLFormElement>) => {
+    // Moving onto a child element also fires dragleave on the form.
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setIsDraggingFiles(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLFormElement>) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    // Otherwise the browser navigates away to open the file.
+    e.preventDefault();
+    setIsDraggingFiles(false);
+    void attachFiles(Array.from(e.dataTransfer.files));
   };
 
   const removeAttachment = (id: number) => {
@@ -165,7 +209,10 @@ export function ChatInput({
         <motion.div layoutId="input-box" className="relative group w-full">
           <form
             onSubmit={handleSubmit}
-            className="relative flex flex-col bg-white dark:bg-[#171717] border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn("relative flex flex-col bg-white dark:bg-[#171717] border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
           >
             {attachmentError && (
               <div className="flex items-center justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
@@ -215,6 +262,7 @@ export function ChatInput({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Send a message..."
               className="min-h-[50px] sm:min-h-[52px] max-h-[200px] sm:max-h-[220px] w-full resize-none border-0 shadow-none focus-visible:ring-0 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-12 text-base sm:text-[15px] bg-transparent text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
               rows={1}
@@ -238,7 +286,7 @@ export function ChatInput({
                       size="icon"
                       aria-label="Attach files"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingAttachments || isStreaming || !modelSupportsFiles}
+                      disabled={!canAttach || !modelSupportsFiles}
                       className={cn(
                         "h-8 w-8 rounded-full text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer",
                         !modelSupportsFiles && "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-400"
