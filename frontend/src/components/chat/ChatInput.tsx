@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
+import { AlertCircle, ArrowUp, FileText, Loader2, Mic, Paperclip, Square, X } from "lucide-react";
 
 import { chatApi } from "@/api/chat";
 import { getErrorMessage } from "@/api/errors";
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { canRecordVoice, useVoiceInput } from "@/hooks/use-voice-input";
 import { ChatGreeting } from "./ChatGreeting";
 import { EffortPicker } from "./EffortPicker";
 import { ModelPicker } from "./ModelPicker";
@@ -76,7 +77,7 @@ export function ChatInput({
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
-  const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [inputError, setInputError] = useState<string | null>(null);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [uncontrolledModelId, setUncontrolledModelId] = useState<string | null>(null);
   const isMobile = useIsMobile();
@@ -99,6 +100,15 @@ export function ChatInput({
     }
   }, [input]);
 
+  const voice = useVoiceInput(
+    (text) => {
+      setInputError(null);
+      setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+      textareaRef.current?.focus();
+    },
+    setInputError,
+  );
+
   const canAttach = !isUploadingAttachments && !isStreaming;
 
   const attachFiles = async (files: File[]) => {
@@ -107,7 +117,7 @@ export function ChatInput({
     const problem = modelSupportsFiles
       ? attachmentProblem(files, attachments.length)
       : `The selected model (${selectedModel?.display_name}) does not accept file attachments.`;
-    setAttachmentError(problem);
+    setInputError(problem);
     if (problem) return;
 
     setIsUploadingAttachments(true);
@@ -115,7 +125,7 @@ export function ChatInput({
       const uploaded = await chatApi.uploadAttachments(files);
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (err) {
-      setAttachmentError(getErrorMessage(err, "Failed to upload attachments."));
+      setInputError(getErrorMessage(err, "Failed to upload attachments."));
     } finally {
       setIsUploadingAttachments(false);
     }
@@ -158,7 +168,7 @@ export function ChatInput({
 
   const removeAttachment = (id: number) => {
     setAttachments((prev) => prev.filter((a) => a.id !== id));
-    setAttachmentError(null);
+    setInputError(null);
   };
 
   const handleSubmit = (e?: FormEvent) => {
@@ -167,11 +177,11 @@ export function ChatInput({
     if (!selectedModel) return;
 
     if (attachments.length > 0 && !modelSupportsFiles) {
-      setAttachmentError(`Model "${selectedModel.display_name}" cannot accept files. Please select a compatible model.`);
+      setInputError(`Model "${selectedModel.display_name}" cannot accept files. Please select a compatible model.`);
       return;
     }
 
-    setAttachmentError(null);
+    setInputError(null);
     onSend({ prompt: input.trim(), attachments, modelId: selectedModel.id, effort });
     setInput("");
     setAttachments([]);
@@ -214,15 +224,15 @@ export function ChatInput({
             onDrop={handleDrop}
             className={cn("relative flex flex-col bg-composer border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
           >
-            {attachmentError && (
+            {inputError && (
               <div className="flex items-center justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{attachmentError}</span>
+                  <span className="truncate">{inputError}</span>
                 </div>
                 <button
                   type="button"
-                  onClick={() => setAttachmentError(null)}
+                  onClick={() => setInputError(null)}
                   aria-label="Dismiss"
                   className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 ml-2 cursor-pointer shrink-0"
                 >
@@ -307,6 +317,36 @@ export function ChatInput({
                     </span>
                   </TooltipContent>
                 </Tooltip>
+                {canRecordVoice && (
+                  <Tooltip>
+                    <TooltipTrigger render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label={voice.state === "recording" ? "Stop recording" : "Voice input"}
+                        aria-pressed={voice.state === "recording"}
+                        onClick={voice.toggle}
+                        disabled={voice.state === "starting" || voice.state === "transcribing"}
+                        className={cn(
+                          "h-8 w-8 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer",
+                          voice.state === "recording" && "text-red-500 hover:text-red-600 dark:text-red-400 animate-pulse"
+                        )}
+                      >
+                        {voice.state === "recording" ? (
+                          <Square className="h-3.5 w-3.5 fill-current" />
+                        ) : voice.state === "idle" ? (
+                          <Mic className="h-4 w-4" />
+                        ) : (
+                          <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+                        )}
+                      </Button>
+                    } />
+                    <TooltipContent side="top" align="center">
+                      <span>{voice.state === "recording" ? "Stop and transcribe" : "Dictate a message"}</span>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 <EffortPicker value={effort} onChange={onEffortChange} disabled={isStreaming} />
               </div>
 
