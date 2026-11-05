@@ -1,9 +1,9 @@
 # Architecture
 
-The code is split by domain under `src/`: `auth`, `chat`, `llm` and
-`notifications`. Each domain has its own `router`, `service`, `flows`, `models`
-and `config` modules as it needs them. Shared infrastructure lives at the top
-of `src/`.
+The code is split by domain under `src/`: `auth`, `chat`, `llm`,
+`notifications` and `voice`. Each domain has its own `router`, `service`,
+`flows`, `models` and `config` modules as it needs them. Shared infrastructure
+lives at the top of `src/`.
 
 ## Auth
 
@@ -89,6 +89,28 @@ pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
 
 Deleting a chat also deletes its files.
 
+## Voice
+
+`src/voice/`. `POST /voice/transcriptions` turns one recording into text, in
+the language spoken, for the client to put in the chat input. Nothing is
+stored.
+
+- **Provider:** Groq's `whisper-large-v3-turbo`, called directly through the
+  shared `httpx2` client (`src/voice/client.py`), since Pydantic AI has no
+  speech-to-text API. The key is `GROQ_API_KEY` from `LLMSettings`, like the
+  other provider keys. Without it the route returns 503.
+- **Input:** WebM, Ogg, MP4, M4A, MP3, WAV or FLAC, up to 10 MiB. Browsers send
+  types with codecs, like `audio/webm;codecs=opus`, so only the part before
+  `;` is checked. The file goes to Groq as `audio.<ext>`, since a recording
+  arrives named `blob`.
+- **Errors:** Groq rejecting the audio (400) becomes a 422, telling the user to
+  record again, and is logged in case the request was at fault. Groq's 429
+  becomes a 503 with its `Retry-After`. Anything else is a 502.
+- **Groq limits:** they apply to the whole organization, not per user, so every
+  user shares one quota (Groq's docs list 20 requests per minute and 2 hours
+  of audio per hour for Whisper). The per-user rate limit keeps one user from
+  taking all of it.
+
 ## Rate limiting
 
 `src/rate_limit.py`. The limiter is a fixed-window counter in Redis.
@@ -103,6 +125,7 @@ Deleting a chat also deletes its files.
   | Exchange a code | 10 per 15 minutes per IP |
   | Upload files | 30 per minute per user |
   | Send a message | 20 per minute per user |
+  | Transcribe audio | 10 per minute per user |
 
 - **Response:** a request over the limit gets a 429 with `Retry-After`.
 - **Monitoring:** when the app-wide limit rejects a request, its request span
