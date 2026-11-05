@@ -25,7 +25,7 @@ export function Modal({ open, onClose, dismissible = true, className, children }
         <Dialog.Backdrop className="fixed inset-0 z-50 bg-black/40 backdrop-blur-xs transition-opacity duration-150 data-ending-style:opacity-0 data-starting-style:opacity-0 dark:bg-black/70" />
         <Dialog.Popup
           className={cn(
-            "fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-zinc-200 bg-white p-5 text-zinc-900 shadow-2xl outline-none transition duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 dark:border-white/10 dark:bg-[#1c1c1f] dark:text-foreground",
+            "fixed top-1/2 left-1/2 z-50 w-[calc(100%-2rem)] max-w-sm max-h-[calc(100dvh-2rem)] overflow-y-auto -translate-x-1/2 -translate-y-1/2 rounded-2xl border border-line-1 bg-overlay p-5 text-zinc-900 shadow-2xl outline-none transition duration-150 data-ending-style:scale-95 data-ending-style:opacity-0 data-starting-style:scale-95 data-starting-style:opacity-0 dark:text-foreground",
             className
           )}
         >

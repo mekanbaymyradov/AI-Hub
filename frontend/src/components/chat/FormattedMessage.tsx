@@ -17,11 +17,11 @@ const TOKEN_STYLES: Record<string, string> = {
   function: "text-blue-700 dark:text-blue-400",
   type: "text-teal-700 dark:text-teal-300",
   operator: "text-pink-600 dark:text-pink-400/90",
-  punctuation: "text-zinc-500 dark:text-zinc-400",
+  punctuation: "text-fg-7",
   property: "text-sky-700 dark:text-sky-300",
   tag: "text-red-600 dark:text-red-400 font-medium",
   attribute: "text-purple-600 dark:text-purple-300",
-  text: "text-zinc-800 dark:text-zinc-200",
+  text: "text-fg-3",
 };
 
 const PYTHON_KEYWORDS = new Set([
@@ -364,23 +364,23 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
   }, [code, displayLang]);
 
   return (
-    <div className="relative my-3.5 w-full max-w-full rounded-xl overflow-hidden border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-[#0c0c0e] shadow-xs dark:shadow-md group/code">
+    <div className="relative my-3.5 w-full max-w-full rounded-xl overflow-hidden border border-line-2 bg-code shadow-xs dark:shadow-md group/code">
       {/* Code Header Bar */}
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-xs select-none">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-b border-line-2 text-xs select-none">
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 opacity-60">
             <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
             <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
             <span className="h-2.5 w-2.5 rounded-full bg-green-500/80" />
           </div>
-          <span className="font-mono text-[11px] font-medium tracking-wider uppercase text-zinc-500 dark:text-zinc-400 ml-1.5">
+          <span className="font-mono text-[11px] font-medium tracking-wider uppercase text-fg-7 ml-1.5">
             {displayLang}
           </span>
         </div>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 py-1 px-2.5 rounded-md text-zinc-500 hover:bg-zinc-200 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-white/10 dark:hover:text-white transition-colors cursor-pointer text-[11px]"
+          className="flex items-center gap-1.5 py-1 px-2.5 rounded-md text-fg-7 hover:bg-zinc-200 hover:text-fg-1 dark:hover:bg-white/10 transition-colors cursor-pointer text-[11px]"
           title="Copy code"
         >
           {copied ? (
@@ -406,7 +406,7 @@ function CodeBlock({ language, code }: { language: string; code: string }) {
                 <td className="text-right pr-4 text-zinc-400 dark:text-zinc-600 select-none text-[11px] align-top w-7 tabular-nums">
                   {lineIdx + 1}
                 </td>
-                <td className="whitespace-pre align-top text-zinc-800 dark:text-zinc-200">
+                <td className="whitespace-pre align-top text-fg-3">
                   {lineTokens.length === 0 ? (
                     " "
                   ) : (
@@ -440,7 +440,7 @@ function renderInline(text: string): React.ReactNode {
       return (
         <code
           key={index}
-          className="font-mono text-[12px] bg-zinc-100 dark:bg-zinc-800 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700/60 font-medium selection:bg-blue-500/20 shadow-2xs break-words [overflow-wrap:anywhere]"
+          className="font-mono text-[12px] bg-fill-3 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700/60 font-medium selection:bg-blue-500/20 shadow-2xs break-words [overflow-wrap:anywhere]"
         >
           {part.slice(1, -1)}
         </code>
@@ -450,7 +450,7 @@ function renderInline(text: string): React.ReactNode {
     // Bold + Italic
     if (part.startsWith("***") && part.endsWith("***") && part.length >= 6) {
       return (
-        <strong key={index} className="font-semibold italic text-zinc-900 dark:text-white">
+        <strong key={index} className="font-semibold italic text-fg-1">
           {part.slice(3, -3)}
         </strong>
       );
@@ -459,7 +459,7 @@ function renderInline(text: string): React.ReactNode {
     // Bold
     if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
       return (
-        <strong key={index} className="font-semibold text-zinc-900 dark:text-white">
+        <strong key={index} className="font-semibold text-fg-1">
           {part.slice(2, -2)}
         </strong>
       );
@@ -533,9 +533,9 @@ function parseTable(lines: string[], start: number): { tableNode: React.ReactNod
   const consumed = i - start;
 
   const tableNode = (
-    <div key={`table-${start}`} className="my-3 w-full max-w-full overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-white/[0.02]">
+    <div key={`table-${start}`} className="my-3 w-full max-w-full overflow-x-auto rounded-xl border border-line-2 bg-zinc-50/50 dark:bg-white/[0.02]">
       <table className="w-full min-w-full text-xs text-left border-collapse">
-        <thead className="bg-zinc-100 dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 text-zinc-900 dark:text-zinc-200 font-medium select-none">
+        <thead className="bg-zinc-100 dark:bg-zinc-900 border-b border-line-2 text-fg-2 font-medium select-none">
           <tr>
             {headers.map((h, hIdx) => (
               <th key={hIdx} className="px-3.5 py-2">
@@ -573,7 +573,7 @@ function renderTextLines(text: string, blockKey: string | number) {
         elements.push(
           <ul key={`ul-${elements.length}`} className="my-2.5 space-y-1.5 pl-1">
             {currentList.items.map((item, idx) => (
-              <li key={idx} className="flex items-start gap-2.5 leading-relaxed text-[14px] sm:text-[15px] text-zinc-800 dark:text-zinc-200 break-words [overflow-wrap:anywhere]">
+              <li key={idx} className="flex items-start gap-2.5 leading-relaxed text-[14px] sm:text-[15px] text-fg-3 break-words [overflow-wrap:anywhere]">
                 <span className="h-1.5 w-1.5 rounded-full bg-zinc-400 dark:bg-zinc-500 shrink-0 mt-2" />
                 <span className="flex-1">{item}</span>
               </li>
@@ -584,8 +584,8 @@ function renderTextLines(text: string, blockKey: string | number) {
         elements.push(
           <ol key={`ol-${elements.length}`} className="my-2.5 space-y-1.5 pl-1">
             {currentList.items.map((item, idx) => (
-              <li key={idx} className="flex items-start gap-2 leading-relaxed text-[14px] sm:text-[15px] text-zinc-800 dark:text-zinc-200 break-words [overflow-wrap:anywhere]">
-                <span className="font-mono text-xs text-zinc-500 dark:text-zinc-400 shrink-0 mt-0.5 select-none font-medium">
+              <li key={idx} className="flex items-start gap-2 leading-relaxed text-[14px] sm:text-[15px] text-fg-3 break-words [overflow-wrap:anywhere]">
+                <span className="font-mono text-xs text-fg-7 shrink-0 mt-0.5 select-none font-medium">
                   {idx + 1}.
                 </span>
                 <span className="flex-1">{item}</span>
@@ -639,7 +639,7 @@ function renderTextLines(text: string, blockKey: string | number) {
     if (line.startsWith("# ")) {
       flushList();
       elements.push(
-        <h1 key={`h1-${i}`} className="text-lg font-bold text-zinc-900 dark:text-white mt-4 mb-2 first:mt-0 tracking-tight break-words [overflow-wrap:anywhere]">
+        <h1 key={`h1-${i}`} className="text-lg font-bold text-fg-1 mt-4 mb-2 first:mt-0 tracking-tight break-words [overflow-wrap:anywhere]">
           {renderInline(line.slice(2))}
         </h1>
       );
@@ -651,7 +651,7 @@ function renderTextLines(text: string, blockKey: string | number) {
     if (line.startsWith("## ")) {
       flushList();
       elements.push(
-        <h2 key={`h2-${i}`} className="text-base font-semibold text-zinc-900 dark:text-white mt-3.5 mb-1.5 first:mt-0 tracking-tight break-words [overflow-wrap:anywhere]">
+        <h2 key={`h2-${i}`} className="text-base font-semibold text-fg-1 mt-3.5 mb-1.5 first:mt-0 tracking-tight break-words [overflow-wrap:anywhere]">
           {renderInline(line.slice(3))}
         </h2>
       );
@@ -674,7 +674,7 @@ function renderTextLines(text: string, blockKey: string | number) {
     // Horizontal Rule
     if (/^(---|___|\*\*\*)$/.test(trimmed)) {
       flushList();
-      elements.push(<hr key={`hr-${i}`} className="my-3.5 border-zinc-200 dark:border-zinc-800" />);
+      elements.push(<hr key={`hr-${i}`} className="my-3.5 border-line-2" />);
       i++;
       continue;
     }
@@ -685,7 +685,7 @@ function renderTextLines(text: string, blockKey: string | number) {
       elements.push(
         <blockquote
           key={`quote-${i}`}
-          className="border-l-2 border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 pl-3.5 py-1.5 my-2 rounded-r-md text-zinc-700 dark:text-zinc-300 italic text-[14px] break-words [overflow-wrap:anywhere]"
+          className="border-l-2 border-blue-500 bg-blue-50/50 dark:bg-blue-950/20 pl-3.5 py-1.5 my-2 rounded-r-md text-fg-4 italic text-[14px] break-words [overflow-wrap:anywhere]"
         >
           {renderInline(line.slice(2))}
         </blockquote>
@@ -721,7 +721,7 @@ function renderTextLines(text: string, blockKey: string | number) {
     // Normal paragraph
     flushList();
     elements.push(
-      <p key={`p-${i}`} className="my-1.5 leading-relaxed text-[14px] sm:text-[15px] text-zinc-800 dark:text-zinc-200 break-words [overflow-wrap:anywhere]">
+      <p key={`p-${i}`} className="my-1.5 leading-relaxed text-[14px] sm:text-[15px] text-fg-3 break-words [overflow-wrap:anywhere]">
         {renderInline(line)}
       </p>
     );

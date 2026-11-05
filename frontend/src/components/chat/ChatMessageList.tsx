@@ -92,7 +92,7 @@ export function ChatMessageList({
       <ScrollArea className="h-full w-full px-3 sm:px-4" ref={scrollAreaRef}>
         <div className="w-full max-w-3xl mx-auto min-w-0 pb-36 sm:pb-44 pt-4 sm:pt-6">
           {activeChatId !== null && isLoadingHistory && messages.length === 0 ? (
-            <div className="flex items-center justify-center py-24 text-zinc-500 dark:text-zinc-400">
+            <div className="flex items-center justify-center py-24 text-fg-7">
               <Loader2 className="h-6 w-6 animate-spin mr-2 text-blue-600" />
               <span className="text-sm">Loading conversation...</span>
             </div>
@@ -142,7 +142,7 @@ export function ChatMessageList({
           type="button"
           onClick={jumpToLatest}
           aria-label="Jump to latest message"
-          className="absolute z-10 left-1/2 -translate-x-1/2 bottom-36 sm:bottom-44 flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 bg-white text-zinc-600 shadow-md hover:text-zinc-900 dark:border-white/10 dark:bg-[#171717] dark:text-zinc-300 dark:hover:text-white cursor-pointer"
+          className="absolute z-10 left-1/2 -translate-x-1/2 bottom-36 sm:bottom-44 flex h-9 w-9 items-center justify-center rounded-full border border-line-1 bg-composer text-fg-5 shadow-md hover:text-fg-1 cursor-pointer"
         >
           <ArrowDown className="h-4 w-4" />
         </button>

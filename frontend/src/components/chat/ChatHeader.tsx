@@ -11,15 +11,15 @@ interface ChatHeaderProps {
 
 export const ChatHeader = memo(function ChatHeader({ chatTitle, onNewThread }: ChatHeaderProps) {
   return (
-    <header className="h-12 border-b border-zinc-200/80 dark:border-white/5 flex items-center justify-between px-3 sm:px-4 z-10 shrink-0 bg-white/80 dark:bg-[#0a0a0a]/80 backdrop-blur-xs transition-colors duration-200">
+    <header className="h-12 border-b border-zinc-200/80 dark:border-white/5 flex items-center justify-between px-3 sm:px-4 z-10 shrink-0 bg-chrome/80 backdrop-blur-xs transition-colors duration-200">
       <div className="flex items-center gap-2 min-w-0">
-        <SidebarTrigger className="md:hidden h-8 w-8 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 shrink-0 cursor-pointer" />
+        <SidebarTrigger className="md:hidden h-8 w-8 rounded-lg text-fg-5 hover:text-fg-1 hover:bg-fill-1 shrink-0 cursor-pointer" />
         {chatTitle ? (
-          <span className="text-xs font-medium text-zinc-600 dark:text-zinc-400 truncate sm:max-w-[320px]">
+          <span className="text-xs font-medium text-fg-6 truncate sm:max-w-[320px]">
             {chatTitle}
           </span>
         ) : (
-          <span className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 md:hidden">
+          <span className="text-xs font-semibold text-fg-4 md:hidden">
             AI-Hub
           </span>
         )}
@@ -33,7 +33,7 @@ export const ChatHeader = memo(function ChatHeader({ chatTitle, onNewThread }: C
             onClick={onNewThread}
             aria-label="New thread"
             title="New thread"
-            className="md:hidden h-8 w-8 rounded-lg text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 cursor-pointer"
+            className="md:hidden h-8 w-8 rounded-lg text-fg-5 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 cursor-pointer"
           >
             <SquarePen className="h-4 w-4" />
           </Button>

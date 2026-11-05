@@ -68,6 +68,19 @@ interface AppSidebarProps {
   onNewThread: () => void;
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Return the sidebar heading for a chat last active at `iso`, counted in local calendar days. */
+function dateGroup(iso: string, now: Date): string {
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const daysAgo = Math.ceil((startOfToday - new Date(iso).getTime()) / DAY_MS);
+  if (daysAgo <= 0) return "Today";
+  if (daysAgo === 1) return "Yesterday";
+  if (daysAgo <= 7) return "Previous 7 days";
+  if (daysAgo <= 30) return "Previous 30 days";
+  return "Older";
+}
+
 export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSidebarProps) {
   const { toggleSidebar, setOpen, isMobile, setOpenMobile } = useSidebar();
   const { user, logout } = useAuth();
@@ -119,6 +132,8 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   });
 
   // Chats visible in the UI (exits smoothly when added to deletingChatIds)
+  // Fixed for the render, so every row is bucketed against the same moment.
+  const now = new Date();
   const visibleChats = useMemo(
     () => chats.filter((chat) => !deletingChatIds.has(chat.id)),
     [chats, deletingChatIds]
@@ -239,7 +254,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
 
   return (
     <>
-      <Sidebar collapsible="icon" className="border-r border-zinc-200 dark:border-white/10 bg-white dark:bg-[#141416] text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
+      <Sidebar collapsible="icon" className="border-r border-line-1 bg-panel text-zinc-900 dark:text-zinc-100 transition-colors duration-200">
         <SidebarHeader className="group-data-[state=expanded]:p-3 group-data-[state=expanded]:pb-2 group-data-[state=expanded]:pt-3.5 group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:py-3 flex flex-row items-center justify-between group-data-[state=collapsed]:justify-center">
           <Logo className="pl-0.5 text-sm font-semibold group-data-[state=collapsed]:hidden" />
           <Tooltip>
@@ -248,7 +263,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                 variant="ghost"
                 size="icon"
                 aria-label="Toggle sidebar"
-                className="group/logo-btn group-data-[state=expanded]:h-9 group-data-[state=expanded]:w-9 group-data-[state=collapsed]:h-8 group-data-[state=collapsed]:w-8 text-zinc-500 hover:text-zinc-900 dark:text-muted-foreground dark:hover:text-white rounded-lg p-0 cursor-pointer"
+                className="group/logo-btn group-data-[state=expanded]:h-9 group-data-[state=expanded]:w-9 group-data-[state=collapsed]:h-8 group-data-[state=collapsed]:w-8 text-zinc-500 hover:text-fg-1 dark:text-muted-foreground rounded-lg p-0 cursor-pointer"
                 onClick={toggleSidebar}
               >
                 {/* Collapsed, the logo stands in for the button until hovered. */}
@@ -258,14 +273,14 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                     alt=""
                     className="h-5 w-5 object-contain shrink-0 group-hover/logo-btn:hidden"
                   />
-                  <PanelLeft className="h-4 w-4 text-zinc-600 dark:text-zinc-300 group-hover/logo-btn:text-zinc-900 dark:group-hover/logo-btn:text-white hidden group-hover/logo-btn:block" />
+                  <PanelLeft className="h-4 w-4 text-fg-5 group-hover/logo-btn:text-fg-1 hidden group-hover/logo-btn:block" />
                 </div>
                 <PanelLeftClose className="h-4 w-4 group-data-[state=collapsed]:hidden" />
               </Button>
             } />
             <TooltipContent side="right" align="center">
               <span>Toggle sidebar</span>
-              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-zinc-100 dark:bg-white/10 text-zinc-700 dark:text-zinc-300 border border-zinc-200 dark:border-white/10 shadow-xs">
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-fill-1 text-fg-4 border border-line-1 shadow-xs">
                 {IS_MAC ? "⌘ B" : "Ctrl + B"}
               </kbd>
             </TooltipContent>
@@ -318,7 +333,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                         variant="ghost"
                         size="icon"
                         aria-label="Recent chats"
-                        className="h-8 w-8 rounded-md text-zinc-500 hover:text-zinc-900 dark:text-muted-foreground dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 cursor-pointer"
+                        className="h-8 w-8 rounded-md text-zinc-500 hover:text-fg-1 dark:text-muted-foreground hover:bg-fill-2 dark:hover:bg-fill-2 cursor-pointer"
                       >
                         <MessageSquare className="h-4 w-4" />
                       </Button>
@@ -368,10 +383,10 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
 
           <SidebarGroup className="p-0 group-data-[state=expanded]:mt-4 group-data-[state=collapsed]:hidden flex-1 flex flex-col min-h-0">
             {isSelectionMode ? (
-              <div className="flex items-center justify-between px-2 py-1.5 mb-1.5 rounded-lg bg-zinc-100/90 dark:bg-white/5 border border-zinc-200/80 dark:border-white/10 text-xs select-none shrink-0 animate-in fade-in-50 duration-150">
+              <div className="flex items-center justify-between px-2 py-1.5 mb-1.5 rounded-lg bg-zinc-100/90 dark:bg-white/5 border border-line-3 text-xs select-none shrink-0 animate-in fade-in-50 duration-150">
                 <div className="flex items-center gap-1.5 pl-0.5">
-                  <span className="font-semibold text-zinc-900 dark:text-white">{selectedChatIds.size}</span>
-                  <span className="text-zinc-500 dark:text-zinc-400">selected</span>
+                  <span className="font-semibold text-fg-1">{selectedChatIds.size}</span>
+                  <span className="text-fg-7">selected</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <button
@@ -394,7 +409,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
             ) : (
               <div className="flex items-center justify-between px-1 mb-1 shrink-0">
                 <SidebarGroupLabel className="p-0 text-xs font-medium text-zinc-500 dark:text-muted-foreground select-none">
-                  Earlier
+                  Chats
                 </SidebarGroupLabel>
                 {visibleChats.length > 0 && (
                   <Tooltip>
@@ -403,7 +418,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                         type="button"
                         onClick={() => handleStartSelect()}
                         aria-label="Select chats"
-                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium text-fg-7 hover:text-fg-1 hover:bg-fill-1 transition-colors cursor-pointer"
                       >
                         <ListChecks className="h-3.5 w-3.5" />
                         <span>Select</span>
@@ -425,46 +440,65 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   </SidebarMenuItem>
                 )}
                 <AnimatePresence initial={false}>
-                  {visibleChats.map((chat) => (
-                    <motion.li
-                      key={chat.id}
-                      layout="position"
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: "auto" }}
-                      exit={{
-                        opacity: 0,
-                        height: 0,
-                        x: -20,
-                        scale: 0.96,
-                        filter: "blur(2px)",
-                        backgroundColor: "rgba(239, 68, 68, 0.12)",
-                        transition: {
-                          opacity: { duration: 0.32, ease: "easeOut" },
-                          x: { duration: 0.32, ease: "easeOut" },
-                          scale: { duration: 0.32, ease: "easeOut" },
-                          filter: { duration: 0.32, ease: "easeOut" },
-                          backgroundColor: { duration: 0.18 },
-                          height: { duration: 0.34, ease: [0.4, 0, 0.2, 1], delay: 0.08 },
-                        },
-                      }}
-                      transition={{ layout: { duration: 0.28, ease: "easeOut" } }}
-                      data-slot="sidebar-menu-item"
-                      data-sidebar="menu-item"
-                      className="group/menu-item relative overflow-hidden list-none rounded-lg"
-                    >
-                      <ChatRowContent
-                        name={chat.name}
-                        active={chat.id === activeChatId}
-                        onSelect={() => handleSelectChat(chat.id)}
-                        onRename={() => openRename(chat)}
-                        onDelete={() => openDelete(chat)}
-                        onStartSelect={() => handleStartSelect(chat.id)}
-                        selectionMode={isSelectionMode}
-                        selected={selectedChatIds.has(chat.id)}
-                        onToggleSelect={() => handleToggleChat(chat.id)}
-                      />
-                    </motion.li>
-                  ))}
+                  {visibleChats.flatMap((chat, index) => {
+                    const group = dateGroup(chat.updated_at, now);
+                    const startsGroup =
+                      index === 0 || dateGroup(visibleChats[index - 1].updated_at, now) !== group;
+                    const row = (
+                      <motion.li
+                        key={chat.id}
+                        layout="position"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        exit={{
+                          opacity: 0,
+                          height: 0,
+                          x: -20,
+                          scale: 0.96,
+                          filter: "blur(2px)",
+                          backgroundColor: "rgba(239, 68, 68, 0.12)",
+                          transition: {
+                            opacity: { duration: 0.32, ease: "easeOut" },
+                            x: { duration: 0.32, ease: "easeOut" },
+                            scale: { duration: 0.32, ease: "easeOut" },
+                            filter: { duration: 0.32, ease: "easeOut" },
+                            backgroundColor: { duration: 0.18 },
+                            height: { duration: 0.34, ease: [0.4, 0, 0.2, 1], delay: 0.08 },
+                          },
+                        }}
+                        transition={{ layout: { duration: 0.28, ease: "easeOut" } }}
+                        data-slot="sidebar-menu-item"
+                        data-sidebar="menu-item"
+                        className="group/menu-item relative overflow-hidden list-none rounded-lg"
+                      >
+                        <ChatRowContent
+                          name={chat.name}
+                          active={chat.id === activeChatId}
+                          onSelect={() => handleSelectChat(chat.id)}
+                          onRename={() => openRename(chat)}
+                          onDelete={() => openDelete(chat)}
+                          onStartSelect={() => handleStartSelect(chat.id)}
+                          selectionMode={isSelectionMode}
+                          selected={selectedChatIds.has(chat.id)}
+                          onToggleSelect={() => handleToggleChat(chat.id)}
+                        />
+                      </motion.li>
+                    );
+                    if (!startsGroup) return [row];
+                    return [
+                      <motion.li
+                        key={`group-${group}`}
+                        layout="position"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="list-none px-2 pt-3 pb-1 text-[11px] font-medium text-fg-8 select-none first:pt-1"
+                      >
+                        {group}
+                      </motion.li>,
+                      row,
+                    ];
+                  })}
                 </AnimatePresence>
                 {/* Older chats load when this comes into view. */}
                 <li ref={loadMoreChatsRef} aria-hidden="true" className="h-px" />
@@ -474,13 +508,13 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
 
           {/* Docked Batch Action Bar during Selection Mode */}
           {isSelectionMode && (
-            <div className="group-data-[state=collapsed]:hidden sticky bottom-0 z-20 shrink-0 mt-2 p-2 rounded-xl border border-zinc-200/90 dark:border-white/10 bg-white/95 dark:bg-[#1c1c1f]/95 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm animate-in slide-in-from-bottom-2 duration-150">
+            <div className="group-data-[state=collapsed]:hidden sticky bottom-0 z-20 shrink-0 mt-2 p-2 rounded-xl border border-zinc-200/90 dark:border-white/10 bg-overlay/95 backdrop-blur-md flex items-center justify-between gap-2 shadow-sm animate-in slide-in-from-bottom-2 duration-150">
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
                 onClick={handleCancelSelection}
-                className="h-8 px-2.5 text-xs text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white cursor-pointer"
+                className="h-8 px-2.5 text-xs text-fg-6 hover:text-fg-1 cursor-pointer"
               >
                 Cancel
               </Button>
@@ -511,13 +545,13 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   aria-label="Account menu"
                   className={cn(
                     "cursor-pointer text-zinc-600 dark:text-muted-foreground hover:text-zinc-900 dark:hover:text-foreground transition-colors",
-                    "group-data-[state=expanded]:w-full group-data-[state=expanded]:justify-start group-data-[state=expanded]:h-12 group-data-[state=expanded]:px-2 group-data-[state=expanded]:rounded-xl group-data-[state=expanded]:hover:bg-zinc-100 dark:group-data-[state=expanded]:hover:bg-white/5",
-                    "group-data-[state=collapsed]:w-9 group-data-[state=collapsed]:h-9 group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:rounded-full group-data-[state=collapsed]:hover:bg-zinc-100 dark:group-data-[state=collapsed]:hover:bg-white/10 group-data-[state=collapsed]:flex group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center"
+                    "group-data-[state=expanded]:w-full group-data-[state=expanded]:justify-start group-data-[state=expanded]:h-12 group-data-[state=expanded]:px-2 group-data-[state=expanded]:rounded-xl group-data-[state=expanded]:hover:bg-fill-2 dark:group-data-[state=expanded]:hover:bg-fill-2",
+                    "group-data-[state=collapsed]:w-9 group-data-[state=collapsed]:h-9 group-data-[state=collapsed]:p-0 group-data-[state=collapsed]:rounded-full group-data-[state=collapsed]:hover:bg-fill-1 group-data-[state=collapsed]:flex group-data-[state=collapsed]:items-center group-data-[state=collapsed]:justify-center"
                   )}
                 >
                   <UserAvatar user={user} className="h-7 w-7 group-data-[state=expanded]:mr-3" fallbackClassName="text-[10px]" />
                   <div className="flex flex-col items-start min-w-0 flex-1 overflow-hidden group-data-[state=collapsed]:hidden">
-                    <span className="font-medium text-xs text-zinc-900 dark:text-zinc-200 truncate w-full text-left">
+                    <span className="font-medium text-xs text-fg-2 truncate w-full text-left">
                       {displayName(user)}
                     </span>
                     <span className="text-[11px] text-zinc-500 truncate w-full text-left">{user.email}</span>
@@ -528,13 +562,13 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                 <div className="px-2.5 py-2 mb-1 border-b border-zinc-100 dark:border-white/10 flex items-center gap-2.5">
                   <UserAvatar user={user} className="h-8 w-8" fallbackClassName="text-xs" />
                   <div className="flex flex-col min-w-0 flex-1">
-                    <span className="text-xs font-semibold text-zinc-900 dark:text-white truncate">{displayName(user)}</span>
-                    <span className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate">{user.email}</span>
+                    <span className="text-xs font-semibold text-fg-1 truncate">{displayName(user)}</span>
+                    <span className="text-[11px] text-fg-7 truncate">{user.email}</span>
                   </div>
                 </div>
 
                 <DropdownMenuItem onClick={() => { if (isMobile) setOpenMobile(false); setIsProfileOpen(true); }} className={cn(MENU_ITEM, "py-2")}>
-                  <UserIcon className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
+                  <UserIcon className="h-3.5 w-3.5 text-fg-7" />
                   <span>Profile Settings</span>
                 </DropdownMenuItem>
 
@@ -576,7 +610,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
         description={
           <>
             Are you sure you want to delete{" "}
-            <span className="text-zinc-900 dark:text-zinc-200 font-medium">"{deleteDialog.item?.name}"</span>? This
+            <span className="text-fg-2 font-medium">"{deleteDialog.item?.name}"</span>? This
             will permanently remove the conversation and its history.
           </>
         }
@@ -600,7 +634,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
           ) : (
             <>
               Are you sure you want to delete{" "}
-              <span className="text-zinc-900 dark:text-zinc-200 font-medium">
+              <span className="text-fg-2 font-medium">
                 {selectedChatIds.size} chats
               </span>
               ? This will permanently remove these conversations and their message history.
@@ -621,7 +655,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
         description={
           <>
             Are you sure you want to log out of{" "}
-            <span className="text-zinc-900 dark:text-zinc-200 font-medium">{user?.email}</span>? You will need to sign
+            <span className="text-fg-2 font-medium">{user?.email}</span>? You will need to sign
             in again to access your account.
           </>
         }
@@ -675,7 +709,7 @@ function ChatRowContent({
           "group/chat-row flex items-center gap-2.5 w-full h-8 px-2 rounded-lg text-[13px] transition-colors cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40",
           selected
             ? "bg-blue-50/90 text-blue-900 dark:bg-blue-950/40 dark:text-blue-100 border border-blue-200/80 dark:border-blue-800/60 font-medium"
-            : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 border border-transparent"
+            : "text-fg-6 hover:text-fg-2 hover:bg-fill-2 border border-transparent"
         )}
       >
         <div
@@ -702,7 +736,7 @@ function ChatRowContent({
         "group/chat-row flex items-center gap-1.5 w-full h-8 px-1.5 rounded-lg text-[13px] transition-colors",
         active
           ? "bg-blue-50 text-blue-600 dark:bg-white/10 dark:text-white font-medium border border-blue-100 dark:border-transparent"
-          : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5"
+          : "text-fg-6 hover:text-fg-2 hover:bg-fill-2"
       )}
     >
       {onRename && onDelete ? (
@@ -711,7 +745,7 @@ function ChatRowContent({
             <button
               type="button"
               aria-label={`Options for ${name}`}
-              className="opacity-0 pointer-coarse:opacity-100 group-hover/chat-row:opacity-100data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
+              className="opacity-0 pointer-coarse:opacity-100 group-hover/chat-row:opacity-100data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-fg-1 hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>

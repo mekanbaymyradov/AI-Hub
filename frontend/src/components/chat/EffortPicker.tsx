@@ -39,11 +39,11 @@ export function EffortPicker({ value, onChange, disabled }: EffortPickerProps) {
           disabled={disabled}
           aria-label={`Reasoning effort: ${current.label}`}
           className={cn(
-            "h-8 px-2 sm:px-2.5 rounded-full text-xs font-normal flex items-center gap-1 sm:gap-1.5 cursor-pointer transition-colors hover:bg-zinc-100 dark:hover:bg-white/10",
+            "h-8 px-2 sm:px-2.5 rounded-full text-xs font-normal flex items-center gap-1 sm:gap-1.5 cursor-pointer transition-colors hover:bg-fill-1 dark:hover:bg-fill-1",
             // Highlighted when set, so a non-default effort is never forgotten.
             value
               ? "text-blue-600 dark:text-blue-400"
-              : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
+              : "text-fg-6 hover:text-fg-1"
           )}
         >
           <Brain className="h-3.5 w-3.5 shrink-0" />
@@ -58,7 +58,7 @@ export function EffortPicker({ value, onChange, disabled }: EffortPickerProps) {
         className={cn(MENU_CONTENT, "w-60")}
       >
         <DropdownMenuGroup>
-          <DropdownMenuLabel className="px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+          <DropdownMenuLabel className="px-2.5 pt-1.5 pb-1 text-[11px] font-medium text-fg-7">
             Reasoning effort
           </DropdownMenuLabel>
           {OPTIONS.map((option) => {
@@ -71,19 +71,19 @@ export function EffortPicker({ value, onChange, disabled }: EffortPickerProps) {
                   "cursor-pointer flex items-center justify-between gap-3 px-2.5 py-1.5 rounded-lg transition-colors",
                   isSelected
                     ? "bg-blue-50 dark:bg-white/10"
-                    : "hover:bg-zinc-100 dark:hover:bg-white/10 focus:bg-zinc-100 dark:focus:bg-white/10"
+                    : "hover:bg-fill-1 focus:bg-fill-1"
                 )}
               >
                 <span className="flex flex-col">
                   <span
                     className={cn(
                       "text-xs font-medium",
-                      isSelected ? "text-blue-600 dark:text-white" : "text-zinc-800 dark:text-zinc-200"
+                      isSelected ? "text-blue-600 dark:text-white" : "text-fg-3"
                     )}
                   >
                     {option.label}
                   </span>
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">{option.hint}</span>
+                  <span className="text-[11px] text-fg-7">{option.hint}</span>
                 </span>
                 {isSelected && <Check className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400 shrink-0" />}
               </DropdownMenuItem>

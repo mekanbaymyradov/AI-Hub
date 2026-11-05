@@ -154,7 +154,7 @@ export const ChatMessageItem = memo(
                     type="button"
                     onClick={() => onRetry(failedModelId || undefined)}
                     disabled={isStreaming}
-                    className="inline-flex items-center justify-center size-7 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200 transition-colors disabled:opacity-50 cursor-pointer select-none shadow-2xs"
+                    className="inline-flex items-center justify-center size-7 rounded-lg border border-line-2 bg-tile hover:bg-zinc-50 dark:hover:bg-zinc-800 text-fg-6 hover:text-fg-2 transition-colors disabled:opacity-50 cursor-pointer select-none shadow-2xs"
                     title="Retry"
                     aria-label="Retry"
                   >
@@ -171,7 +171,7 @@ export const ChatMessageItem = memo(
                           <button
                             type="button"
                             disabled={isStreaming}
-                            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800 text-zinc-700 dark:text-zinc-300 font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 select-none shadow-2xs"
+                            className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-line-2 bg-tile hover:bg-zinc-50 dark:hover:bg-zinc-800 text-fg-4 font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 select-none shadow-2xs"
                           >
                             <span>Try another model</span>
                             <ChevronDown className="h-3 w-3 opacity-60" />
@@ -197,7 +197,7 @@ export const ChatMessageItem = memo(
                             >
                               <span className="truncate">{model.display_name}</span>
                               {fileIncompatible && (
-                                <span className="text-[10px] text-zinc-400 dark:text-zinc-500 shrink-0">No files</span>
+                                <span className="text-[10px] text-fg-8 shrink-0">No files</span>
                               )}
                             </DropdownMenuItem>
                           );
@@ -212,7 +212,7 @@ export const ChatMessageItem = memo(
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="inline-flex items-center justify-center size-7 rounded-lg text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors cursor-pointer select-none"
+                  className="inline-flex items-center justify-center size-7 rounded-lg text-zinc-400 hover:text-fg-5 hover:bg-fill-3 transition-colors cursor-pointer select-none"
                   title="Copy message"
                 >
                   {copied ? (
@@ -236,14 +236,14 @@ export const ChatMessageItem = memo(
                     type="button"
                     onClick={() => setUserReasoningOpen(!isReasoningOpen)}
                     aria-expanded={isReasoningOpen}
-                    className="inline-flex items-center gap-1.5 py-1 px-2 -ml-2 rounded-lg text-xs font-medium text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer select-none"
+                    className="inline-flex items-center gap-1.5 py-1 px-2 -ml-2 rounded-lg text-xs font-medium text-fg-7 hover:text-fg-3 hover:bg-fill-2 transition-colors cursor-pointer select-none"
                   >
                     <Brain
                       className={cn(
                         "h-3.5 w-3.5 shrink-0",
                         isReasoningStreaming
                           ? "text-blue-600 dark:text-blue-400 animate-pulse"
-                          : "text-zinc-400 dark:text-zinc-500"
+                          : "text-fg-8"
                       )}
                     />
                     <span>{isReasoningStreaming ? "Thinking…" : "Thought process"}</span>
@@ -263,7 +263,7 @@ export const ChatMessageItem = memo(
                         transition={{ duration: 0.2, ease: "easeInOut" }}
                         className="overflow-hidden"
                       >
-                        <div className="mt-1 mb-1.5 border-l-2 border-zinc-200 dark:border-zinc-700/80 pl-3.5 py-1 text-[13px] text-zinc-600 dark:text-zinc-400 leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                        <div className="mt-1 mb-1.5 border-l-2 border-zinc-200 dark:border-zinc-700/80 pl-3.5 py-1 text-[13px] text-fg-6 leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                           {message.reasoning}
                         </div>
                       </motion.div>
@@ -300,7 +300,7 @@ export const ChatMessageItem = memo(
                   </div>
 
                   {modelDisplayName && (
-                    <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500 select-none font-normal">
+                    <span className="ml-auto text-xs text-fg-8 select-none font-normal">
                       {modelDisplayName}
                     </span>
                   )}
@@ -308,18 +308,18 @@ export const ChatMessageItem = memo(
               )}
 
               {activeTool && (
-                <div className="flex items-center gap-2 h-6 px-1 text-sm text-zinc-500 dark:text-zinc-400">
+                <div className="flex items-center gap-2 h-6 px-1 text-sm text-fg-7">
                   <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
                   <span>{TOOL_LABELS[activeTool] ?? `Using ${activeTool}…`}</span>
                 </div>
               )}
 
               {!isStreaming && !message.error && message.content && (
-                <div className="flex flex-wrap items-center gap-2 mt-2 text-zinc-400 dark:text-zinc-500">
+                <div className="flex flex-wrap items-center gap-2 mt-2 text-fg-8">
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-zinc-100 dark:hover:bg-white/10 hover:text-zinc-700 dark:hover:text-zinc-300 transition-colors text-xs font-medium cursor-pointer select-none"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-fill-1 hover:text-fg-4 transition-colors text-xs font-medium cursor-pointer select-none"
                     title="Copy response"
                   >
                     {copied ? (
@@ -336,7 +336,7 @@ export const ChatMessageItem = memo(
                   </button>
 
                   {modelDisplayName && (
-                    <span className="ml-auto text-xs text-zinc-400 dark:text-zinc-500 select-none font-normal">
+                    <span className="ml-auto text-xs text-fg-8 select-none font-normal">
                       {modelDisplayName}
                     </span>
                   )}

@@ -9,6 +9,29 @@
     --font-heading: var(--font-sans);
     --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
+    --color-canvas: var(--canvas);
+    --color-chrome: var(--chrome);
+    --color-panel: var(--panel);
+    --color-composer: var(--composer);
+    --color-overlay: var(--overlay);
+    --color-sheet: var(--sheet);
+    --color-tile: var(--tile);
+    --color-field: var(--field);
+    --color-code: var(--code);
+    --color-fg-1: var(--fg-1);
+    --color-fg-2: var(--fg-2);
+    --color-fg-3: var(--fg-3);
+    --color-fg-4: var(--fg-4);
+    --color-fg-5: var(--fg-5);
+    --color-fg-6: var(--fg-6);
+    --color-fg-7: var(--fg-7);
+    --color-fg-8: var(--fg-8);
+    --color-fill-1: var(--fill-1);
+    --color-fill-2: var(--fill-2);
+    --color-fill-3: var(--fill-3);
+    --color-line-1: var(--line-1);
+    --color-line-2: var(--line-2);
+    --color-line-3: var(--line-3);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-accent: var(--sidebar-accent);
@@ -81,6 +104,31 @@
     --sidebar-accent-foreground: oklch(0.205 0 0);
     --sidebar-border: oklch(0.92 0 0);
     --sidebar-ring: oklch(0.546 0.245 262.881 / 50%);
+    /* Chat UI. Each token is one light/dark pair the components already used, so the look is unchanged.
+       fg-1..fg-8 run from most to least contrast; near neighbours are candidates to merge later. */
+    --canvas: color-mix(in oklab, oklch(98.5% 0 none) 70%, oklch(100% 0 0));
+    --chrome: oklch(100% 0 0);
+    --panel: oklch(100% 0 0);
+    --composer: oklch(100% 0 0);
+    --overlay: oklch(100% 0 0);
+    --sheet: oklch(100% 0 0);
+    --tile: oklch(100% 0 0);
+    --field: oklch(98.5% 0 none);
+    --code: oklch(98.5% 0 none);
+    --fg-1: oklch(21% 0.006 285.885);
+    --fg-2: oklch(21% 0.006 285.885);
+    --fg-3: oklch(27.4% 0.006 286.033);
+    --fg-4: oklch(37% 0.013 285.805);
+    --fg-5: oklch(44.2% 0.017 285.786);
+    --fg-6: oklch(44.2% 0.017 285.786);
+    --fg-7: oklch(55.2% 0.016 285.938);
+    --fg-8: oklch(70.5% 0.015 286.067);
+    --fill-1: oklch(96.7% 0.001 286.375);
+    --fill-2: oklch(96.7% 0.001 286.375);
+    --fill-3: oklch(96.7% 0.001 286.375);
+    --line-1: oklch(92% 0.004 286.32);
+    --line-2: oklch(92% 0.004 286.32);
+    --line-3: oklch(92% 0.004 286.32 / 80%);
 }
 
 .dark {
@@ -115,6 +163,29 @@
     --sidebar-accent-foreground: oklch(0.985 0 0);
     --sidebar-border: oklch(1 0 0 / 10%);
     --sidebar-ring: oklch(0.58 0.23 260 / 50%);
+    --canvas: #0a0a0a;
+    --chrome: #0a0a0a;
+    --panel: #141416;
+    --composer: #171717;
+    --overlay: #1c1c1f;
+    --sheet: #18181b;
+    --tile: oklch(21% 0.006 285.885);
+    --field: #121214;
+    --code: #0c0c0e;
+    --fg-1: oklch(100% 0 0);
+    --fg-2: oklch(92% 0.004 286.32);
+    --fg-3: oklch(92% 0.004 286.32);
+    --fg-4: oklch(87.1% 0.006 286.286);
+    --fg-5: oklch(87.1% 0.006 286.286);
+    --fg-6: oklch(70.5% 0.015 286.067);
+    --fg-7: oklch(70.5% 0.015 286.067);
+    --fg-8: oklch(55.2% 0.016 285.938);
+    --fill-1: oklch(100% 0 0 / 10%);
+    --fill-2: oklch(100% 0 0 / 5%);
+    --fill-3: oklch(27.4% 0.006 286.033);
+    --line-1: oklch(100% 0 0 / 10%);
+    --line-2: oklch(27.4% 0.006 286.033);
+    --line-3: oklch(100% 0 0 / 10%);
 }
 
 @layer base {

@@ -1,4 +1,13 @@
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ClipboardEvent,
+  type DragEvent,
+  type FormEvent,
+  type KeyboardEvent,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertCircle, ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
 
@@ -34,6 +43,8 @@ interface ChatInputProps {
   isInitialState: boolean;
   selectedModelId?: string | null;
   onSelectModelId?: (id: string) => void;
+  effort: Effort | null;
+  onEffortChange: (effort: Effort | null) => void;
 }
 
 /** Return why these files can't be attached, or null when they can. */
@@ -59,13 +70,15 @@ export function ChatInput({
   isInitialState,
   selectedModelId: controlledModelId,
   onSelectModelId,
+  effort,
+  onEffortChange,
 }: ChatInputProps) {
   const [input, setInput] = useState("");
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const [uncontrolledModelId, setUncontrolledModelId] = useState<string | null>(null);
-  const [effort, setEffort] = useState<Effort | null>(null);
   const isMobile = useIsMobile();
 
   const selectedModelId = controlledModelId !== undefined ? controlledModelId : uncontrolledModelId;
@@ -86,11 +99,10 @@ export function ChatInput({
     }
   }, [input]);
 
-  const handleAttachmentChange = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    // Cleared now, so choosing the same file again still fires a change.
-    e.target.value = "";
-    if (files.length === 0) return;
+  const canAttach = !isUploadingAttachments && !isStreaming;
+
+  const attachFiles = async (files: File[]) => {
+    if (files.length === 0 || !canAttach) return;
 
     const problem = modelSupportsFiles
       ? attachmentProblem(files, attachments.length)
@@ -107,6 +119,41 @@ export function ChatInput({
     } finally {
       setIsUploadingAttachments(false);
     }
+  };
+
+  const handleAttachmentChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files ?? []);
+    // Cleared now, so choosing the same file again still fires a change.
+    e.target.value = "";
+    void attachFiles(files);
+  };
+
+  // Text pastes as usual; only pasted files become attachments.
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    const files = Array.from(e.clipboardData.files);
+    if (files.length === 0) return;
+    e.preventDefault();
+    void attachFiles(files);
+  };
+
+  const handleDragOver = (e: DragEvent<HTMLFormElement>) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    setIsDraggingFiles(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLFormElement>) => {
+    // Moving onto a child element also fires dragleave on the form.
+    if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+    setIsDraggingFiles(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLFormElement>) => {
+    if (!e.dataTransfer.types.includes("Files")) return;
+    // Otherwise the browser navigates away to open the file.
+    e.preventDefault();
+    setIsDraggingFiles(false);
+    void attachFiles(Array.from(e.dataTransfer.files));
   };
 
   const removeAttachment = (id: number) => {
@@ -154,7 +201,7 @@ export function ChatInput({
     >
       {/* Phones leave only a thin gap under the composer, so cover it instead of showing messages scroll through. */}
       {!isInitialState && isMobile && (
-        <div className="absolute inset-x-0 bottom-0 h-12 bg-zinc-50 dark:bg-[#0a0a0a]" />
+        <div className="absolute inset-x-0 bottom-0 h-12 bg-canvas" />
       )}
       <div className={cn("w-full max-w-2xl mx-auto flex flex-col pointer-events-auto", isInitialState && isMobile ? "mt-4 mb-6" : "")}>
         <AnimatePresence>{isInitialState && <ChatGreeting onSelectPrompt={selectPrompt} />}</AnimatePresence>
@@ -162,7 +209,10 @@ export function ChatInput({
         <motion.div layoutId="input-box" className="relative group w-full">
           <form
             onSubmit={handleSubmit}
-            className="relative flex flex-col bg-white dark:bg-[#171717] border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={cn("relative flex flex-col bg-composer border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
           >
             {attachmentError && (
               <div className="flex items-center justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
@@ -186,10 +236,10 @@ export function ChatInput({
                 {attachments.map((att) => (
                   <div
                     key={att.id}
-                    className="flex items-center gap-1.5 bg-zinc-100 dark:bg-white/10 hover:bg-zinc-200/80 dark:hover:bg-white/15 border border-zinc-200 dark:border-white/10 rounded-lg px-2.5 py-1 text-xs text-zinc-800 dark:text-zinc-200 transition-colors"
+                    className="flex items-center gap-1.5 bg-fill-1 hover:bg-zinc-200/80 dark:hover:bg-white/15 border border-line-1 rounded-lg px-2.5 py-1 text-xs text-fg-3 transition-colors"
                   >
                     {att.media_type.startsWith("image/") ? (
-                      <Paperclip className="h-3 w-3 text-zinc-500 dark:text-zinc-400 shrink-0" />
+                      <Paperclip className="h-3 w-3 text-fg-7 shrink-0" />
                     ) : (
                       <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
                     )}
@@ -212,8 +262,9 @@ export function ChatInput({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
+              onPaste={handlePaste}
               placeholder="Send a message..."
-              className="min-h-[50px] sm:min-h-[52px] max-h-[200px] sm:max-h-[220px] w-full resize-none border-0 shadow-none focus-visible:ring-0 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-12 text-base sm:text-[15px] bg-transparent text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-zinc-500"
+              className="min-h-[50px] sm:min-h-[52px] max-h-[200px] sm:max-h-[220px] w-full resize-none border-0 shadow-none focus-visible:ring-0 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-12 text-base sm:text-[15px] bg-transparent text-fg-1 placeholder:text-fg-8"
               rows={1}
             />
 
@@ -235,9 +286,9 @@ export function ChatInput({
                       size="icon"
                       aria-label="Attach files"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploadingAttachments || isStreaming || !modelSupportsFiles}
+                      disabled={!canAttach || !modelSupportsFiles}
                       className={cn(
-                        "h-8 w-8 rounded-full text-zinc-500 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors cursor-pointer",
+                        "h-8 w-8 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer",
                         !modelSupportsFiles && "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-400"
                       )}
                     >
@@ -256,7 +307,7 @@ export function ChatInput({
                     </span>
                   </TooltipContent>
                 </Tooltip>
-                <EffortPicker value={effort} onChange={setEffort} disabled={isStreaming} />
+                <EffortPicker value={effort} onChange={onEffortChange} disabled={isStreaming} />
               </div>
 
               <div className="flex items-center gap-1.5">
