@@ -24,6 +24,7 @@ from src.observability import request_attributes_mapper, setup_observability
 from src.rate_limit import global_rate_limit
 from src.redis import RedisDep, create_redis_client
 from src.storage import create_storage_client
+from src.voice.router import voice_router
 
 setup_observability()
 
@@ -102,3 +103,4 @@ async def healthz(db: DbSession, redis: RedisDep) -> dict:
 app.include_router(auth_router)
 app.include_router(llm_router)
 app.include_router(chat_router)
+app.include_router(voice_router)
