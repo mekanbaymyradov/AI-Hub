@@ -59,6 +59,10 @@ export interface AttachmentPublic {
   url: string;
 }
 
+export interface TranscriptionResponse {
+  text: string;
+}
+
 export interface MessagePublic {
   id: number;
   kind: 'request' | 'response';

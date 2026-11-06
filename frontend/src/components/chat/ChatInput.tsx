@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, ArrowUp, FileText, Loader2, Paperclip, Square, X } from "lucide-react";
+import { AlertCircle, ArrowUp, Check, FileText, Loader2, Mic, Paperclip, Square, X } from "lucide-react";
 
 import { chatApi } from "@/api/chat";
 import { getErrorMessage } from "@/api/errors";
@@ -20,9 +20,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { canRecordVoice, useVoiceInput } from "@/hooks/use-voice-input";
 import { ChatGreeting } from "./ChatGreeting";
 import { EffortPicker } from "./EffortPicker";
 import { ModelPicker } from "./ModelPicker";
+import { VoiceWaveform } from "./VoiceWaveform";
 
 // The API's limits for attachments.
 const ATTACHMENT_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "application/pdf"];
@@ -45,6 +47,10 @@ interface ChatInputProps {
   onSelectModelId?: (id: string) => void;
   effort: Effort | null;
   onEffortChange: (effort: Effort | null) => void;
+}
+
+function formatElapsed(seconds: number): string {
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 /** Return why these files can't be attached, or null when they can. */
@@ -98,6 +104,13 @@ export function ChatInput({
       textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
     }
   }, [input]);
+
+  const voice = useVoiceInput((text) => {
+    setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
+    textareaRef.current?.focus();
+  });
+  const isDictating = voice.state === "recording" || voice.state === "transcribing";
+  const error = voice.error ?? attachmentError;
 
   const canAttach = !isUploadingAttachments && !isStreaming;
 
@@ -163,7 +176,7 @@ export function ChatInput({
 
   const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();
-    if ((!input.trim() && attachments.length === 0) || isStreaming || isUploadingAttachments) return;
+    if ((!input.trim() && attachments.length === 0) || isStreaming || isUploadingAttachments || isDictating) return;
     if (!selectedModel) return;
 
     if (attachments.length > 0 && !modelSupportsFiles) {
@@ -214,20 +227,31 @@ export function ChatInput({
             onDrop={handleDrop}
             className={cn("relative flex flex-col bg-composer border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
           >
-            {attachmentError && (
+            {error && (
               <div className="flex items-center justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
                 <div className="flex items-center gap-1.5 min-w-0">
                   <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{attachmentError}</span>
+                  <span className="truncate">{error}</span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setAttachmentError(null)}
-                  aria-label="Dismiss"
-                  className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 ml-2 cursor-pointer shrink-0"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex items-center gap-2 ml-2 shrink-0">
+                  {voice.error && voice.canRetry && (
+                    <button
+                      type="button"
+                      onClick={voice.retry}
+                      className="font-medium hover:text-red-600 dark:hover:text-red-300 hover:underline underline-offset-2 cursor-pointer"
+                    >
+                      Retry
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={voice.error ? voice.dismissError : () => setAttachmentError(null)}
+                    aria-label="Dismiss"
+                    className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -268,78 +292,140 @@ export function ChatInput({
               rows={1}
             />
 
-            <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
-              <div className="flex items-center gap-1">
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleAttachmentChange}
-                  accept={ATTACHMENT_TYPES.join(",")}
-                  multiple
-                  className="hidden"
+            {isDictating ? (
+              <div className="absolute bottom-2 left-2 right-2 flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Cancel dictation"
+                  onClick={voice.cancel}
+                  className="h-8 w-8 shrink-0 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <VoiceWaveform
+                  analyser={voice.analyser}
+                  className={cn("h-7 min-w-0 flex-1 text-fg-3 transition-opacity", voice.state === "transcribing" && "opacity-40")}
                 />
-                <Tooltip>
-                  <TooltipTrigger render={
+                <span className="shrink-0 text-xs tabular-nums text-fg-7">
+                  {formatElapsed(voice.elapsed)}
+                </span>
+                <Button
+                  type="button"
+                  aria-label={voice.state === "transcribing" ? "Transcribing" : "Stop and transcribe"}
+                  onClick={voice.finish}
+                  disabled={voice.state === "transcribing"}
+                  // Focused when the bar appears, since the mic button that had focus is gone.
+                  autoFocus
+                  className="h-8 w-8 shrink-0 rounded-full bg-blue-600 hover:bg-blue-700 text-white p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer disabled:opacity-80 disabled:cursor-default"
+                >
+                  {voice.state === "transcribing" ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Check className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            ) : (
+              <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+                <div className="flex items-center gap-1">
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleAttachmentChange}
+                    accept={ATTACHMENT_TYPES.join(",")}
+                    multiple
+                    className="hidden"
+                  />
+                  <Tooltip>
+                    <TooltipTrigger render={
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Attach files"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={!canAttach || !modelSupportsFiles}
+                        className={cn(
+                          "h-8 w-8 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer",
+                          !modelSupportsFiles && "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-400"
+                        )}
+                      >
+                        {isUploadingAttachments ? (
+                          <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+                        ) : (
+                          <Paperclip className="h-4 w-4" />
+                        )}
+                      </Button>
+                    } />
+                    <TooltipContent side="top" align="center">
+                      <span>
+                        {modelSupportsFiles
+                          ? `Attach images or PDFs (up to ${MAX_ATTACHMENTS} files, max 10MB each)`
+                          : "Selected model does not support file attachments"}
+                      </span>
+                    </TooltipContent>
+                  </Tooltip>
+                  <EffortPicker value={effort} onChange={onEffortChange} disabled={isStreaming} />
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <ModelPicker
+                    models={models}
+                    selected={selectedModel}
+                    onSelect={setSelectedModelId}
+                    disabled={isStreaming}
+                  />
+
+                  {canRecordVoice && (
+                    <Tooltip>
+                      <TooltipTrigger render={
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          aria-label="Dictate"
+                          onClick={voice.start}
+                          disabled={voice.state === "starting"}
+                          className="h-8 w-8 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
+                        >
+                          {voice.state === "starting" ? (
+                            <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
+                          ) : (
+                            <Mic className="h-4 w-4" />
+                          )}
+                        </Button>
+                      } />
+                      <TooltipContent side="top" align="center">
+                        <span>Dictate</span>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+
+                  {isStreaming ? (
                     <Button
                       type="button"
-                      variant="ghost"
-                      size="icon"
-                      aria-label="Attach files"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={!canAttach || !modelSupportsFiles}
-                      className={cn(
-                        "h-8 w-8 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer",
-                        !modelSupportsFiles && "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-400"
-                      )}
+                      onClick={onStop}
+                      aria-label="Stop generation"
+                      title="Stop generation"
+                      className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-500 text-white p-0 flex items-center justify-center transition-all shadow-none cursor-pointer"
                     >
-                      {isUploadingAttachments ? (
-                        <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
-                      ) : (
-                        <Paperclip className="h-4 w-4" />
-                      )}
+                      <Square className="h-3 w-3 fill-current" />
                     </Button>
-                  } />
-                  <TooltipContent side="top" align="center">
-                    <span>
-                      {modelSupportsFiles
-                        ? `Attach images or PDFs (up to ${MAX_ATTACHMENTS} files, max 10MB each)`
-                        : "Selected model does not support file attachments"}
-                    </span>
-                  </TooltipContent>
-                </Tooltip>
-                <EffortPicker value={effort} onChange={onEffortChange} disabled={isStreaming} />
+                  ) : (
+                    <Button
+                      type="submit"
+                      aria-label="Send message"
+                      disabled={(!input.trim() && attachments.length === 0) || isUploadingAttachments}
+                      className="h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
-
-              <div className="flex items-center gap-1.5">
-                <ModelPicker
-                  models={models}
-                  selected={selectedModel}
-                  onSelect={setSelectedModelId}
-                  disabled={isStreaming}
-                />
-
-                {isStreaming ? (
-                  <Button
-                    type="button"
-                    onClick={onStop}
-                    aria-label="Stop generation"
-                    title="Stop generation"
-                    className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-500 text-white p-0 flex items-center justify-center transition-all shadow-none cursor-pointer"
-                  >
-                    <Square className="h-3 w-3 fill-current" />
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    aria-label="Send message"
-                    disabled={(!input.trim() && attachments.length === 0) || isUploadingAttachments}
-                    className="h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
-                  >
-                    <ArrowUp className="h-4 w-4" />
-                  </Button>
-                )}
-              </div>
-            </div>
+            )}
           </form>
         </motion.div>
       </div>
