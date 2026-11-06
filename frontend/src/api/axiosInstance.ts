@@ -18,6 +18,13 @@ export const setAccessToken = (token: string | null) => {
 
 export const getAccessToken = () => currentAccessToken;
 
+let onSessionExpired = () => {};
+
+/** Set what runs when the API rejects the refresh token, so the app can sign the user out. */
+export const setSessionExpiredHandler = (handler: () => void) => {
+  onSessionExpired = handler;
+};
+
 // The API revokes the whole session when a refresh token is used twice, so
 // requests that fail together must share one refresh instead of each sending
 // their own with the same cookie.
@@ -33,6 +40,8 @@ export function refreshAccessToken(): Promise<string> {
     })
     .catch((error: unknown) => {
       setAccessToken(null);
+      // Only a 401 means the session is gone; a network error may pass, so it keeps the user signed in.
+      if (axios.isAxiosError(error) && error.response?.status === 401) onSessionExpired();
       throw error;
     })
     .finally(() => {
