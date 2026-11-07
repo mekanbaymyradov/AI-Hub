@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/auth";
 import { type UserPublic, type UserUpdate } from "@/api/types";
-import { setAccessToken } from "@/api/axiosInstance";
+import { setAccessToken, setSessionExpiredHandler } from "@/api/axiosInstance";
 import { AuthContext } from "@/context/auth";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<UserPublic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -13,6 +15,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .getCurrentUser()
       .then(setUser, () => setUser(null))
       .finally(() => setIsLoading(false));
+
+  const signOutLocally = useCallback(() => {
+    setAccessToken(null);
+    setUser(null);
+    // So the next account to sign in on this tab never sees this one's chats.
+    // Queries only: clear() would also drop the logout mutation still running.
+    queryClient.removeQueries();
+  }, [queryClient]);
+
+  // Declared before the effect below, so it is set before the first refresh can fail.
+  useEffect(() => {
+    setSessionExpiredHandler(signOutLocally);
+  }, [signOutLocally]);
 
   useEffect(() => {
     // The access token lives in memory, so a reload starts without one; the
@@ -31,8 +46,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error) {
       console.error("Logout error", error);
     } finally {
-      setAccessToken(null);
-      setUser(null);
+      signOutLocally();
     }
   };
 
