@@ -1,0 +1,108 @@
+# Questions the chat agent answers in every eval run. `expected_output` is a
+# reference the judge checks correctness against, set only where one right
+# answer exists. `max_words` caps answers to questions that deserve a short one.
+name: answer_quality
+cases:
+  - name: capital_of_australia
+    inputs: What's the capital of Australia?
+    expected_output: Canberra.
+    metadata:
+      category: quick_fact
+      max_words: 30
+
+  - name: idempotent_meaning
+    inputs: What does "idempotent" mean for an API endpoint?
+    expected_output: >-
+      Calling it several times with the same request has the same effect as
+      calling it once, like PUT or DELETE, unlike POST.
+    metadata:
+      category: quick_fact
+      max_words: 120
+
+  - name: small_talk
+    inputs: hey! how's your day going?
+    metadata:
+      category: small_talk
+      max_words: 40
+
+  - name: ssh_key_github
+    inputs: How do I set up an SSH key for GitHub on my Mac?
+    metadata:
+      category: steps
+
+  - name: postgres_vs_mongodb
+    inputs: >-
+      Should I store my chat app's messages in PostgreSQL or MongoDB? Compare
+      them for this use case.
+    metadata:
+      category: comparison
+
+  - name: python_dedupe
+    inputs: >-
+      Write a Python function that removes duplicates from a list but keeps
+      the original order.
+    metadata:
+      category: code
+
+  - name: flask_keyerror
+    inputs: |
+      My Flask route crashes with this error. What's wrong?
+
+      Traceback (most recent call last):
+        File "app.py", line 12, in signup
+          email = request.json["email"]
+      KeyError: 'email'
+    expected_output: >-
+      The JSON body the client sent has no "email" key. Validate the body, or
+      read it with request.json.get("email") and handle a missing value.
+    metadata:
+      category: debug
+
+  - name: discount_then_tax
+    inputs: >-
+      A jacket costs $80. It's 25% off, and then 8% sales tax is added to the
+      discounted price. How much do I pay?
+    expected_output: $64.80
+    metadata:
+      category: math
+
+  - name: https_explained
+    inputs: How does HTTPS keep my data safe? Explain it simply.
+    metadata:
+      category: explain
+
+  - name: go_or_rust
+    inputs: I'm a Python backend developer. Should I learn Go or Rust next?
+    metadata:
+      category: advice
+
+  - name: decline_meeting_email
+    inputs: >-
+      Write a short, polite email declining a meeting on Thursday because I
+      have a deadline that day.
+    metadata:
+      category: writing
+
+  - name: process_vs_thread_ru
+    inputs: Чем процесс отличается от потока в операционной системе?
+    metadata:
+      category: comparison
+
+  - name: long_summer_days_tk
+    inputs: Tomusda gündiz näme üçin uzyn bolýar?
+    expected_output: >-
+      The Earth's axis is tilted about 23.5°, so in summer your hemisphere
+      leans toward the Sun: the Sun rises higher and stays above the horizon
+      longer.
+    metadata:
+      category: explain
+
+  - name: debit_vs_credit_es
+    inputs: ¿Cuál es la diferencia entre una tarjeta de débito y una de crédito?
+    metadata:
+      category: comparison
+
+  - name: read_json_zh
+    inputs: 如何在 Python 中读取 JSON 文件？
+    metadata:
+      category: code

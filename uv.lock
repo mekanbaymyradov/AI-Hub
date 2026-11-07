@@ -28,8 +28,10 @@ dependencies = [
 dev = [
     { name = "asgi-lifespan" },
     { name = "moto", extra = ["s3"] },
+    { name = "pydantic-evals" },
     { name = "pytest" },
     { name = "ruff" },
+    { name = "tenacity" },
     { name = "ty" },
 ]
 
@@ -56,8 +58,10 @@ requires-dist = [
 dev = [
     { name = "asgi-lifespan", specifier = "==2.*" },
     { name = "moto", extras = ["s3"], specifier = ">=5.2.3" },
+    { name = "pydantic-evals", specifier = ">=2.53.0" },
     { name = "pytest", specifier = ">=9.1.1" },
     { name = "ruff", specifier = ">=0.16.10" },
+    { name = "tenacity", specifier = ">=9.1.4" },
     { name = "ty", specifier = ">=0.0.84" },
 ]
 

@@ -52,8 +52,10 @@ convention = "pep257"
 dev = [
     "asgi-lifespan==2.*",
     "moto[s3]>=5.2.3",
+    "pydantic-evals>=2.53.0",
     "pytest>=9.1.1",
     "ruff>=0.16.10",
+    "tenacity>=9.1.4",
     "ty>=0.0.84",
 ]
 
