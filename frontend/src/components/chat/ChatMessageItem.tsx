@@ -1,4 +1,4 @@
-import { memo, useCallback, useState } from "react";
+import { lazy, memo, Suspense, useCallback, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -20,9 +20,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FormattedMessage } from "./FormattedMessage";
 import { MENU_CONTENT, MENU_ITEM } from "./menu-styles";
 import { type UIMessage } from "./types";
+
+// Its own chunk, since KaTeX, highlight.js and the Markdown parser outweigh the
+// rest of the chat page. Requested as soon as this module loads, so it downloads
+// alongside the chat's history instead of after it.
+const formattedMessageModule = import("./FormattedMessage");
+const FormattedMessage = lazy(() =>
+  formattedMessageModule.then((m) => ({ default: m.FormattedMessage }))
+);
 
 // Named after the API's tool chunks; native and DuckDuckGo search share a label.
 const TOOL_LABELS: Record<string, string> = {
@@ -273,10 +280,18 @@ export const ChatMessageItem = memo(
               )}
 
               {message.content ? (
-                <FormattedMessage
-                  content={message.content}
-                  isStreaming={isStreaming && isLastMessage}
-                />
+                <Suspense
+                  fallback={
+                    <p className="my-1.5 leading-relaxed text-[14px] sm:text-[15px] text-fg-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+                      {message.content}
+                    </p>
+                  }
+                >
+                  <FormattedMessage
+                    content={message.content}
+                    isStreaming={isStreaming && isLastMessage}
+                  />
+                </Suspense>
               ) : showStreamingDots ? (
                 <div className="flex space-x-1.5 h-6 items-center px-1">
                   {[0, 0.2, 0.4].map((delay) => (
