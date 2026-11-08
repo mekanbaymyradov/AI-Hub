@@ -12,7 +12,7 @@ ADD --checksum=sha256:02aa0cb229ba09050cba6638059dadb9eedc2276632ea43d6a57a2f8c1
 FROM supercronic-${TARGETARCH} AS supercronic
 
 # Stage 1: Builder
-FROM python:3.14.8-slim AS builder
+FROM python:3.15.0-slim AS builder
 
 # Install uv
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
@@ -40,7 +40,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --locked --no-dev
 
 # Stage 2: Runner
-FROM python:3.14.8-slim
+FROM python:3.15.0-slim
 
 COPY --from=supercronic --chmod=755 /supercronic /usr/local/bin/supercronic
 
