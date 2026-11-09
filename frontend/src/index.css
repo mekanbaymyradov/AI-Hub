@@ -203,3 +203,64 @@
     @apply font-sans;
     }
 }
+/* Chat replies rendered by FormattedMessage. */
+@layer components {
+  .formatted-message :not(pre) > code {
+    @apply font-mono text-[12px] bg-fill-3 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded-md border border-zinc-200 dark:border-zinc-700/60 font-medium break-words [overflow-wrap:anywhere];
+  }
+  /* A wide formula scrolls on its own instead of widening the message. */
+  .formatted-message .katex-display {
+    @apply overflow-x-auto overflow-y-hidden py-1;
+  }
+
+  /* highlight.js token classes. */
+  .formatted-message .hljs-keyword,
+  .formatted-message .hljs-selector-tag,
+  .formatted-message .hljs-doctag {
+    @apply text-purple-700 dark:text-purple-400 font-medium;
+  }
+  .formatted-message .hljs-string,
+  .formatted-message .hljs-regexp,
+  .formatted-message .hljs-addition {
+    @apply text-emerald-700 dark:text-emerald-300;
+  }
+  .formatted-message .hljs-number {
+    @apply text-amber-700 dark:text-amber-300;
+  }
+  .formatted-message .hljs-literal,
+  .formatted-message .hljs-symbol {
+    @apply text-cyan-700 dark:text-cyan-400;
+  }
+  .formatted-message .hljs-comment,
+  .formatted-message .hljs-quote {
+    @apply text-zinc-500 italic;
+  }
+  .formatted-message .hljs-title,
+  .formatted-message .hljs-section {
+    @apply text-blue-700 dark:text-blue-400;
+  }
+  .formatted-message .hljs-type,
+  .formatted-message .hljs-built_in,
+  .formatted-message .hljs-title.class_ {
+    @apply text-teal-700 dark:text-teal-300;
+  }
+  .formatted-message .hljs-operator {
+    @apply text-pink-600 dark:text-pink-400/90;
+  }
+  .formatted-message .hljs-punctuation,
+  .formatted-message .hljs-meta {
+    @apply text-fg-7;
+  }
+  .formatted-message .hljs-property,
+  .formatted-message .hljs-attr,
+  .formatted-message .hljs-variable {
+    @apply text-sky-700 dark:text-sky-300;
+  }
+  .formatted-message .hljs-name,
+  .formatted-message .hljs-deletion {
+    @apply text-red-600 dark:text-red-400;
+  }
+  .formatted-message .hljs-attribute {
+    @apply text-purple-600 dark:text-purple-300;
+  }
+}
