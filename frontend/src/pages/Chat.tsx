@@ -67,6 +67,9 @@ export default function Chat() {
     error,
   } = useChat<ChatUIMessage>({
     transport: chatTransport,
+    // At most 20 renders a second: each re-renders the reply being streamed,
+    // which costs more the longer it gets, and models send chunks faster.
+    throttle: 50,
     onData: (dataPart) => {
       if (dataPart.type === "data-chat-name" && streamChatIdRef.current !== null) {
         updateChatNameInCache(queryClient, streamChatIdRef.current, dataPart.data.name);
