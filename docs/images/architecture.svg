@@ -43,10 +43,11 @@
 
   <rect x="820" y="150" width="160" height="56" rx="8" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1.5"/>
   <text x="900" y="174" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2328">OTel Collector</text>
-  <text x="900" y="192" text-anchor="middle" font-size="12" fill="#57606a">container metrics</text>
+  <text x="900" y="192" text-anchor="middle" font-size="12" fill="#57606a">Docker container metrics</text>
 
   <line x1="380" y1="178" x2="420" y2="178" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
   <path d="M340,150 V118 H700 V150" fill="none" stroke="#8250df" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-telemetry)"/>
+  <text x="520" y="111" text-anchor="middle" font-size="12" fill="#8250df">telemetry</text>
   <line x1="820" y1="178" x2="780" y2="178" stroke="#8250df" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-telemetry)"/>
 
   <!-- Bottom: the data stores -->
@@ -70,10 +71,4 @@
   <ellipse cx="500" cy="294" rx="80" ry="8" fill="#f6f8fa" stroke="#8c959f" stroke-width="1.5"/>
   <text x="500" y="322" text-anchor="middle" font-size="14" font-weight="600" fill="#1f2328">Cloudflare R2</text>
   <text x="500" y="339" text-anchor="middle" font-size="12" fill="#57606a">file storage</text>
-
-  <!-- Legend -->
-  <line x1="640" y1="322" x2="680" y2="322" stroke="#8250df" stroke-width="1.5" stroke-dasharray="5 4"/>
-  <text x="690" y="326" font-size="12" fill="#57606a">telemetry</text>
-  <line x1="780" y1="322" x2="820" y2="322" stroke="#57606a" stroke-width="1.5"/>
-  <text x="830" y="326" font-size="12" fill="#57606a">calls</text>
 </svg>
