@@ -85,38 +85,11 @@ it. The agent runs inside the API process, so a reply is one request from the
 browser's side and one trace in Logfire.
 
 ```mermaid
-flowchart TB
-    browser["Browser<br/>React web app"]
-
-    subgraph server["Server · Docker Compose"]
-        caddy["Caddy<br/>TLS, security headers"]
-        web["Web app<br/>static files"]
-        api["FastAPI app<br/>Pydantic AI agent"]
-        scheduler["Scheduler<br/>hourly cleanup"]
-        postgres[("PostgreSQL<br/>users, chats, messages")]
-        redis[("Redis<br/>sessions, codes, rate limits")]
-        collector["OTel Collector<br/>container metrics"]
-    end
-
-    subgraph external["External services"]
-        llms["LLM providers<br/>Anthropic, OpenAI, Google,<br/>Groq, Mistral"]
-        tools["Tool APIs<br/>Open-Meteo, DuckDuckGo"]
-        whisper["Groq Whisper<br/>speech to text"]
-        resend["Resend<br/>sign-in codes"]
-        r2[("Cloudflare R2<br/>attachments, avatars")]
-        logfire["Logfire<br/>traces, logs, metrics"]
-    end
-
-    browser --> caddy
-    caddy --> web
-    caddy --> api
-    browser -. "reads files" .-> r2
-    api --> postgres & redis & r2
-    api --> llms & tools & whisper & resend
-    scheduler --> postgres & r2
-    api -. traces .-> logfire
-    scheduler -. traces .-> logfire
-    collector -. metrics .-> logfire
+flowchart LR
+    web["Web app<br/>React"] --> api["API<br/>FastAPI + Pydantic AI agent"]
+    api --> data[("PostgreSQL, Redis<br/>and Cloudflare R2")]
+    api --> llms["LLM providers"]
+    api -. traces .-> logfire["Logfire"]
 ```
 
 ## Features
