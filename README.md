@@ -85,7 +85,7 @@ it. The agent runs inside the API process, so a reply is one request from the
 browser's side and one trace in Logfire.
 
 ```mermaid
-flowchart TB
+flowchart LR
     client["Web client<br/>React"] --> caddy["Caddy<br/>HTTPS, reverse proxy"]
 
     caddy ~~~ scheduler["Scheduler<br/>hourly cleanup"]
@@ -101,7 +101,7 @@ flowchart TB
     api --> r2[("Cloudflare R2<br/>file storage")]
     scheduler --> postgres & r2
 
-    %% Keeps the data stores on the bottom row, below the external services.
+    %% Keeps the data stores in the last column, after the external services.
     llms ~~~ postgres
     llms ~~~ redis
     logfire ~~~ r2
