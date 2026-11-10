@@ -85,11 +85,26 @@ it. The agent runs inside the API process, so a reply is one request from the
 browser's side and one trace in Logfire.
 
 ```mermaid
-flowchart LR
-    web["Web app<br/>React"] --> api["API<br/>FastAPI + Pydantic AI agent"]
-    api --> data[("PostgreSQL, Redis<br/>and Cloudflare R2")]
+flowchart TB
+    client["Web client<br/>React"] --> caddy["Caddy<br/>HTTPS, reverse proxy"]
+
+    caddy ~~~ scheduler["Scheduler<br/>hourly cleanup"]
+    caddy --> api["API<br/>FastAPI + Pydantic AI agent"]
+    caddy ~~~ collector["OTel Collector<br/>container metrics"]
+
     api --> llms["LLM providers"]
     api -. traces .-> logfire["Logfire"]
+    collector -. metrics .-> logfire
+
+    api --> postgres[("PostgreSQL<br/>database")]
+    api --> redis[("Redis<br/>sessions, rate limits")]
+    api --> r2[("Cloudflare R2<br/>file storage")]
+    scheduler --> postgres & r2
+
+    %% Keeps the data stores on the bottom row, below the external services.
+    llms ~~~ postgres
+    llms ~~~ redis
+    logfire ~~~ r2
 ```
 
 ## Features
