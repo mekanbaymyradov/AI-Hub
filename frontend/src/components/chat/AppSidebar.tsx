@@ -117,9 +117,6 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   const [selectedChatIds, setSelectedChatIds] = useState<Set<number>>(new Set());
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
 
-  // Chat ids currently undergoing smooth delete animation
-  const [deletingChatIds, setDeletingChatIds] = useState<Set<number>>(new Set());
-
   const renameChat = useRenameChat();
   const deleteChat = useDeleteChat();
   const deleteChats = useDeleteChats();
@@ -131,13 +128,8 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
     },
   });
 
-  // Chats visible in the UI (exits smoothly when added to deletingChatIds)
   // Fixed for the render, so every row is bucketed against the same moment.
   const now = new Date();
-  const visibleChats = useMemo(
-    () => chats.filter((chat) => !deletingChatIds.has(chat.id)),
-    [chats, deletingChatIds]
-  );
 
   const handleStartSelect = (chatId?: number) => {
     setOpen(true);
@@ -158,10 +150,10 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   };
 
   const handleSelectAll = () => {
-    if (selectedChatIds.size === visibleChats.length) {
+    if (selectedChatIds.size === chats.length) {
       setSelectedChatIds(new Set());
     } else {
-      setSelectedChatIds(new Set(visibleChats.map((c) => c.id)));
+      setSelectedChatIds(new Set(chats.map((c) => c.id)));
     }
   };
 
@@ -170,31 +162,18 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
     setSelectedChatIds(new Set());
   };
 
+  // The dialog stays open until the API answers, so a failure shows in it.
   const handleConfirmBulkDelete = () => {
     const ids = Array.from(selectedChatIds);
     if (ids.length === 0) return;
-    setIsBulkDeleteOpen(false);
-    setIsSelectionMode(false);
-    setSelectedChatIds(new Set());
-    setDeletingChatIds((prev) => new Set([...prev, ...ids]));
-    if (activeChatId !== null && selectedChatIds.has(activeChatId)) {
-      handleNewThread();
-    }
-
     deleteChats.mutate(ids, {
-      onError: () => {
-        setDeletingChatIds((prev) => {
-          const next = new Set(prev);
-          ids.forEach((id) => next.delete(id));
-          return next;
-        });
-      },
-      onSettled: () => {
-        setDeletingChatIds((prev) => {
-          const next = new Set(prev);
-          ids.forEach((id) => next.delete(id));
-          return next;
-        });
+      onSuccess: () => {
+        setIsBulkDeleteOpen(false);
+        if (activeChatId !== null && ids.includes(activeChatId)) {
+          handleNewThread();
+        } else {
+          handleCancelSelection();
+        }
       },
     });
   };
@@ -229,25 +208,10 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   const handleDelete = () => {
     const chat = deleteDialog.item;
     if (!chat) return;
-    const id = chat.id;
-    deleteDialog.close();
-    setDeletingChatIds((prev) => new Set(prev).add(id));
-    if (chat.id === activeChatId) onNewThread();
-
-    deleteChat.mutate(id, {
-      onError: () => {
-        setDeletingChatIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-      },
-      onSettled: () => {
-        setDeletingChatIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
+    deleteChat.mutate(chat.id, {
+      onSuccess: () => {
+        deleteDialog.close();
+        if (chat.id === activeChatId) onNewThread();
       },
     });
   };
@@ -342,7 +306,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   <DropdownMenuContent side="right" align="start" sideOffset={10} className={cn(MENU_CONTENT, "w-64 rounded-2xl p-2")}>
                     <div className="flex items-center justify-between px-2.5 py-1 mb-1 select-none">
                       <span className="text-xs text-zinc-500 dark:text-muted-foreground font-normal">Recents</span>
-                      {visibleChats.length > 0 && (
+                      {chats.length > 0 && (
                         <button
                           type="button"
                           onClick={() => {
@@ -362,7 +326,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                           <span className="truncate">{NEW_CHAT_LABEL}</span>
                         </DropdownMenuItem>
                       )}
-                      {visibleChats.map((chat) => (
+                      {chats.map((chat) => (
                         <DropdownMenuItem
                           key={chat.id}
                           onClick={() => handleSelectChat(chat.id)}
@@ -394,7 +358,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                     onClick={handleSelectAll}
                     className="px-2 py-0.5 rounded text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                   >
-                    {selectedChatIds.size === visibleChats.length && visibleChats.length > 0 ? "Deselect all" : "Select all"}
+                    {selectedChatIds.size === chats.length && chats.length > 0 ? "Deselect all" : "Select all"}
                   </button>
                   <button
                     type="button"
@@ -411,7 +375,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                 <SidebarGroupLabel className="p-0 text-xs font-medium text-zinc-500 dark:text-muted-foreground select-none">
                   Chats
                 </SidebarGroupLabel>
-                {visibleChats.length > 0 && (
+                {chats.length > 0 && (
                   <Tooltip>
                     <TooltipTrigger render={
                       <button
@@ -440,10 +404,10 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   </SidebarMenuItem>
                 )}
                 <AnimatePresence initial={false}>
-                  {visibleChats.flatMap((chat, index) => {
+                  {chats.flatMap((chat, index) => {
                     const group = dateGroup(chat.updated_at, now);
                     const startsGroup =
-                      index === 0 || dateGroup(visibleChats[index - 1].updated_at, now) !== group;
+                      index === 0 || dateGroup(chats[index - 1].updated_at, now) !== group;
                     const row = (
                       <motion.li
                         key={chat.id}
