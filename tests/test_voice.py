@@ -60,7 +60,7 @@ async def test_transcribe_returns_text(client: AsyncClient, token: str):
     assert response.json() == {"text": TRANSCRIPT}
     [request] = requests
     assert request.headers["Authorization"] == "Bearer test"
-    assert b'name="model"\r\n\r\nwhisper-large-v3-turbo\r\n' in request.content
+    assert b'name="model"\r\n\r\nwhisper-large-v3\r\n' in request.content
     assert b'filename="audio.webm"' in request.content
     assert b"Content-Type: audio/webm\r\n" in request.content
 
