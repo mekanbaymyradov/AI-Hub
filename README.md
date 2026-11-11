@@ -18,7 +18,7 @@ I'd use at work.
 
 - **Product and system health on one dashboard.** Active users, LLM cost per
   user and model, and time to first token sit next to errors, latency per
-  release and container memory. Ten alerts watch it, and no chat text is stored.
+  release and container memory. Ten alerts watch it.
   ([dashboard](docs/architecture.md#logging-and-observability))
 - **Streamed agent replies.** Pydantic AI streams each reply through FastAPI.
   History lives only in the database, and provider errors never reach the
