@@ -116,6 +116,7 @@ services:
     # Only the token, not .env: the collector needs none of the app's secrets.
     environment:
       LOGFIRE_TOKEN: ${LOGFIRE_TOKEN}
+      LOGFIRE_OPAMP_TOKEN: ${LOGFIRE_OPAMP_TOKEN}
     configs:
       - source: otel_collector
         target: /etc/otelcol-contrib/config.yaml  # the image's default config path

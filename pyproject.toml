@@ -10,7 +10,7 @@ dependencies = [
     "boto3>=1.43.108",
     "fastapi[standard]>=0.141.1",
     "httpx2>=2.13.1",
-    "logfire[fastapi,httpx,sqlalchemy,redis]>=5.1.1,<6",
+    "logfire[fastapi,httpx,sqlalchemy,redis,fleet]>=5.5.0,<6",
     # Logfire 5 supports OpenTelemetry up to 1.44 (instrumentations 0.65b0), so
     # raise this bound together with Logfire's.
     "opentelemetry-instrumentation-botocore>=0.65b0,<0.66",
@@ -62,7 +62,8 @@ dev = [
 [tool.pytest]
 testpaths = ["tests"]
 filterwarnings = [
-    "ignore::DeprecationWarning:google.genai.*"
+    "ignore::DeprecationWarning:google.genai.*",
+    "ignore::logfire.fleet.LogfireFleetWarning"
 ]
 
 

@@ -16,9 +16,10 @@ I'd use at work.
 
 ## What's interesting here
 
-- **Tracing without user data.** One Logfire trace per request, with the model,
-  tokens and timing, but never the chat text.
-  ([code](src/observability.py), [details](docs/architecture.md#logging-and-observability))
+- **Product and system health on one dashboard.** Active users, LLM cost per
+  user and model, and time to first token sit next to errors, latency per
+  release and container memory. Ten alerts watch it.
+  ([dashboard](docs/architecture.md#logging-and-observability))
 - **Streamed agent replies.** Pydantic AI streams each reply through FastAPI.
   History lives only in the database, and provider errors never reach the
   client. ([code](src/chat/adapter.py), [details](docs/architecture.md#streaming))
@@ -104,6 +105,7 @@ Logfire token).
 - Move the system prompt into Logfire, so it changes without a deploy
 - Track token cost per user and model
 - Fall back to another provider when one fails
+- 👍/👎 on replies, turning bad answers into new eval cases
 
 ## Credits
 
