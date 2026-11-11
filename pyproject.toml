@@ -62,7 +62,8 @@ dev = [
 [tool.pytest]
 testpaths = ["tests"]
 filterwarnings = [
-    "ignore::DeprecationWarning:google.genai.*"
+    "ignore::DeprecationWarning:google.genai.*",
+    "ignore::logfire.fleet.LogfireFleetWarning"
 ]
 
 
