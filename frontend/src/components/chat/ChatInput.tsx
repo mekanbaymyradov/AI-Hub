@@ -22,7 +22,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useIsMobile } from "@/hooks/use-mobile";
 import { canRecordVoice, useVoiceInput } from "@/hooks/use-voice-input";
 import { ChatGreeting } from "./ChatGreeting";
-import { EffortPicker } from "./EffortPicker";
 import { ModelPicker } from "./ModelPicker";
 import { VoiceWaveform } from "./VoiceWaveform";
 
@@ -363,7 +362,6 @@ export function ChatInput({
                       </span>
                     </TooltipContent>
                   </Tooltip>
-                  <EffortPicker value={effort} onChange={onEffortChange} disabled={isStreaming} />
                 </div>
 
                 <div className="flex items-center gap-1.5">
@@ -371,6 +369,8 @@ export function ChatInput({
                     models={models}
                     selected={selectedModel}
                     onSelect={onSelectModelId}
+                    effort={effort}
+                    onEffortChange={onEffortChange}
                     disabled={isStreaming}
                   />
 
