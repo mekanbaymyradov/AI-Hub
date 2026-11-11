@@ -68,12 +68,16 @@ class Verdict(BaseModel):
 class Grades(BaseModel):
     answers_first: Verdict = Field(
         description=(
-            "Opens with the substance: the first sentence answers the message, "
-            "or the answer starts directly with what was asked for, such as the "
-            "code or the email. Fails when it opens with a title, a restatement "
-            "of the topic, praise for the question, or an announcement of what "
-            "follows, such as 'Here's a function…' or 'Below is…'. A direct, "
-            "natural reply to small talk passes."
+            "Opens with the substance. When the user asked for something to be "
+            "produced, such as code or an email, starting with it passes, "
+            "including its natural first part like a code block or an email's "
+            "subject line. Otherwise the opening sentence answers the message. "
+            "Fails on a title or heading, a restatement of the topic, praise for "
+            "the question, a hedge such as 'Both are great choices' or 'It "
+            "depends' where the recommendation or key difference should be, or "
+            "a lead-in such as 'Here's a…', 'Here is…', "
+            "'Below is…' or 'Let's break it down', even when the content "
+            "follows. A direct, natural reply to small talk passes."
         )
     )
     format_fits: Verdict = Field(
