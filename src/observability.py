@@ -14,7 +14,8 @@ from src.database import engine
 
 def setup_observability() -> None:
     logfire.configure(
-        service_name=settings.project_title, environment=settings.environment
+        service_name=settings.project_title, 
+        environment=settings.environment,
     )
 
     # A missing token only turns sending off (see pyproject.toml).
