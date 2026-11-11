@@ -19,7 +19,7 @@ I'd use at work.
 - **Product and system health on one dashboard.** Active users, LLM cost per
   user and model, and time to first token sit next to errors, latency per
   release and container memory. Ten alerts watch it, and no chat text is stored.
-  ([dashboard](#dashboard), [details](docs/architecture.md#logging-and-observability))
+  ([dashboard](docs/architecture.md#logging-and-observability))
 - **Streamed agent replies.** Pydantic AI streams each reply through FastAPI.
   History lives only in the database, and provider errors never reach the
   client. ([code](src/chat/adapter.py), [details](docs/architecture.md#streaming))
@@ -48,16 +48,6 @@ Production keeps the model, tokens and timing. The conversation reads
 "Not captured".
 
 ![Logfire's view of the second model call: the model, its tools, tokens and timing are recorded, while the question, the tool call and the answer read "Not captured"](docs/images/model-run.png)
-
-## Dashboard
-
-The launch weeks, Oct 12–24, on the project's Logfire dashboard:
-
-![The Logfire dashboard for Oct 12–24: 1,749 requests, 10 active users, 116 messages, 30 failed replies and no server errors, with a launch-day spike of 89 messages on Oct 13, a users table with cost per user, the models users pick, requests by status and p95 latency](docs/images/dashboard.png)
-
-Of the 30 failed replies, 13 were Mistral Large, which the API plan didn't
-include (since removed), 12 were free-tier rate limits and 5 were empty web
-searches.
 
 ## Architecture
 

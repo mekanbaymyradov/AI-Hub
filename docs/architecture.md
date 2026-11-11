@@ -180,3 +180,16 @@ Logfire is the only logging API: code calls `logfire.info()`,
   production, because tools put user input there, like a city name, and Logfire
   never scrubs URLs (`drop_url_query` in `src/observability.py`). Logs and spans
   identify users by ID, never by email.
+- **Dashboard:** the *AI-Hub* Logfire dashboard puts product numbers (active
+  users, LLM cost per user and model, time to first token) next to system
+  health (errors, latency per release, containers, the DB pool, sign-ins and
+  cron jobs). Each panel's description says how to read it, and ten alerts
+  watch the same data.
+
+The launch weeks, Oct 12–24:
+
+![The Logfire dashboard for Oct 12–24: 1,749 requests, 10 active users, 116 messages, 30 failed replies and no server errors, with a launch-day spike of 89 messages on Oct 13, a users table with cost per user, the models users pick, requests by status and p95 latency](images/dashboard.png)
+
+Of the 30 failed replies, 13 were Mistral Large, which the API plan didn't
+include (since removed), 12 were free-tier rate limits and 5 were empty web
+searches.
