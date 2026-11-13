@@ -305,7 +305,7 @@ export default function Chat() {
         />
 
         <main className="flex flex-col flex-1 min-w-0 h-full overflow-hidden relative">
-          <ChatHeader chatTitle={currentChatTitle} onNewThread={handleNewThread} />
+          <ChatHeader chatId={activeChatId} chatTitle={currentChatTitle} onNewThread={handleNewThread} />
 
           {/* A crash in a message leaves the sidebar and input usable. */}
           <ErrorBoundary>
