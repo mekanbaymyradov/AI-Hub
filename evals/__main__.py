@@ -41,14 +41,21 @@ class EvalSettings(AppBaseSettings):
     logfire_token: SecretStr
 
 
-def is_rate_limited(exc: BaseException) -> bool:
-    return isinstance(exc, ModelHTTPError) and exc.status_code == 429
+# Groq wraps a network failure in a bare ModelAPIError; Mistral's arrives as is.
+UNAVAILABLE = (ModelAPIError, httpx2.TransportError)
 
 
-# Groq's SDK already retries a 429 twice; these waits outlast the one-minute
-# token window when that isn't enough.
-RATE_LIMIT_RETRY = RetryConfig(
-    retry=retry_if_exception(is_rate_limited),
+def is_transient(exc: BaseException) -> bool:
+    """Return whether a retry could succeed: rate limits, server errors and network failures."""
+    if isinstance(exc, ModelHTTPError):
+        return exc.status_code == 429 or exc.status_code >= 500
+    return isinstance(exc, UNAVAILABLE)
+
+
+# Provider SDKs already retry a couple of times; these waits outlast Groq's
+# one-minute token window and short network outages.
+RETRY = RetryConfig(
+    retry=retry_if_exception(is_transient),
     wait=wait_exponential(multiplier=5, max=60),
     stop=stop_after_attempt(5),
     reraise=True,
@@ -56,8 +63,8 @@ RATE_LIMIT_RETRY = RetryConfig(
 
 
 async def ping(model: Model) -> None:
-    """Send a tiny request, raising ModelAPIError when the model can't answer."""
-    async for attempt in AsyncRetrying(**RATE_LIMIT_RETRY):
+    """Send a tiny request, raising an UNAVAILABLE error when the model can't answer."""
+    async for attempt in AsyncRetrying(**RETRY):
         with attempt:
             await model_request(
                 model,
@@ -79,8 +86,8 @@ async def run(
         grader_model = registry.model(grader_spec)
         try:
             await ping(grader_model)
-        except ModelAPIError as exc:
-            raise SystemExit(f"The grader is unavailable: {exc}") from None
+        except UNAVAILABLE as exc:
+            raise SystemExit(f"The grader is unavailable: {exc!r}") from None
 
         for evaluator in (
             NoFillerOpener(),
@@ -98,8 +105,8 @@ async def run(
             model = registry.model(spec)
             try:
                 await ping(model)
-            except ModelAPIError as exc:
-                print(f"Skipping {spec.display_name}: {exc}")
+            except UNAVAILABLE as exc:
+                print(f"Skipping {spec.display_name}: {exc!r}")
                 continue
             report = await evaluate_model(dataset, name, spec, model, http)
             report.print()
@@ -122,8 +129,8 @@ async def evaluate_model(
         name=f"{name} · {spec.display_name}",
         # One case at a time stays near Groq's free 8K tokens per minute.
         max_concurrency=1,
-        retry_task=RATE_LIMIT_RETRY,
-        retry_evaluators=RATE_LIMIT_RETRY,
+        retry_task=RETRY,
+        retry_evaluators=RETRY,
         metadata={"prompt_version": name, "model": spec.id, "grader": GRADER_MODEL},
     )
 
@@ -177,6 +184,9 @@ def main() -> None:
         token=EvalSettings().logfire_token.get_secret_value(),
         # The printed report is the console output; spans go to Logfire only.
         console=False,
+        # The data is our own test questions, and scrubbing hid every answer
+        # that mentions words like "password" or "auth" from review.
+        scrubbing=False,
     )
     logfire.instrument_pydantic_ai()
 
