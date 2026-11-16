@@ -7,7 +7,13 @@ from pydantic_ai import FunctionToolset, ModelRetry, RunContext, ToolFailed
 from pydantic_ai.capabilities import WebSearch
 from pydantic_ai.native_tools import WebSearchTool
 
-from src.llm.constants import FORECAST_URL, GEOCODING_URL, WEATHER_CODES
+from src.llm.config import llm_settings
+from src.llm.constants import (
+    FORECAST_URL,
+    GEOCODING_URL,
+    TAVILY_SEARCH_URL,
+    WEATHER_CODES,
+)
 from src.llm.enums import Provider
 from src.llm.models import AgentDeps
 
@@ -85,11 +91,47 @@ async def get_weather(ctx: RunContext[AgentDeps], city: str) -> Weather:
     )
 
 
+@dataclass
+class SearchResult:
+    title: str
+    url: str
+    content: str
+
+
+async def search_web(ctx: RunContext[AgentDeps], query: str) -> list[SearchResult]:
+    """Search the web and return the top results.
+
+    Args:
+        query: What to look up, like "current US senators from Texas".
+    """
+    api_key = llm_settings.tavily_api_key
+    assert api_key is not None  # web_search below offers this tool only with a key
+    try:
+        response = await ctx.deps.http.post(
+            TAVILY_SEARCH_URL,
+            headers={"Authorization": f"Bearer {api_key.get_secret_value()}"},
+            json={"query": query, "search_depth": "basic", "max_results": 5},
+        )
+        response.raise_for_status()
+    except httpx2.HTTPError as exc:
+        raise ToolFailed("Web search is unavailable.") from exc
+
+    return [
+        SearchResult(
+            title=result["title"], url=result["url"], content=result["content"]
+        )
+        for result in response.json()["results"]
+    ]
+
+
 def _native_web_search(ctx: RunContext[AgentDeps]) -> WebSearchTool | None:
-    """Return the provider's own search, or None to search with DuckDuckGo instead."""
+    """Return the provider's own search, or None to search with Tavily instead."""
     if ctx.model.system in (Provider.ANTHROPIC, Provider.GOOGLE):
         return WebSearchTool()
     return None
 
 
-web_search = WebSearch(native=_native_web_search, local="duckduckgo")
+web_search = WebSearch(
+    native=_native_web_search,
+    local=search_web if llm_settings.tavily_api_key else False,
+)
