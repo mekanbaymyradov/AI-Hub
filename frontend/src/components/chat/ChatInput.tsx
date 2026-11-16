@@ -22,7 +22,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useIsMobile } from "@/hooks/use-mobile";
 import { canRecordVoice, useVoiceInput } from "@/hooks/use-voice-input";
 import { ChatGreeting } from "./ChatGreeting";
-import { EffortPicker } from "./EffortPicker";
 import { ModelPicker } from "./ModelPicker";
 import { VoiceWaveform } from "./VoiceWaveform";
 
@@ -43,8 +42,8 @@ interface ChatInputProps {
   onStop: () => void;
   isStreaming: boolean;
   isInitialState: boolean;
-  selectedModelId?: string | null;
-  onSelectModelId?: (id: string) => void;
+  selectedModelId: string | null;
+  onSelectModelId: (id: string) => void;
   effort: Effort | null;
   onEffortChange: (effort: Effort | null) => void;
 }
@@ -74,7 +73,7 @@ export function ChatInput({
   onStop,
   isStreaming,
   isInitialState,
-  selectedModelId: controlledModelId,
+  selectedModelId,
   onSelectModelId,
   effort,
   onEffortChange,
@@ -84,11 +83,7 @@ export function ChatInput({
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
-  const [uncontrolledModelId, setUncontrolledModelId] = useState<string | null>(null);
   const isMobile = useIsMobile();
-
-  const selectedModelId = controlledModelId !== undefined ? controlledModelId : uncontrolledModelId;
-  const setSelectedModelId = onSelectModelId ?? setUncontrolledModelId;
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -367,14 +362,15 @@ export function ChatInput({
                       </span>
                     </TooltipContent>
                   </Tooltip>
-                  <EffortPicker value={effort} onChange={onEffortChange} disabled={isStreaming} />
                 </div>
 
                 <div className="flex items-center gap-1.5">
                   <ModelPicker
                     models={models}
                     selected={selectedModel}
-                    onSelect={setSelectedModelId}
+                    onSelect={onSelectModelId}
+                    effort={effort}
+                    onEffortChange={onEffortChange}
                     disabled={isStreaming}
                   />
 

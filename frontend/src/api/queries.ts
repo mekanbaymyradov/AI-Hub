@@ -148,11 +148,26 @@ export function useRenameChat() {
   });
 }
 
+// Dropped from the cache at once, so the rows leave without waiting for the
+// refetch, and the dialog closes without waiting for it either.
+function removeChatsFromCache(queryClient: QueryClient, chatIds: number[]): void {
+  queryClient.setQueryData<InfiniteData<PageChatPublic, string | null>>(queryKeys.chats, (old) =>
+    old && {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        items: page.items.filter((chat) => !chatIds.includes(chat.id)),
+      })),
+    }
+  );
+  void queryClient.invalidateQueries({ queryKey: queryKeys.chats });
+}
+
 export function useDeleteChat() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: chatApi.deleteChat,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.chats }),
+    onSuccess: (_, chatId) => removeChatsFromCache(queryClient, [chatId]),
   });
 }
 
@@ -160,6 +175,6 @@ export function useDeleteChats() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (chatIds: number[]) => chatApi.deleteChats(chatIds),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.chats }),
+    onSuccess: (_, chatIds) => removeChatsFromCache(queryClient, chatIds),
   });
 }

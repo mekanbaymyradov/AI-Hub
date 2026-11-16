@@ -1,5 +1,5 @@
 GROQ_TRANSCRIPTION_URL = "https://api.groq.com/openai/v1/audio/transcriptions"
-TRANSCRIPTION_MODEL = "whisper-large-v3-turbo"
+TRANSCRIPTION_MODEL = "whisper-large-v3"
 
 # The audio types accepted, and the extension each is sent to Groq under.
 AUDIO_EXTENSIONS = {

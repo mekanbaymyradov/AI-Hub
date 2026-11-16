@@ -2,6 +2,7 @@ TITLE_MODEL_ID = "groq:openai/gpt-oss-20b"
 
 GEOCODING_URL = "https://geocoding-api.open-meteo.com/v1/search"
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
+TAVILY_SEARCH_URL = "https://api.tavily.com/search"
 
 # WMO weather interpretation codes, as Open-Meteo reports them.
 WEATHER_CODES: dict[int, str] = {

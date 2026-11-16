@@ -38,6 +38,7 @@ function AppRoutes() {
               path="/login"
               element={isAuthenticated ? <Navigate to="/" replace /> : <Auth />}
             />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
       </ErrorBoundary>

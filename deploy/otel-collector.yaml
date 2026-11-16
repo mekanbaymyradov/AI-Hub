@@ -22,9 +22,22 @@ exporters:
     headers:
       Authorization: ${env:LOGFIRE_TOKEN}
 
+extensions:
+  opamp:
+    server:
+      ws:
+        endpoint: wss://logfire-eu.pydantic.dev/v1/opamp
+        headers:
+          Authorization: Bearer ${env:LOGFIRE_OPAMP_TOKEN}
+    capabilities:
+      reports_effective_config: true
+      reports_health: true
+      reports_available_components: true
+
 service:
   pipelines:
     metrics:
       receivers: [docker_stats]
       processors: [resource_detection, resource]
       exporters: [otlp_http/logfire]
+  extensions: [opamp]

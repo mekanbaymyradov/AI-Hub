@@ -13,6 +13,7 @@ Before pushing, run the checks CI runs:
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
 

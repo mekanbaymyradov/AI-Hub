@@ -67,6 +67,9 @@ export default function Chat() {
     error,
   } = useChat<ChatUIMessage>({
     transport: chatTransport,
+    // At most 20 renders a second: each re-renders the reply being streamed,
+    // which costs more the longer it gets, and models send chunks faster.
+    throttle: 50,
     onData: (dataPart) => {
       if (dataPart.type === "data-chat-name" && streamChatIdRef.current !== null) {
         updateChatNameInCache(queryClient, streamChatIdRef.current, dataPart.data.name);
@@ -302,7 +305,7 @@ export default function Chat() {
         />
 
         <main className="flex flex-col flex-1 min-w-0 h-full overflow-hidden relative">
-          <ChatHeader chatTitle={currentChatTitle} onNewThread={handleNewThread} />
+          <ChatHeader chatId={activeChatId} chatTitle={currentChatTitle} onNewThread={handleNewThread} />
 
           {/* A crash in a message leaves the sidebar and input usable. */}
           <ErrorBoundary>

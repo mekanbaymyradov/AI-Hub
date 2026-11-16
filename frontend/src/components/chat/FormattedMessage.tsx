@@ -1,7 +1,9 @@
-import { useState, type ReactNode } from "react";
+import { memo, useState, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import remarkParse from "remark-parse";
+import { unified } from "unified";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import { Check, Copy } from "lucide-react";
@@ -9,31 +11,11 @@ import type { Element, ElementContent } from "hast";
 import type { Nodes, Root } from "mdast";
 import "katex/dist/katex.min.css";
 import { copyToClipboard } from "@/lib/clipboard";
+import { normalizeMath } from "./normalize-math";
 
 interface FormattedMessageProps {
   content: string;
   isStreaming?: boolean;
-}
-
-// remark-math reads only $ and $$, but models often write \( \) and \[ \].
-// A single $ counts only by Pandoc's rule, a non-space inside each delimiter
-// and no digit after the closing one, so "costs $5 and $10" stays text.
-// Code is left alone, so a backslash in a code sample stays as typed.
-function normalizeMath(markdown: string): string {
-  return markdown
-    .split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/g)
-    .map((part, index) =>
-      index % 2 === 1
-        ? part
-        : part
-            .replace(/\\\[([\s\S]*?)\\\]/g, (_, tex: string) => `$$${tex}$$`)
-            .replace(/\\\(([\s\S]*?)\\\)/g, (_, tex: string) => `$${tex.trim()}$`)
-            .replace(
-              /(\\\$)|(\$\$[\s\S]*?\$\$)|(\$[^\s$](?:[^$\n]*[^\s$])?\$(?!\d))|\$/g,
-              (_, escaped, display, inline) => escaped ?? display ?? inline ?? "\\$"
-            )
-    )
-    .join("");
 }
 
 // Show raw HTML as the text it is. Rendering it would let a reply inject
@@ -185,18 +167,40 @@ const components: Components = {
   td: ({ children, style }) => <td style={style} className="px-3.5 py-2">{children}</td>,
 };
 
+const remarkPlugins = [remarkGfm, remarkMath, remarkHtmlAsText];
+const rehypePlugins = [rehypeKatex, rehypeHighlight];
+
+const MarkdownBlock = memo(function MarkdownBlock({ markdown }: { markdown: string }) {
+  return (
+    <Markdown remarkPlugins={remarkPlugins} rehypePlugins={rehypePlugins} components={components}>
+      {markdown}
+    </Markdown>
+  );
+});
+
+// Same syntax as the render, so a block ends where react-markdown ends it.
+const blockParser = unified().use(remarkParse).use(remarkGfm).use(remarkMath);
+
+function splitBlocks(markdown: string): string[] {
+  const starts = blockParser.parse(markdown).children.map((node) => node.position?.start.offset ?? 0);
+  return starts.map((start, index) => markdown.slice(start, starts[index + 1]));
+}
+
 export function FormattedMessage({ content, isStreaming }: FormattedMessageProps) {
   if (!content) return null;
 
+  const markdown = normalizeMath(content);
+
   return (
     <div className="formatted-message w-full min-w-0 max-w-full overflow-hidden">
-      <Markdown
-        remarkPlugins={[remarkGfm, remarkMath, remarkHtmlAsText]}
-        rehypePlugins={[rehypeKatex, rehypeHighlight]}
-        components={components}
-      >
-        {normalizeMath(content)}
-      </Markdown>
+      {/* While a reply streams only its last block changes, so blocks render
+          apart and the finished ones are skipped. A done reply renders whole,
+          since footnotes and link definitions can point across blocks. */}
+      {isStreaming ? (
+        splitBlocks(markdown).map((block, index) => <MarkdownBlock key={index} markdown={block} />)
+      ) : (
+        <MarkdownBlock markdown={markdown} />
+      )}
 
       {isStreaming && (
         <span className="inline-block w-1.5 h-3.5 ml-1 align-baseline bg-blue-400/90 rounded-xs animate-pulse" />

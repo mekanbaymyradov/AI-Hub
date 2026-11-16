@@ -48,10 +48,11 @@ pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
 `get_current_time` and `get_weather` (Open-Meteo, no API key).
 
 - **Web search:** the `WebSearch` capability, always on. Claude and Gemini use
-  their provider's built-in search; every other model gets a DuckDuckGo tool.
-  Built-in search is an allowlist of providers (`_native_web_search`), because
-  pydantic-ai's own support check can't be trusted: it claims built-in search
-  for every Groq model, and they reject it.
+  their provider's built-in search; every other model gets `search_web`, which
+  calls Tavily's API through the shared HTTP client. Without `TAVILY_API_KEY`,
+  those models don't search. Built-in search is an allowlist of providers
+  (`_native_web_search`), because pydantic-ai's own support check can't be
+  trusted: it claims built-in search for every Groq model, and they reject it.
 - **Effort:** a message's `effort` (`low`, `medium` or `high`) becomes the
   run's `thinking` setting, which pydantic-ai maps to each provider's own.
   Reasoning is streamed and stored with the chat, but left out of the
@@ -180,3 +181,10 @@ Logfire is the only logging API: code calls `logfire.info()`,
   production, because tools put user input there, like a city name, and Logfire
   never scrubs URLs (`drop_url_query` in `src/observability.py`). Logs and spans
   identify users by ID, never by email.
+- **Dashboard:** the *AI-Hub* Logfire dashboard puts product numbers (active
+  users, LLM cost per user and model, time to first token) next to system
+  health (errors, latency per release, containers, the DB pool, sign-ins and
+  cron jobs). Each panel's description says how to read it, and ten alerts
+  watch the same data.
+
+![The Logfire dashboard for Oct 12–24: 1,749 requests, 10 active users, 116 messages, 30 failed replies and no server errors, with a launch-day spike of 89 messages on Oct 13, a users table with cost per user, the models users pick, requests by status and p95 latency](images/dashboard.png)
