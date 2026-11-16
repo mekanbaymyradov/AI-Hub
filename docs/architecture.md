@@ -48,10 +48,11 @@ pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
 `get_current_time` and `get_weather` (Open-Meteo, no API key).
 
 - **Web search:** the `WebSearch` capability, always on. Claude and Gemini use
-  their provider's built-in search; every other model gets a DuckDuckGo tool.
-  Built-in search is an allowlist of providers (`_native_web_search`), because
-  pydantic-ai's own support check can't be trusted: it claims built-in search
-  for every Groq model, and they reject it.
+  their provider's built-in search; every other model gets `search_web`, which
+  calls Tavily's API through the shared HTTP client. Without `TAVILY_API_KEY`,
+  those models don't search. Built-in search is an allowlist of providers
+  (`_native_web_search`), because pydantic-ai's own support check can't be
+  trusted: it claims built-in search for every Groq model, and they reject it.
 - **Effort:** a message's `effort` (`low`, `medium` or `high`) becomes the
   run's `thinking` setting, which pydantic-ai maps to each provider's own.
   Reasoning is streamed and stored with the chat, but left out of the

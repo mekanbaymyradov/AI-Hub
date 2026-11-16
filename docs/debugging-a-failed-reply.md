@@ -85,7 +85,6 @@ The status code in the cause decides who fixes it and what the user hears.
 | `status_code: 404` | The provider renamed or retired the model. | Update or remove it in the catalog. | The same as for 403. |
 | `status_code: 429` | The provider's rate limit or quota. Free tiers hit this. | Usually nothing. If it lasts, check the quota. | "That model is busy right now. Try again in a minute, or pick another one." |
 | `status_code: 5xx` | The provider is down. | Check its status page. | "The model's provider is having problems. Please pick another model for now." |
-| `DDGSException: No results found.` | A DuckDuckGo search found nothing, and the search library raises an error for that, which ends the reply. The user sees "An unexpected error occurred." instead. It caused 5 failed replies from 2026-10-13 to 10-22. | Not caught yet; see [pydantic-ai#9820](https://github.com/pydantic/pydantic-ai/issues/9820). | "Something went wrong while searching the web. Please try again, or word the question differently." |
 
 ## 5. Confirm the fix
 

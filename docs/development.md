@@ -25,6 +25,10 @@ Optional: set `LOGFIRE_TOKEN` to a write token from your Logfire project. The
 `app` and `scheduler` containers then send traces tagged `environment=local`,
 with full LLM prompts and replies. Without it, they only print to the console.
 
+Optional: set `TAVILY_API_KEY` to a free key from app.tavily.com (1,000
+searches a month) to give Groq and Mistral models web search. Claude and Gemini
+use their own search and don't need it.
+
 ## Run
 
 ```bash

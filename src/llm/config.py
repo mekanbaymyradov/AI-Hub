@@ -11,6 +11,8 @@ class LLMSettings(AppBaseSettings):
     google_api_key: SecretStr | None = None
     groq_api_key: SecretStr | None = None
     mistral_api_key: SecretStr | None = None
+    # Web search for models without built-in search; without it they get none.
+    tavily_api_key: SecretStr | None = None
 
 
 llm_settings = LLMSettings()
