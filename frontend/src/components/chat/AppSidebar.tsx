@@ -709,7 +709,7 @@ function ChatRowContent({
             <button
               type="button"
               aria-label={`Options for ${name}`}
-              className="opacity-0 pointer-coarse:opacity-100 group-hover/chat-row:opacity-100data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-fg-1 hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
+              className="opacity-0 pointer-coarse:opacity-100 group-hover/chat-row:opacity-100 data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-fg-1 hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
             >
               <MoreVertical className="h-3.5 w-3.5" />
             </button>
