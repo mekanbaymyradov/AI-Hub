@@ -71,13 +71,15 @@ class Grades(BaseModel):
             "Opens with the substance. When the user asked for something to be "
             "produced, such as code or an email, starting with it passes, "
             "including its natural first part like a code block or an email's "
-            "subject line. Otherwise the opening sentence answers the message. "
+            "subject line. For a calculation, brief working followed by the "
+            "result passes. Otherwise the opening sentence answers the message. "
             "Fails on a title or heading, a restatement of the topic, praise for "
             "the question, a hedge such as 'Both are great choices' or 'It "
             "depends' where the recommendation or key difference should be, or "
             "a lead-in such as 'Here's a…', 'Here is…', "
             "'Below is…' or 'Let's break it down', even when the content "
-            "follows. A direct, natural reply to small talk passes."
+            "follows. A direct, natural reply to small talk passes. Judge only "
+            "how it opens: a wrong answer fails correct_and_complete, not this."
         )
     )
     format_fits: Verdict = Field(
