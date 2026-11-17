@@ -130,12 +130,14 @@ class AppChatTransport extends DefaultChatTransport<ChatUIMessage> {
         throw new Error("Cannot regenerate reply without an active chat.");
       }
       try {
-        const created = await chatApi.createChat();
+        // Passed on, so Stop also cancels a chat that is still being created.
+        const created = await chatApi.createChat(options.abortSignal);
         resolvedChatId = created.id;
         if (!options.abortSignal?.aborted) {
           meta.onChatCreated?.(created);
         }
       } catch (error) {
+        if (options.abortSignal?.aborted) throw error;
         throw new Error(getErrorMessage(error, "Failed to start a new chat."), {
           cause: error,
         });
@@ -165,8 +167,8 @@ export const chatApi = {
     return response.data;
   },
 
-  createChat: async (): Promise<ChatPublic> => {
-    const response = await apiClient.post<ChatPublic>("/chats");
+  createChat: async (signal?: AbortSignal): Promise<ChatPublic> => {
+    const response = await apiClient.post<ChatPublic>("/chats", undefined, { signal });
     return response.data;
   },
 

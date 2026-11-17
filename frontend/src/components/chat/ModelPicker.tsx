@@ -49,7 +49,7 @@ export function ModelPicker({ models, selected, onSelect, effort, onEffortChange
           variant="ghost"
           disabled={disabled}
           aria-label={`Model: ${name}. Thinking: ${current.label}`}
-          className="h-8 gap-1.5 rounded-full pl-2 pr-1.5 sm:pl-2.5 sm:pr-2 text-xs font-medium text-fg-5 hover:bg-fill-1 hover:text-fg-1 dark:hover:bg-fill-1 cursor-pointer transition-colors"
+          className="h-8 pointer-coarse:h-11 gap-1.5 rounded-full pl-2 pr-1.5 sm:pl-2.5 sm:pr-2 text-xs font-medium text-fg-5 hover:bg-fill-1 hover:text-fg-1 dark:hover:bg-fill-1 cursor-pointer transition-colors"
         >
           {selected && <ModelLogo model={selected} className="size-4" />}
           <span className="truncate max-w-24 min-[400px]:max-w-36 sm:max-w-44">{name}</span>

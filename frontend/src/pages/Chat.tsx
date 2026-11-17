@@ -8,6 +8,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { chatTransport } from "@/api/chat";
 import { getErrorMessage } from "@/api/errors";
 import { type Effort } from "@/api/types";
+import { useStoredState } from "@/hooks/use-stored-state";
 import {
   prependChatToCache,
   queryKeys,
@@ -37,10 +38,23 @@ import {
 export default function Chat() {
   const queryClient = useQueryClient();
 
-  const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  // Saved, so a returning user finds the model and effort they last picked.
+  const [selectedModelId, setSelectedModelId] = useStoredState<string | null>(
+    "ai_hub_model",
+    null,
+    (value): value is string | null => typeof value === "string" || value === null
+  );
   // Kept here rather than in ChatInput so a retry answers with the same effort.
-  const [effort, setEffort] = useState<Effort | null>(null);
+  const [effort, setEffort] = useStoredState<Effort | null>(
+    "ai_hub_effort",
+    null,
+    (value): value is Effort | null => value === null || value === "low" || value === "medium" || value === "high"
+  );
   const { data: models = [] } = useModels();
+  // Read out by screen readers, which can't see the reply start, finish or fail.
+  const [announcement, setAnnouncement] = useState("");
+  // A saved model the API no longer offers falls back to the first, as ChatInput shows it.
+  const activeModelId = models.some((m) => m.id === selectedModelId) ? selectedModelId : (models[0]?.id ?? null);
 
   // The open chat lives in the URL, so a reload or a shared link reopens it.
   const navigate = useNavigate();
@@ -75,10 +89,11 @@ export default function Chat() {
         updateChatNameInCache(queryClient, streamChatIdRef.current, dataPart.data.name);
       }
     },
-    onFinish: () => {
+    onFinish: ({ isAbort, isError }) => {
       if (streamChatIdRef.current !== null) {
         dirtyChatIdRef.current = streamChatIdRef.current;
       }
+      setAnnouncement(isError ? "The reply failed." : isAbort ? "Reply stopped." : "Reply ready.");
     },
   });
 
@@ -179,11 +194,24 @@ export default function Chat() {
     navigate("/");
   }, [clearError, navigate, queryClient, setMessages, stop]);
 
+  // The shortcut ChatGPT uses, so it's already familiar to many people.
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "o") {
+        e.preventDefault();
+        handleNewThread();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [handleNewThread]);
+
   const handleSend = async ({ prompt, attachments, modelId, effort }: OutgoingMessage) => {
     if (isStreaming) return;
 
     const sendText = prompt || "Attached files";
     clearError();
+    setAnnouncement("Writing a reply…");
     streamChatIdRef.current = activeChatId;
 
     if (activeChatId !== null) {
@@ -224,10 +252,11 @@ export default function Chat() {
     async (targetModelId?: string) => {
       if (isStreaming || activeChatId === null) return;
 
-      const modelToUse = targetModelId || selectedModelId || models[0]?.id;
+      const modelToUse = targetModelId || activeModelId;
       if (!modelToUse) return;
 
       clearError();
+      setAnnouncement("Writing a reply…");
       streamChatIdRef.current = activeChatId;
       touchChatInCache(queryClient, activeChatId);
 
@@ -247,7 +276,7 @@ export default function Chat() {
         metadata: requestMetadata,
       });
     },
-    [isStreaming, activeChatId, selectedModelId, effort, models, clearError, queryClient, regenerate]
+    [isStreaming, activeChatId, activeModelId, selectedModelId, effort, models, clearError, queryClient, regenerate, setSelectedModelId]
   );
 
   const lastChatMessage = chatMessages[chatMessages.length - 1];
@@ -277,7 +306,7 @@ export default function Chat() {
           id: `${lastMsg.id}-pending`,
           role: "ai",
           content: "",
-          modelId: selectedModelId,
+          modelId: activeModelId,
         });
       } else if (streamErrorText) {
         rendered.push({
@@ -285,15 +314,16 @@ export default function Chat() {
           role: "ai",
           content: "",
           error: streamErrorText,
-          modelId: selectedModelId,
+          modelId: activeModelId,
         });
       }
     }
 
     return rendered;
-  }, [chatMessages, isStreaming, streamErrorText, selectedModelId]);
+  }, [chatMessages, isStreaming, streamErrorText, activeModelId]);
 
   const isInitialState = activeChatId === null && messages.length === 0 && !isStreaming;
+  const lastPrompt = messages.findLast((m) => m.role === "user")?.content;
 
   return (
     <SidebarProvider>
@@ -305,6 +335,7 @@ export default function Chat() {
         />
 
         <main className="flex flex-col flex-1 min-w-0 h-full overflow-hidden relative">
+          <p role="status" className="sr-only">{announcement}</p>
           <ChatHeader chatId={activeChatId} chatTitle={currentChatTitle} onNewThread={handleNewThread} />
 
           {/* A crash in a message leaves the sidebar and input usable. */}
@@ -323,6 +354,8 @@ export default function Chat() {
           </ErrorBoundary>
 
           <ChatInput
+            chatId={activeChatId}
+            lastPrompt={lastPrompt}
             onSend={handleSend}
             onStop={handleStopGeneration}
             isStreaming={isStreaming}
