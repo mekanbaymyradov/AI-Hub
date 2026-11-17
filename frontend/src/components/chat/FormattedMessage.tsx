@@ -53,34 +53,23 @@ function CodeBlock({ node, children }: { node?: Element; children?: ReactNode })
   };
 
   return (
-    <div className="relative my-3.5 w-full max-w-full rounded-xl overflow-hidden border border-line-2 bg-code shadow-xs dark:shadow-md">
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-b border-line-2 text-xs select-none">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 opacity-60">
-            <span className="h-2.5 w-2.5 rounded-full bg-red-500/80" />
-            <span className="h-2.5 w-2.5 rounded-full bg-yellow-500/80" />
-            <span className="h-2.5 w-2.5 rounded-full bg-green-500/80" />
-          </div>
-          <span className="font-mono text-[11px] font-medium tracking-wider uppercase text-fg-7 ml-1.5">
-            {language ?? "code"}
-          </span>
-        </div>
+    // overflow-clip, not hidden: hidden makes this a scroll container and the
+    // sticky header would stop following the chat's scroll.
+    <div className="relative my-3.5 w-full max-w-full rounded-xl overflow-clip border border-line-2 bg-code shadow-xs dark:shadow-md">
+      {/* No z-index: one would lift the header above the composer, which overlays the bottom of the list. */}
+      <div className="sticky top-0 flex items-center justify-between px-3.5 py-1.5 bg-zinc-100 dark:bg-zinc-900 border-b border-line-2 select-none">
+        <span className="font-mono text-xs font-semibold text-fg-2">{language ?? "code"}</span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 py-1 px-2.5 rounded-md text-fg-7 hover:bg-zinc-200 hover:text-fg-1 dark:hover:bg-white/10 transition-colors cursor-pointer text-[11px]"
-          title="Copy code"
+          className="flex items-center justify-center size-7 rounded-md text-fg-6 hover:bg-zinc-200 hover:text-fg-1 dark:hover:bg-white/10 transition-colors cursor-pointer"
+          title={copied ? "Copied!" : "Copy code"}
+          aria-label="Copy code"
         >
           {copied ? (
-            <>
-              <Check className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-              <span className="text-emerald-600 dark:text-emerald-400 font-medium">Copied!</span>
-            </>
+            <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           ) : (
-            <>
-              <Copy className="h-3.5 w-3.5" />
-              <span>Copy</span>
-            </>
+            <Copy className="h-4 w-4" />
           )}
         </button>
       </div>
@@ -192,7 +181,7 @@ export function FormattedMessage({ content, isStreaming }: FormattedMessageProps
   const markdown = normalizeMath(content);
 
   return (
-    <div className="formatted-message w-full min-w-0 max-w-full overflow-hidden">
+    <div className="formatted-message w-full min-w-0 max-w-full overflow-clip">
       {/* While a reply streams only its last block changes, so blocks render
           apart and the finished ones are skipped. A done reply renders whole,
           since footnotes and link definitions can point across blocks. */}
