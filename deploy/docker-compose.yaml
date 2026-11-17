@@ -69,6 +69,8 @@ services:
       ENVIRONMENT: production
       LOGFIRE_CONSOLE_MIN_LOG_LEVEL: warn
       LOGFIRE_SERVICE_VERSION: ${IMAGE_TAG}
+      # Each job exits within a second, before a Fleet policy can arrive.
+      OTEL_OPAMP_DISABLED: "true"
       POSTGRES_HOST: postgres
       REDIS_HOST: redis
     command: ["supercronic", "-passthrough-logs", "/app/crontab"]

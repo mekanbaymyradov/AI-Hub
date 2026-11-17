@@ -66,6 +66,8 @@ services:
       REDIS_HOST: redis
       LOGFIRE_CONSOLE_VERBOSE: true
       LOGFIRE_CONSOLE_COLORS: always
+      # Each job exits within a second, before a Fleet policy can arrive.
+      OTEL_OPAMP_DISABLED: "true"
     restart: unless-stopped
     command: ["supercronic", "-passthrough-logs", "/app/crontab"]
     depends_on:
