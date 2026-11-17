@@ -31,12 +31,12 @@ const FormattedMessage = lazy(() =>
   formattedMessageModule.then((m) => ({ default: m.FormattedMessage }))
 );
 
-// Named after the API's tool chunks; native and DuckDuckGo search share a label.
+// Named after the API's tool chunks; the provider's native search and our fallback share a label.
 const TOOL_LABELS: Record<string, string> = {
   get_weather: "Checking the weather…",
   get_current_time: "Checking the time…",
   web_search: "Searching the web…",
-  duckduckgo_search: "Searching the web…",
+  search_web: "Searching the web…",
 };
 
 interface ChatMessageItemProps {
