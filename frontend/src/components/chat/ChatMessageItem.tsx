@@ -232,11 +232,11 @@ export const ChatMessageItem = memo(
             </div>
           </div>
         ) : (
-          <div className="flex gap-2.5 sm:gap-4 w-full min-w-0 max-w-full overflow-hidden">
+          <div className="flex gap-2.5 sm:gap-4 w-full min-w-0 max-w-full overflow-clip">
             <span className="flex size-7 sm:size-8 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-blue-50 mt-1 dark:border-white/10 dark:bg-zinc-900">
               <img src="/favicon.svg" alt="AI-Hub" className="size-4 sm:size-5 object-contain" />
             </span>
-            <div className="flex-1 min-w-0 max-w-full overflow-hidden mt-1 text-[14px] sm:text-[15px] text-zinc-800 dark:text-zinc-300 leading-relaxed">
+            <div className="flex-1 min-w-0 max-w-full overflow-clip mt-1 text-[14px] sm:text-[15px] text-zinc-800 dark:text-zinc-300 leading-relaxed">
               {message.reasoning && (
                 <div className="mb-2.5">
                   <button
