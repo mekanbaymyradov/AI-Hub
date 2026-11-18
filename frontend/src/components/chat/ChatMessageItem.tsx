@@ -10,9 +10,10 @@ import {
   FileText,
   Loader2,
   RotateCcw,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { copyToClipboard } from "@/lib/clipboard";
+import { useCopy } from "@/hooks/use-copy";
 import { type ModelPublic } from "@/api/types";
 import {
   DropdownMenu,
@@ -65,7 +66,7 @@ export const ChatMessageItem = memo(
     failedModelId = null,
   }: ChatMessageItemProps) {
     const [userReasoningOpen, setUserReasoningOpen] = useState<boolean | null>(null);
-    const [copied, setCopied] = useState(false);
+    const [copyState, copy] = useCopy();
     const isUser = message.role === "user";
     const isReasoningStreaming = Boolean(
       !isUser && isStreaming && isLastMessage && message.isReasoningStreaming
@@ -73,14 +74,9 @@ export const ChatMessageItem = memo(
     // Auto-expand while actively thinking, then auto-collapse once the answer starts unless toggled.
     const isReasoningOpen = userReasoningOpen ?? (isReasoningStreaming && !message.content);
 
-    const handleCopy = useCallback(async () => {
-      if (!message.content) return;
-      const ok = await copyToClipboard(message.content);
-      if (ok) {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      }
-    }, [message.content]);
+    const handleCopy = useCallback(() => {
+      if (message.content) void copy(message.content);
+    }, [message.content, copy]);
 
     const modelDisplayName = message.modelId
       ? models?.find((m) => m.id === message.modelId)?.display_name
@@ -161,7 +157,7 @@ export const ChatMessageItem = memo(
                     type="button"
                     onClick={() => onRetry(failedModelId || undefined)}
                     disabled={isStreaming}
-                    className="inline-flex items-center justify-center size-7 rounded-lg border border-line-2 bg-tile hover:bg-zinc-50 dark:hover:bg-zinc-800 text-fg-6 hover:text-fg-2 transition-colors disabled:opacity-50 cursor-pointer select-none shadow-2xs"
+                    className="inline-flex items-center justify-center size-7 pointer-coarse:size-10 rounded-lg border border-line-2 bg-tile hover:bg-zinc-50 dark:hover:bg-zinc-800 text-fg-6 hover:text-fg-2 transition-colors disabled:opacity-50 cursor-pointer select-none shadow-2xs"
                     title="Retry"
                     aria-label="Retry"
                   >
@@ -219,11 +215,13 @@ export const ChatMessageItem = memo(
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="inline-flex items-center justify-center size-7 rounded-lg text-zinc-400 hover:text-fg-5 hover:bg-fill-3 transition-colors cursor-pointer select-none"
-                  title="Copy message"
+                  className="inline-flex items-center justify-center size-7 pointer-coarse:size-10 rounded-lg text-zinc-400 hover:text-fg-5 hover:bg-fill-3 transition-colors cursor-pointer select-none"
+                  title={copyState === "failed" ? "Couldn't copy" : "Copy message"}
                 >
-                  {copied ? (
+                  {copyState === "copied" ? (
                     <Check className="h-3.5 w-3.5 text-green-500" />
+                  ) : copyState === "failed" ? (
+                    <X className="h-3.5 w-3.5 text-red-500" />
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
@@ -334,13 +332,18 @@ export const ChatMessageItem = memo(
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-fill-1 hover:text-fg-4 transition-colors text-xs font-medium cursor-pointer select-none"
+                    className="inline-flex items-center gap-1.5 px-2.5 py-1 pointer-coarse:min-h-10 rounded-lg hover:bg-fill-1 hover:text-fg-4 transition-colors text-xs font-medium cursor-pointer select-none"
                     title="Copy response"
                   >
-                    {copied ? (
+                    {copyState === "copied" ? (
                       <>
                         <Check className="h-3.5 w-3.5 text-green-500" />
                         <span className="text-xs text-green-500">Copied</span>
+                      </>
+                    ) : copyState === "failed" ? (
+                      <>
+                        <X className="h-3.5 w-3.5 text-red-500" />
+                        <span className="text-xs text-red-500">Couldn't copy</span>
                       </>
                     ) : (
                       <>

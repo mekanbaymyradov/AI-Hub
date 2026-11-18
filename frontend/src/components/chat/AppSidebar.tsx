@@ -52,12 +52,12 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { IS_MAC, NEW_CHAT_KEYS } from "@/lib/shortcuts";
 import { ConfirmModal } from "./ConfirmModal";
 import { MENU_CONTENT, MENU_ITEM, MENU_ITEM_DANGER, MENU_ITEM_SELECTED } from "./menu-styles";
 import { ProfileSettingsModal } from "./ProfileSettingsModal";
 import { RenameChatModal } from "./RenameChatModal";
 
-const IS_MAC = /Mac|iPhone|iPad/.test(navigator.userAgent);
 
 // Shown at the top of the list while the open chat hasn't been created yet.
 const NEW_CHAT_LABEL = "New Chat";
@@ -259,7 +259,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   if (isSelectionMode) handleCancelSelection();
                   handleNewThread();
                 }}
-                tooltip="New thread"
+                tooltip={`New thread  ${NEW_CHAT_KEYS}`}
                 className={cn(
                   "group/new-btn relative transition-all duration-200 overflow-hidden cursor-pointer active:scale-[0.97]",
                   "group-data-[state=expanded]:w-full group-data-[state=expanded]:h-10 group-data-[state=expanded]:px-2.5",
@@ -283,6 +283,9 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                       New thread
                     </span>
                   </div>
+                  <kbd className="hidden shrink-0 rounded border border-line-1 bg-fill-1 px-1.5 py-0.5 font-mono text-[10px] font-medium text-fg-6 shadow-xs group-hover/new-btn:inline group-data-[state=collapsed]:hidden">
+                    {NEW_CHAT_KEYS}
+                  </kbd>
                 </div>
               </SidebarMenuButton>
             </SidebarMenuItem>

@@ -9,17 +9,20 @@ import {
   type KeyboardEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertCircle, ArrowUp, Check, FileText, Loader2, Mic, Paperclip, Square, X } from "lucide-react";
+import { AlertCircle, ArrowUp, Check, FileText, Loader2, Mic, Paperclip, Square, WifiOff, X } from "lucide-react";
 
 import { chatApi } from "@/api/chat";
 import { getErrorMessage } from "@/api/errors";
 import { useModels } from "@/api/queries";
 import { type AttachmentPublic, type Effort } from "@/api/types";
 import { cn } from "@/lib/utils";
+import { draftKey, readDraft, saveDraft } from "@/lib/drafts";
+import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useOnline } from "@/hooks/use-online";
 import { canRecordVoice, useVoiceInput } from "@/hooks/use-voice-input";
 import { ChatGreeting } from "./ChatGreeting";
 import { ModelPicker } from "./ModelPicker";
@@ -38,6 +41,10 @@ export interface OutgoingMessage {
 }
 
 interface ChatInputProps {
+  // Which chat the composer writes to, so each keeps its own draft; null is a new chat.
+  chatId: number | null;
+  // The last prompt sent in this chat, which Up in an empty composer brings back.
+  lastPrompt?: string;
   onSend: (message: OutgoingMessage) => void;
   onStop: () => void;
   isStreaming: boolean;
@@ -69,6 +76,8 @@ function attachmentProblem(files: File[], alreadyAttached: number): string | nul
 }
 
 export function ChatInput({
+  chatId,
+  lastPrompt,
   onSend,
   onStop,
   isStreaming,
@@ -78,7 +87,19 @@ export function ChatInput({
   effort,
   onEffortChange,
 }: ChatInputProps) {
-  const [input, setInput] = useState("");
+  const { user } = useAuth();
+  const draft = draftKey(user?.id, chatId);
+  const [input, setInput] = useState(() => readDraft(draft));
+  // Swapped during the render that changes chats, so the old chat's text never shows in the new one.
+  const [shownDraft, setShownDraft] = useState(draft);
+  if (shownDraft !== draft) {
+    setShownDraft(draft);
+    setInput(readDraft(draft));
+  }
+
+  useEffect(() => {
+    saveDraft(draft, input);
+  }, [draft, input]);
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
   const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
@@ -106,6 +127,7 @@ export function ChatInput({
   });
   const isDictating = voice.state === "recording" || voice.state === "transcribing";
   const error = voice.error ?? attachmentError;
+  const isOnline = useOnline();
 
   const canAttach = !isUploadingAttachments && !isStreaming;
 
@@ -171,7 +193,7 @@ export function ChatInput({
 
   const handleSubmit = (e?: FormEvent) => {
     e?.preventDefault();
-    if ((!input.trim() && attachments.length === 0) || isStreaming || isUploadingAttachments || isDictating) return;
+    if ((!input.trim() && attachments.length === 0) || isStreaming || isUploadingAttachments || isDictating || !isOnline) return;
     if (!selectedModel) return;
 
     if (attachments.length > 0 && !modelSupportsFiles) {
@@ -194,6 +216,12 @@ export function ChatInput({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
+    } else if (e.key === "Escape" && isStreaming) {
+      e.preventDefault();
+      onStop();
+    } else if (e.key === "ArrowUp" && !input && lastPrompt) {
+      e.preventDefault();
+      setInput(lastPrompt);
     }
   };
 
@@ -222,6 +250,12 @@ export function ChatInput({
             onDrop={handleDrop}
             className={cn("relative flex flex-col bg-composer border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
           >
+            {!isOnline && (
+              <div role="status" className="flex items-center gap-1.5 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                <WifiOff className="h-3.5 w-3.5 shrink-0" />
+                <span className="truncate">You're offline. Your message is saved here until you reconnect.</span>
+              </div>
+            )}
             {error && (
               <div className="flex items-center justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
                 <div className="flex items-center gap-1.5 min-w-0">
@@ -295,7 +329,7 @@ export function ChatInput({
                   size="icon"
                   aria-label="Cancel dictation"
                   onClick={voice.cancel}
-                  className="h-8 w-8 shrink-0 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
+                  className="h-8 w-8 pointer-coarse:size-11 shrink-0 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -313,7 +347,7 @@ export function ChatInput({
                   disabled={voice.state === "transcribing"}
                   // Focused when the bar appears, since the mic button that had focus is gone.
                   autoFocus
-                  className="h-8 w-8 shrink-0 rounded-full bg-blue-600 hover:bg-blue-700 text-white p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer disabled:opacity-80 disabled:cursor-default"
+                  className="h-8 w-8 pointer-coarse:size-11 shrink-0 rounded-full bg-blue-600 hover:bg-blue-700 text-white p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer disabled:opacity-80 disabled:cursor-default"
                 >
                   {voice.state === "transcribing" ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -343,7 +377,7 @@ export function ChatInput({
                         onClick={() => fileInputRef.current?.click()}
                         disabled={!canAttach || !modelSupportsFiles}
                         className={cn(
-                          "h-8 w-8 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer",
+                          "h-8 w-8 pointer-coarse:size-11 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer",
                           !modelSupportsFiles && "opacity-40 cursor-not-allowed hover:bg-transparent hover:text-zinc-400"
                         )}
                       >
@@ -384,7 +418,7 @@ export function ChatInput({
                           aria-label="Dictate"
                           onClick={voice.start}
                           disabled={voice.state === "starting"}
-                          className="h-8 w-8 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
+                          className="h-8 w-8 pointer-coarse:size-11 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
                         >
                           {voice.state === "starting" ? (
                             <Loader2 className="h-4 w-4 animate-spin text-zinc-400" />
@@ -404,8 +438,9 @@ export function ChatInput({
                       type="button"
                       onClick={onStop}
                       aria-label="Stop generation"
-                      title="Stop generation"
-                      className="h-8 w-8 rounded-full bg-red-600 hover:bg-red-500 text-white p-0 flex items-center justify-center transition-all shadow-none cursor-pointer"
+                      aria-keyshortcuts="Escape"
+                      title="Stop generation (Esc)"
+                      className="h-8 w-8 pointer-coarse:size-11 rounded-full bg-red-600 hover:bg-red-500 text-white p-0 flex items-center justify-center transition-all shadow-none cursor-pointer"
                     >
                       <Square className="h-3 w-3 fill-current" />
                     </Button>
@@ -413,8 +448,8 @@ export function ChatInput({
                     <Button
                       type="submit"
                       aria-label="Send message"
-                      disabled={(!input.trim() && attachments.length === 0) || isUploadingAttachments}
-                      className="h-8 w-8 rounded-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
+                      disabled={(!input.trim() && attachments.length === 0) || isUploadingAttachments || !isOnline}
+                      className="h-8 w-8 pointer-coarse:size-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
                     >
                       <ArrowUp className="h-4 w-4" />
                     </Button>

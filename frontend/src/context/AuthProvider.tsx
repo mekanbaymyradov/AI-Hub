@@ -4,6 +4,7 @@ import { authApi } from "@/api/auth";
 import { type UserPublic, type UserUpdate } from "@/api/types";
 import { setAccessToken, setSessionExpiredHandler } from "@/api/axiosInstance";
 import { AuthContext } from "@/context/auth";
+import { clearDrafts } from "@/lib/drafts";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
@@ -19,9 +20,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOutLocally = useCallback(() => {
     setAccessToken(null);
     setUser(null);
-    // So the next account to sign in on this tab never sees this one's chats.
+    // So the next account to sign in on this tab never sees this one's chats or drafts.
     // Queries only: clear() would also drop the logout mutation still running.
     queryClient.removeQueries();
+    clearDrafts();
   }, [queryClient]);
 
   // Declared before the effect below, so it is set before the first refresh can fail.

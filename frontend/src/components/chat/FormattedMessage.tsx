@@ -1,4 +1,4 @@
-import { memo, useState, type ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import Markdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -6,11 +6,11 @@ import remarkParse from "remark-parse";
 import { unified } from "unified";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
-import { Check, Copy } from "lucide-react";
+import { Check, Copy, X } from "lucide-react";
 import type { Element, ElementContent } from "hast";
 import type { Nodes, Root } from "mdast";
 import "katex/dist/katex.min.css";
-import { copyToClipboard } from "@/lib/clipboard";
+import { useCopy } from "@/hooks/use-copy";
 import { normalizeMath } from "./normalize-math";
 
 interface FormattedMessageProps {
@@ -36,20 +36,16 @@ function textOf(node: ElementContent): string {
 }
 
 function CodeBlock({ node, children }: { node?: Element; children?: ReactNode }) {
-  const [copied, setCopied] = useState(false);
+  const [copyState, copy] = useCopy();
 
   const code = node?.children.find((child): child is Element => child.type === "element");
   const language = (code?.properties.className as string[] | undefined)
     ?.find((name) => name.startsWith("language-"))
     ?.slice("language-".length);
 
-  const handleCopy = async () => {
+  const handleCopy = () => {
     // The parser ends every code block with a newline the model didn't write.
-    const ok = await copyToClipboard(code ? textOf(code).replace(/\n$/, "") : "");
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
+    void copy(code ? textOf(code).replace(/\n$/, "") : "");
   };
 
   return (
@@ -62,12 +58,14 @@ function CodeBlock({ node, children }: { node?: Element; children?: ReactNode })
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center justify-center size-7 rounded-md text-fg-6 hover:bg-zinc-200 hover:text-fg-1 dark:hover:bg-white/10 transition-colors cursor-pointer"
-          title={copied ? "Copied!" : "Copy code"}
+          className="flex items-center justify-center size-7 pointer-coarse:size-10 rounded-md text-fg-6 hover:bg-zinc-200 hover:text-fg-1 dark:hover:bg-white/10 transition-colors cursor-pointer"
+          title={copyState === "copied" ? "Copied!" : copyState === "failed" ? "Couldn't copy" : "Copy code"}
           aria-label="Copy code"
         >
-          {copied ? (
+          {copyState === "copied" ? (
             <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          ) : copyState === "failed" ? (
+            <X className="h-4 w-4 text-red-500" />
           ) : (
             <Copy className="h-4 w-4" />
           )}
