@@ -1,37 +1,23 @@
 import { memo } from "react";
 import { motion } from "framer-motion";
 import { Code2, FileText, Lightbulb, Sparkles } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { useAuth } from "@/context/auth";
 import { displayName } from "@/lib/user";
 
+// The prompt is in the user's language too, so the reply comes back in it.
 const STARTER_PROMPTS = [
-  {
-    icon: Code2,
-    label: "Write & debug code",
-    prompt: "Help me write and optimize a clean, modular code solution.",
-  },
-  {
-    icon: Lightbulb,
-    label: "Brainstorm ideas",
-    prompt: "Let's brainstorm creative and practical ideas for my next project.",
-  },
-  {
-    icon: FileText,
-    label: "Summarize text",
-    prompt: "Summarize the key takeaways and actionable points from this text.",
-  },
-  {
-    icon: Sparkles,
-    label: "Explain a concept",
-    prompt: "Explain this concept in a clear, beginner-friendly way with examples.",
-  },
-];
+  { icon: Code2, key: "code" },
+  { icon: Lightbulb, key: "ideas" },
+  { icon: FileText, key: "summarize" },
+  { icon: Sparkles, key: "explain" },
+] as const;
 
-function timeGreeting(hour: number): string {
-  if (hour >= 5 && hour < 12) return "Good morning";
-  if (hour >= 12 && hour < 17) return "Good afternoon";
-  if (hour >= 17 && hour < 22) return "Good evening";
-  return "Welcome back";
+function timeGreeting(hour: number) {
+  if (hour >= 5 && hour < 12) return "greeting.morning";
+  if (hour >= 12 && hour < 17) return "greeting.afternoon";
+  if (hour >= 17 && hour < 22) return "greeting.evening";
+  return "greeting.welcomeBack";
 }
 
 interface ChatGreetingProps {
@@ -40,6 +26,7 @@ interface ChatGreetingProps {
 
 export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatGreetingProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
 
   return (
     <motion.div
@@ -57,7 +44,7 @@ export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatG
       </div>
 
       <h2 className="text-xl sm:text-3xl md:text-[32px] font-semibold tracking-tight text-fg-1 leading-tight">
-        {timeGreeting(new Date().getHours())}
+        {t(timeGreeting(new Date().getHours()))}
         {user && (
           <>
             {", "}
@@ -67,15 +54,15 @@ export const ChatGreeting = memo(function ChatGreeting({ onSelectPrompt }: ChatG
       </h2>
 
       <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2 mt-3 sm:mt-5">
-        {STARTER_PROMPTS.map(({ icon: Icon, label, prompt }) => (
+        {STARTER_PROMPTS.map(({ icon: Icon, key }) => (
           <button
-            key={label}
+            key={key}
             type="button"
-            onClick={() => onSelectPrompt(prompt)}
+            onClick={() => onSelectPrompt(t(`greeting.${key}.prompt`))}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-tile/80 hover:bg-fill-3 text-fg-6 hover:text-fg-1 border border-line-3 hover:border-blue-500/40 dark:hover:border-blue-500/40 transition-all shadow-2xs cursor-pointer group"
           >
             <Icon className="w-3.5 h-3.5 text-fg-8 group-hover:text-blue-500 transition-colors" />
-            <span>{label}</span>
+            <span>{t(`greeting.${key}.label`)}</span>
           </button>
         ))}
       </div>

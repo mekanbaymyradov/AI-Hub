@@ -1,10 +1,12 @@
 import { MotionConfig, motion } from 'framer-motion';
+import { useTranslation } from 'react-i18next';
 import SectionHeading from '@/components/SectionHeading';
 import { REPO_URL } from '@/lib/links';
 
 const STACK = ['FastAPI', 'Pydantic AI', 'PostgreSQL', 'Redis', 'Cloudflare R2', 'Logfire', 'React', 'Tailwind CSS'];
 
 export default function About() {
+  const { t } = useTranslation();
   return (
     // No top padding: the features section's bottom padding already spaces it. The scroll margin keeps
     // the heading clear of the fixed navbar when the About link jumps here.
@@ -18,9 +20,9 @@ export default function About() {
           className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8"
         >
           <SectionHeading
-            title="Open source."
-            highlight="Built in public."
-            description="AI-Hub is an MIT-licensed project. Read the code, run it yourself, or help build it."
+            title={t('landing.about.title')}
+            highlight={t('landing.about.highlight')}
+            description={t('landing.about.description')}
           />
 
           <div className="mt-8 flex justify-center">
@@ -37,12 +39,12 @@ export default function About() {
                   clipRule="evenodd"
                 />
               </svg>
-              View on GitHub
+              {t('landing.about.github')}
             </a>
           </div>
 
           <p className="mt-12 text-center text-xs font-medium tracking-wider text-zinc-400 uppercase dark:text-zinc-500">
-            Built with
+            {t('landing.about.builtWith')}
           </p>
           <ul className="mt-4 flex flex-wrap justify-center gap-2">
             {STACK.map((name) => (

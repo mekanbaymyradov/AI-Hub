@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { type LucideIcon } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Modal, ModalDescription, ModalTitle } from "@/components/Modal";
 
@@ -29,6 +30,7 @@ export function ConfirmModal({
   confirmLabel,
   pendingLabel,
 }: ConfirmModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal open={open} onClose={onClose} dismissible={!pending} className="space-y-4">
       <div className="space-y-1.5">
@@ -55,7 +57,7 @@ export function ConfirmModal({
           disabled={pending}
           className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
         >
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button
           type="button"

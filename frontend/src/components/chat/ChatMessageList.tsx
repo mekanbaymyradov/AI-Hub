@@ -1,5 +1,6 @@
 import { useRef, useLayoutEffect, useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { ArrowDown, Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useLoadMore, type PageLoader } from "@/hooks/use-load-more";
@@ -30,6 +31,7 @@ export function ChatMessageList({
   lastPromptHasAttachments,
   onRetry,
 }: ChatMessageListProps) {
+  const { t } = useTranslation();
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const loadOlderRef = useLoadMore(olderMessages);
   // What the list looked like at the last render, to tell older messages
@@ -141,7 +143,7 @@ export function ChatMessageList({
         <button
           type="button"
           onClick={jumpToLatest}
-          aria-label="Jump to latest message"
+          aria-label={t("message.jumpToLatest")}
           className="absolute z-10 left-1/2 -translate-x-1/2 bottom-36 sm:bottom-44 flex h-9 w-9 items-center justify-center rounded-full border border-line-1 bg-composer text-fg-5 shadow-md hover:text-fg-1 cursor-pointer"
         >
           <ArrowDown className="h-4 w-4" />

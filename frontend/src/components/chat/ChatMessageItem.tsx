@@ -1,4 +1,5 @@
 import { lazy, memo, Suspense, useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertCircle,
@@ -33,12 +34,12 @@ const FormattedMessage = lazy(() =>
 );
 
 // Named after the API's tool chunks; the provider's native search and our fallback share a label.
-const TOOL_LABELS: Record<string, string> = {
-  get_weather: "Checking the weather…",
-  get_current_time: "Checking the time…",
-  web_search: "Searching the web…",
-  search_web: "Searching the web…",
-};
+const TOOL_LABELS = {
+  get_weather: "message.tools.get_weather",
+  get_current_time: "message.tools.get_current_time",
+  web_search: "message.tools.web_search",
+  search_web: "message.tools.search_web",
+} as const;
 
 interface ChatMessageItemProps {
   message: UIMessage;
@@ -67,6 +68,7 @@ export const ChatMessageItem = memo(
   }: ChatMessageItemProps) {
     const [userReasoningOpen, setUserReasoningOpen] = useState<boolean | null>(null);
     const [copyState, copy] = useCopy();
+    const { t } = useTranslation();
     const isUser = message.role === "user";
     const isReasoningStreaming = Boolean(
       !isUser && isStreaming && isLastMessage && message.isReasoningStreaming
@@ -158,8 +160,8 @@ export const ChatMessageItem = memo(
                     onClick={() => onRetry(failedModelId || undefined)}
                     disabled={isStreaming}
                     className="inline-flex items-center justify-center size-7 pointer-coarse:size-10 rounded-lg border border-line-2 bg-tile hover:bg-zinc-50 dark:hover:bg-zinc-800 text-fg-6 hover:text-fg-2 transition-colors disabled:opacity-50 cursor-pointer select-none shadow-2xs"
-                    title="Retry"
-                    aria-label="Retry"
+                    title={t("message.retry")}
+                    aria-label={t("message.retry")}
                   >
                     <RotateCcw className="h-3.5 w-3.5" />
                   </button>
@@ -176,14 +178,14 @@ export const ChatMessageItem = memo(
                             disabled={isStreaming}
                             className="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg border border-line-2 bg-tile hover:bg-zinc-50 dark:hover:bg-zinc-800 text-fg-4 font-medium text-xs transition-colors cursor-pointer disabled:opacity-50 select-none shadow-2xs"
                           >
-                            <span>Try another model</span>
+                            <span>{t("message.tryAnotherModel")}</span>
                             <ChevronDown className="h-3 w-3 opacity-60" />
                           </button>
                         }
                       />
                       <DropdownMenuContent side="bottom" align="end" sideOffset={6} className={cn(MENU_CONTENT, "w-52 p-1")}>
                         <div className="px-2 py-1 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">
-                          Select a model
+                          {t("message.retryWith")}
                         </div>
                         {otherModels.map((model) => {
                           const fileIncompatible = Boolean(lastPromptHasAttachments && !model.supports_files);
@@ -200,7 +202,7 @@ export const ChatMessageItem = memo(
                             >
                               <span className="truncate">{model.display_name}</span>
                               {fileIncompatible && (
-                                <span className="text-[10px] text-fg-8 shrink-0">No files</span>
+                                <span className="text-[10px] text-fg-8 shrink-0">{t("message.noFiles")}</span>
                               )}
                             </DropdownMenuItem>
                           );
@@ -216,7 +218,7 @@ export const ChatMessageItem = memo(
                   type="button"
                   onClick={handleCopy}
                   className="inline-flex items-center justify-center size-7 pointer-coarse:size-10 rounded-lg text-zinc-400 hover:text-fg-5 hover:bg-fill-3 transition-colors cursor-pointer select-none"
-                  title={copyState === "failed" ? "Couldn't copy" : "Copy message"}
+                  title={copyState === "failed" ? t("message.copyFailed") : t("message.copyMessage")}
                 >
                   {copyState === "copied" ? (
                     <Check className="h-3.5 w-3.5 text-green-500" />
@@ -251,7 +253,7 @@ export const ChatMessageItem = memo(
                           : "text-fg-8"
                       )}
                     />
-                    <span>{isReasoningStreaming ? "Thinking…" : "Thought process"}</span>
+                    <span>{isReasoningStreaming ? t("message.thinking") : t("message.thoughtProcess")}</span>
                     <ChevronRight
                       className={cn(
                         "h-3.5 w-3.5 text-zinc-400 transition-transform duration-200",
@@ -323,7 +325,11 @@ export const ChatMessageItem = memo(
               {activeTool && (
                 <div className="flex items-center gap-2 h-6 px-1 text-sm text-fg-7">
                   <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
-                  <span>{TOOL_LABELS[activeTool] ?? `Using ${activeTool}…`}</span>
+                  <span>
+                    {activeTool in TOOL_LABELS
+                      ? t(TOOL_LABELS[activeTool as keyof typeof TOOL_LABELS])
+                      : t("message.tools.other", { tool: activeTool })}
+                  </span>
                 </div>
               )}
 
@@ -333,22 +339,22 @@ export const ChatMessageItem = memo(
                     type="button"
                     onClick={handleCopy}
                     className="inline-flex items-center gap-1.5 px-2.5 py-1 pointer-coarse:min-h-10 rounded-lg hover:bg-fill-1 hover:text-fg-4 transition-colors text-xs font-medium cursor-pointer select-none"
-                    title="Copy response"
+                    title={t("message.copyResponse")}
                   >
                     {copyState === "copied" ? (
                       <>
                         <Check className="h-3.5 w-3.5 text-green-500" />
-                        <span className="text-xs text-green-500">Copied</span>
+                        <span className="text-xs text-green-500">{t("message.copied")}</span>
                       </>
                     ) : copyState === "failed" ? (
                       <>
                         <X className="h-3.5 w-3.5 text-red-500" />
-                        <span className="text-xs text-red-500">Couldn't copy</span>
+                        <span className="text-xs text-red-500">{t("message.copyFailed")}</span>
                       </>
                     ) : (
                       <>
                         <Copy className="h-3.5 w-3.5" />
-                        <span className="text-xs">Copy</span>
+                        <span className="text-xs">{t("message.copy")}</span>
                       </>
                     )}
                   </button>

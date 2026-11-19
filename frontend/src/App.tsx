@@ -1,5 +1,6 @@
 import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useTranslation } from "react-i18next";
 import { AuthProvider } from "@/context/AuthProvider";
 import { useAuth } from "@/context/auth";
 import { ThemeProvider } from "@/context/ThemeProvider";
@@ -10,21 +11,24 @@ const Auth = lazy(() => import("@/components/Auth").then((m) => ({ default: m.Au
 const Chat = lazy(() => import("@/pages/Chat"));
 const Landing = lazy(() => import("@/pages/Landing"));
 
-const loadingScreen = (
-  <div className="flex min-h-screen items-center justify-center bg-background">
-    <p className="text-muted-foreground animate-pulse">Loading...</p>
-  </div>
-);
+function LoadingScreen() {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background">
+      <p className="text-muted-foreground animate-pulse">{t("common.loading")}</p>
+    </div>
+  );
+}
 
 function AppRoutes() {
   const { isAuthenticated, isLoading } = useAuth();
 
-  if (isLoading) return loadingScreen;
+  if (isLoading) return <LoadingScreen />;
 
   return (
     <div className="min-h-screen bg-background text-foreground transition-colors duration-200">
       <ErrorBoundary>
-        <Suspense fallback={loadingScreen}>
+        <Suspense fallback={<LoadingScreen />}>
           <Routes>
             <Route
               path="/"

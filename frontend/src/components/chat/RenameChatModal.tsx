@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { type ChatPublic } from "@/api/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,12 +15,13 @@ interface RenameChatModalProps {
 }
 
 export function RenameChatModal({ open, chat, onClose, onRename, pending, error }: RenameChatModalProps) {
+  const { t } = useTranslation();
   return (
     <Modal open={open} onClose={onClose} dismissible={!pending} className="space-y-4">
       <div className="space-y-1">
-        <ModalTitle className="text-base font-semibold text-fg-1">Rename Chat</ModalTitle>
+        <ModalTitle className="text-base font-semibold text-fg-1">{t("rename.title")}</ModalTitle>
         <ModalDescription className="text-xs text-fg-7">
-          Enter a new name for this conversation.
+          {t("rename.description")}
         </ModalDescription>
       </div>
       {/* The popup's content mounts on each open, so the field starts from the chat's current name. */}
@@ -35,6 +37,7 @@ function RenameForm({
   pending,
   error,
 }: Omit<RenameChatModalProps, "open" | "chat"> & { initialName: string }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialName);
 
   const handleSubmit = (e: FormEvent) => {
@@ -49,8 +52,8 @@ function RenameForm({
         value={name}
         onChange={(e) => setName(e.target.value)}
         onFocus={(e) => e.target.select()}
-        placeholder="Chat name"
-        aria-label="Chat name"
+        placeholder={t("rename.placeholder")}
+        aria-label={t("rename.placeholder")}
         className="h-10 rounded-xl border-line-1 bg-field dark:bg-field text-base sm:text-sm text-fg-1 focus-visible:ring-1 focus-visible:ring-blue-500"
       />
       {error && (
@@ -67,14 +70,14 @@ function RenameForm({
           disabled={pending}
           className="w-full sm:w-auto h-9 cursor-pointer rounded-lg px-4 text-xs text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
         >
-          Cancel
+          {t("common.cancel")}
         </Button>
         <Button
           type="submit"
           disabled={!name.trim() || pending}
           className="w-full sm:w-auto h-9 cursor-pointer rounded-lg bg-blue-600 px-4 text-xs font-medium text-white shadow-xs transition-colors hover:bg-blue-500"
         >
-          {pending ? "Saving..." : "Save"}
+          {pending ? t("common.saving") : t("common.save")}
         </Button>
       </div>
     </form>

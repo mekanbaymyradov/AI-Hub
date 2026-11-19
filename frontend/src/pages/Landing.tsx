@@ -5,10 +5,12 @@ import About from "@/components/About";
 import Footer from "@/components/Footer";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { useTheme } from "@/context/theme";
 
 export default function Landing() {
   const { theme } = useTheme();
+  const { t } = useTranslation();
   const isDark = theme === "dark";
 
   return (
@@ -16,8 +18,8 @@ export default function Landing() {
       <Navbar />
       <main className="w-full max-w-full overflow-x-hidden">
         <HeroGeometric
-          title1="Build your workspace"
-          title2="with AI-Hub"
+          title1={t("landing.hero.title1")}
+          title2={t("landing.hero.title2")}
           color1={isDark ? "#2563EB" : "#3B82F6"}
           color2={isDark ? "#09090B" : "#EFF6FF"}
           bgColor={isDark ? "#09090B" : "#FFFFFF"}
@@ -32,7 +34,7 @@ export default function Landing() {
               to="/login"
               className="px-8 py-3.5 text-base font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-full transition-all shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 inline-block"
             >
-              Get Started
+              {t("landing.nav.getStarted")}
             </Link>
           </motion.div>
         </HeroGeometric>

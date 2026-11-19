@@ -1,5 +1,6 @@
 import { Menu as MenuPrimitive } from "@base-ui/react/menu";
 import { Brain, ChevronDown } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { type Effort, type ModelPublic } from "@/api/types";
 import { Button } from "@/components/ui/button";
@@ -19,12 +20,8 @@ import { modelOrigin } from "./model-origin";
 import { MENU_CONTENT } from "./menu-styles";
 
 // "auto" stands in for null, which sends no effort and leaves the model on its own default.
-const EFFORTS: { value: Effort | "auto"; label: string; hint: string }[] = [
-  { value: "auto", label: "Auto", hint: "The model decides how long to think" },
-  { value: "low", label: "Low", hint: "Quick answers, little reasoning" },
-  { value: "medium", label: "Medium", hint: "Balanced speed and reasoning" },
-  { value: "high", label: "High", hint: "Thinks longest, for hard problems" },
-];
+// Labels and hints are under models.efforts.<value> in the translations.
+const EFFORTS = ["auto", "low", "medium", "high"] as const satisfies readonly (Effort | "auto")[];
 
 const SECTION_LABEL = "px-2 pt-1 pb-1.5 text-[11px] font-medium text-fg-7";
 
@@ -38,8 +35,10 @@ interface ModelPickerProps {
 }
 
 export function ModelPicker({ models, selected, onSelect, effort, onEffortChange, disabled }: ModelPickerProps) {
-  const current = EFFORTS.find((option) => option.value === (effort ?? "auto")) ?? EFFORTS[0];
-  const name = selected?.display_name ?? "Select model";
+  const { t } = useTranslation();
+  const current = effort ?? "auto";
+  const name = selected?.display_name ?? t("models.selectModel");
+  const currentLabel = t(`models.efforts.${current}.label`);
 
   return (
     <DropdownMenu>
@@ -48,7 +47,7 @@ export function ModelPicker({ models, selected, onSelect, effort, onEffortChange
           type="button"
           variant="ghost"
           disabled={disabled}
-          aria-label={`Model: ${name}. Thinking: ${current.label}`}
+          aria-label={t("models.pickerLabel", { model: name, effort: currentLabel })}
           className="h-8 pointer-coarse:h-11 gap-1.5 rounded-full pl-2 pr-1.5 sm:pl-2.5 sm:pr-2 text-xs font-medium text-fg-5 hover:bg-fill-1 hover:text-fg-1 dark:hover:bg-fill-1 cursor-pointer transition-colors"
         >
           {selected && <ModelLogo model={selected} className="size-4" />}
@@ -57,7 +56,7 @@ export function ModelPicker({ models, selected, onSelect, effort, onEffortChange
           {effort && (
             <span className="flex items-center gap-1 rounded-full bg-blue-500/10 px-1.5 py-0.5 text-[11px] text-blue-600 dark:text-blue-400">
               <Brain className="size-3" />
-              <span className="hidden sm:inline">{current.label}</span>
+              <span className="hidden sm:inline">{currentLabel}</span>
             </span>
           )}
           <ChevronDown className="size-3 shrink-0 opacity-60" />
@@ -66,11 +65,11 @@ export function ModelPicker({ models, selected, onSelect, effort, onEffortChange
 
       <DropdownMenuContent side="top" align="end" sideOffset={8} className={cn(MENU_CONTENT, "w-72 p-1.5")}>
         <DropdownMenuGroup>
-          <DropdownMenuLabel className={SECTION_LABEL}>Model</DropdownMenuLabel>
+          <DropdownMenuLabel className={SECTION_LABEL}>{t("models.model")}</DropdownMenuLabel>
           <DropdownMenuRadioGroup value={selected?.id ?? null} onValueChange={(id: string) => onSelect(id)}>
             {models.map((model) => {
               const { makerName, host } = modelOrigin(model);
-              const details = [makerName, host && `via ${host}`, !model.supports_files && "Text only"]
+              const details = [makerName, host && t("models.viaHost", { host }), !model.supports_files && t("models.textOnly")]
                 .filter(Boolean)
                 .join(" · ");
               return (
@@ -98,25 +97,25 @@ export function ModelPicker({ models, selected, onSelect, effort, onEffortChange
         <DropdownMenuGroup>
           <DropdownMenuLabel className={cn(SECTION_LABEL, "flex items-center gap-1.5")}>
             <Brain className="size-3" />
-            Thinking
+            {t("models.thinking")}
           </DropdownMenuLabel>
           {/* Stays open on a change, so model and effort can be set in one visit. */}
           <DropdownMenuRadioGroup
-            value={current.value}
+            value={current}
             onValueChange={(value: Effort | "auto") => onEffortChange(value === "auto" ? null : value)}
             className="mx-1 grid grid-cols-4 gap-0.5 rounded-lg bg-fill-2 p-0.5"
           >
             {EFFORTS.map((option) => (
               <MenuPrimitive.RadioItem
-                key={option.value}
-                value={option.value}
+                key={option}
+                value={option}
                 className="cursor-pointer rounded-md py-1 text-center text-[11px] font-medium text-fg-6 outline-none transition-colors data-highlighted:text-fg-1 data-checked:bg-overlay data-checked:text-fg-1 data-checked:shadow-xs data-checked:ring-1 data-checked:ring-line-1 dark:data-checked:bg-fill-1"
               >
-                {option.label}
+                {t(`models.efforts.${option}.label`)}
               </MenuPrimitive.RadioItem>
             ))}
           </DropdownMenuRadioGroup>
-          <p className="px-2 pt-1.5 pb-1 text-[11px] text-fg-7">{current.hint}</p>
+          <p className="px-2 pt-1.5 pb-1 text-[11px] text-fg-7">{t(`models.efforts.${current}.hint`)}</p>
         </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -1,5 +1,7 @@
 import { chatApi } from "@/api/chat";
 import { type MessagePublic, type ModelPublic } from "@/api/types";
+// The instance, not the hook: this runs outside React.
+import i18n from "@/i18n";
 
 export function chatToMarkdown(
   title: string,
@@ -9,11 +11,12 @@ export function chatToMarkdown(
   const sections = messages.map((msg) => {
     const author =
       msg.kind === "request"
-        ? "You"
-        : (models.find((m) => m.id === msg.model_id)?.display_name ?? msg.model_id ?? "Assistant");
+        ? i18n.t("chat.exportYou")
+        : (models.find((m) => m.id === msg.model_id)?.display_name ?? msg.model_id ?? i18n.t("chat.exportAssistant"));
     const files = msg.attachments?.map((a) => a.filename) ?? [];
     // Attachment URLs can expire, so only the names are kept.
-    const attachments = files.length > 0 ? `\n\n_Attachments: ${files.join(", ")}_` : "";
+    const attachments =
+      files.length > 0 ? `\n\n_${i18n.t("chat.exportAttachments", { files: files.join(", ") })}_` : "";
     return `## ${author}\n\n${msg.content.trim()}${attachments}`;
   });
   return `# ${title}\n\n${sections.join("\n\n---\n\n")}\n`;

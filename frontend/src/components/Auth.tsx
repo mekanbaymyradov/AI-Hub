@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
+import { useTranslation } from "react-i18next";
 import { ArrowLeft, ArrowRight, Check, LoaderCircle, Mail } from "lucide-react";
 import { authApi } from "@/api/auth";
 import { getErrorMessage } from "@/api/errors";
@@ -10,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/Logo";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LanguageMenu } from "@/components/LanguageSwitch";
 import { cn } from "@/lib/utils";
 
 const OTP_LENGTH = 6;
@@ -23,6 +25,7 @@ const stepMotion = {
 } as const;
 
 export function Auth() {
+  const { t } = useTranslation();
   const [email, setEmail] = useState("");
   const [step, setStep] = useState<"email" | "code">("email");
   const [pending, setPending] = useState<"send" | "verify" | null>(null);
@@ -45,7 +48,7 @@ export function Auth() {
       setStep("code");
       inputRefs.current[0]?.focus();
     } catch (err) {
-      setError(getErrorMessage(err, "Couldn't send the code. Please try again."));
+      setError(getErrorMessage(err, t("auth.sendFailed")));
     } finally {
       setPending(null);
     }
@@ -59,7 +62,7 @@ export function Auth() {
       await login(access_token);
       navigate("/", { replace: true });
     } catch (err) {
-      setError(getErrorMessage(err, "That code didn't work. Please try again."));
+      setError(getErrorMessage(err, t("auth.codeFailed")));
       setOtp(EMPTY_OTP);
       inputRefs.current[0]?.focus();
     } finally {
@@ -110,12 +113,15 @@ export function Auth() {
       <header className="relative flex items-center justify-between px-4 py-3.5 sm:px-8 sm:py-4">
         <Link
           to="/"
-          aria-label="AI-Hub home"
+          aria-label={t("common.homeLink")}
           className="transition-opacity hover:opacity-80"
         >
           <Logo className="text-base font-semibold" />
         </Link>
-        <ThemeToggle />
+        <div className="flex items-center gap-1">
+          <LanguageMenu />
+          <ThemeToggle />
+        </div>
       </header>
 
       {/* The bottom padding lifts the card slightly above center, where the eye expects it. */}
@@ -135,15 +141,15 @@ export function Auth() {
                   <span className="mx-auto mb-4 flex size-11 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-500/10">
                     <img src="/favicon.svg" alt="" className="size-6 object-contain" />
                   </span>
-                  <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Welcome to AI-Hub</h1>
+                  <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">{t("auth.welcome")}</h1>
                   <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    Sign in or create an account with your email. No password needed.
+                    {t("auth.intro")}
                   </p>
                 </div>
 
                 <div className="mt-6 space-y-2">
                   <Label htmlFor="email" className="text-zinc-700 dark:text-zinc-300">
-                    Email
+                    {t("auth.email")}
                   </Label>
                   <Input
                     id="email"
@@ -175,11 +181,11 @@ export function Auth() {
                   {pending === "send" ? (
                     <>
                       <LoaderCircle className="animate-spin" />
-                      Sending code…
+                      {t("auth.sendingCode")}
                     </>
                   ) : (
                     <>
-                      Continue
+                      {t("auth.continue")}
                       <ArrowRight />
                     </>
                   )}
@@ -191,9 +197,9 @@ export function Auth() {
                   <span className="mx-auto mb-4 flex size-11 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400">
                     <Mail className="size-5" />
                   </span>
-                  <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">Check your email</h1>
+                  <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-white">{t("auth.checkEmail")}</h1>
                   <p className="mt-2 text-sm text-zinc-500 dark:text-zinc-400">
-                    Enter the 6-digit code we sent to
+                    {t("auth.codeSentTo")}
                     <br />
                     <span className="font-medium break-all text-zinc-900 dark:text-white">{email}</span>
                   </p>
@@ -214,7 +220,7 @@ export function Auth() {
                       readOnly={pending === "verify"}
                       inputMode="numeric"
                       autoComplete={index === 0 ? "one-time-code" : "off"}
-                      aria-label={`Digit ${index + 1}`}
+                      aria-label={t("auth.digit", { position: index + 1 })}
                       aria-invalid={error !== null}
                       autoFocus={index === 0}
                       className={cn(
@@ -235,16 +241,16 @@ export function Auth() {
                   ) : pending === "verify" ? (
                     <span className="flex items-center gap-1.5 text-zinc-500">
                       <LoaderCircle className="size-3.5 animate-spin" />
-                      Checking your code…
+                      {t("auth.checkingCode")}
                     </span>
                   ) : resent ? (
                     <span className="flex items-center gap-1.5 text-emerald-600 dark:text-emerald-400">
                       <Check className="size-3.5" />
-                      New code sent. The old one no longer works.
+                      {t("auth.newCodeSent")}
                     </span>
                   ) : (
                     <span className="text-zinc-500 dark:text-zinc-400">
-                      The code works once and expires in 5 minutes.
+                      {t("auth.codeExpiry")}
                     </span>
                   )}
                 </p>
@@ -257,7 +263,7 @@ export function Auth() {
                     className="inline-flex items-center gap-1.5 font-medium text-zinc-500 transition-colors hover:text-zinc-900 disabled:opacity-50 dark:text-zinc-400 dark:hover:text-white"
                   >
                     <ArrowLeft className="size-4" />
-                    Change email
+                    {t("auth.changeEmail")}
                   </button>
                   <button
                     type="button"
@@ -265,7 +271,7 @@ export function Auth() {
                     disabled={pending !== null}
                     className="font-semibold text-blue-600 transition-colors hover:text-blue-700 disabled:opacity-50 dark:text-blue-400 dark:hover:text-blue-300"
                   >
-                    {pending === "send" ? "Sending…" : "Resend code"}
+                    {pending === "send" ? t("auth.sending") : t("auth.resend")}
                   </button>
                 </div>
               </motion.div>

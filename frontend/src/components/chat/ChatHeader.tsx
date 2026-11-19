@@ -1,5 +1,6 @@
 import { memo } from "react";
 import { useMutation } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 import { CircleAlert, Download, Loader2, SquarePen } from "lucide-react";
 import { useModels } from "@/api/queries";
 import { downloadChatAsMarkdown } from "@/lib/export-chat";
@@ -17,6 +18,7 @@ const ICON_BUTTON =
   "h-8 w-8 rounded-lg text-fg-5 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 cursor-pointer";
 
 export const ChatHeader = memo(function ChatHeader({ chatId, chatTitle, onNewThread }: ChatHeaderProps) {
+  const { t } = useTranslation();
   return (
     <header className="h-12 border-b border-zinc-200/80 dark:border-white/5 flex items-center justify-between px-3 sm:px-4 z-10 shrink-0 bg-chrome/80 backdrop-blur-xs transition-colors duration-200">
       <div className="flex items-center gap-2 min-w-0">
@@ -42,8 +44,8 @@ export const ChatHeader = memo(function ChatHeader({ chatId, chatTitle, onNewThr
             variant="ghost"
             size="icon"
             onClick={onNewThread}
-            aria-label="New thread"
-            title="New thread"
+            aria-label={t("chat.newThread")}
+            title={t("chat.newThread")}
             className={`md:hidden ${ICON_BUTTON}`}
           >
             <SquarePen className="h-4 w-4" />
@@ -57,10 +59,11 @@ export const ChatHeader = memo(function ChatHeader({ chatId, chatTitle, onNewThr
 
 function ExportChatButton({ chatId, chatTitle }: { chatId: number; chatTitle: string }) {
   const { data: models = [] } = useModels();
+  const { t } = useTranslation();
   const exportChat = useMutation({
     mutationFn: () => downloadChatAsMarkdown(chatId, chatTitle, models),
   });
-  const label = exportChat.isError ? "Couldn't export the chat. Try again" : "Export as Markdown";
+  const label = exportChat.isError ? t("chat.exportFailed") : t("chat.exportMarkdown");
 
   return (
     <Button

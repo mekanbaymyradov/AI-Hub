@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AnimatePresence, MotionConfig, motion, useInView, useReducedMotion } from 'framer-motion';
 import { Check, Lock, Server, ShieldCheck, Sparkles, type LucideIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import SectionHeading from '@/components/SectionHeading';
 import { cn } from '@/lib/utils';
 
@@ -29,16 +30,15 @@ const PROVIDERS = [
   { name: 'Groq', color: 'bg-[#F55036]' },
 ];
 
-const REPLY =
-  "Server-Sent Events keep one HTTP response open, so the server can push every token to your browser the moment it's ready.".split(' ');
-
-// Each model streams the reply, then holds it for a beat before the next one takes over.
-const TICKS_PER_MODEL = REPLY.length + 12;
 
 function ModelsDemo() {
-  const tick = useTick(PROVIDERS.length * TICKS_PER_MODEL, 90);
-  const active = Math.floor(tick / TICKS_PER_MODEL);
-  const words = (tick % TICKS_PER_MODEL) + 1;
+  const { t } = useTranslation();
+  const reply = t('landing.features.demoReply').split(' ');
+  // Each model streams the reply, then holds it for a beat before the next one takes over.
+  const ticksPerModel = reply.length + 12;
+  const tick = useTick(PROVIDERS.length * ticksPerModel, 90);
+  const active = Math.floor(tick / ticksPerModel);
+  const words = (tick % ticksPerModel) + 1;
 
   return (
     <div className="w-full max-w-lg space-y-4">
@@ -66,7 +66,7 @@ function ModelsDemo() {
       </div>
 
       <div className="ml-auto w-fit rounded-2xl rounded-br-md bg-blue-600 px-3.5 py-2 text-sm text-white">
-        Explain SSE in one sentence.
+        {t('landing.features.demoQuestion')}
       </div>
 
       <div className="flex gap-2.5">
@@ -80,10 +80,10 @@ function ModelsDemo() {
         </span>
         {/* The invisible full reply reserves its height, so the card doesn't jump as words stream in. */}
         <p className="grid text-sm leading-relaxed text-zinc-700 dark:text-zinc-300">
-          <span className="invisible col-start-1 row-start-1">{REPLY.join(' ')}</span>
+          <span className="invisible col-start-1 row-start-1">{reply.join(' ')}</span>
           <span className="col-start-1 row-start-1">
-            {REPLY.slice(0, words).join(' ')}
-            {words < REPLY.length && <Caret />}
+            {reply.slice(0, words).join(' ')}
+            {words < reply.length && <Caret />}
           </span>
         </p>
       </div>
@@ -182,45 +182,24 @@ function SelfHostDemo() {
 }
 
 interface Feature {
-  // The section heading while this feature is open; its second half is shown in the gradient.
-  heading: [string, string];
+  // Its text is under landing.features.<key>: heading1 and heading2 head the section while it's open,
+  // the second half in the gradient.
+  key: 'models' | 'privacy' | 'selfHost';
   icon: LucideIcon;
-  title: string;
-  description: string;
   demo: ReactNode;
 }
 
 const FEATURES: Feature[] = [
-  {
-    heading: ['Every model.', 'One chat.'],
-    icon: Sparkles,
-    title: 'Any model, any message',
-    description:
-      'Pick a model from Anthropic, OpenAI, Google or Groq for each message. Replies stream in while they are written, not after.',
-    demo: <ModelsDemo />,
-  },
-  {
-    heading: ['Your words.', 'Stay yours.'],
-    icon: ShieldCheck,
-    title: 'Your words stay yours',
-    description:
-      'Files live in private storage behind links that expire in 15 minutes. Our logs keep the model, tokens and timing, never what you wrote.',
-    demo: <PrivacyDemo />,
-  },
-  {
-    heading: ['Your server.', 'Your rules.'],
-    icon: Server,
-    title: 'Deploy it on your own server',
-    description:
-      'AI-Hub is open source. Run the whole stack on your own server with Docker Compose, your own API keys and automatic HTTPS.',
-    demo: <SelfHostDemo />,
-  },
+  { key: 'models', icon: Sparkles, demo: <ModelsDemo /> },
+  { key: 'privacy', icon: ShieldCheck, demo: <PrivacyDemo /> },
+  { key: 'selfHost', icon: Server, demo: <SelfHostDemo /> },
 ];
 
 // How long each feature stays open before the list moves on by itself.
 const AUTO_ADVANCE_MS = 7000;
 
 export default function Features() {
+  const { t } = useTranslation();
   const showcaseRef = useRef<HTMLDivElement>(null);
   const inView = useInView(showcaseRef, { amount: 0.4 });
   const reduceMotion = useReducedMotion();
@@ -259,13 +238,13 @@ export default function Features() {
             <div className="mb-5 text-center">
               <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/5 px-3 py-1 text-xs font-medium text-blue-600 dark:text-blue-400">
                 <Sparkles className="size-3.5" />
-                Features
+                {t('landing.features.badge')}
               </span>
             </div>
             <SectionHeading
-              title={FEATURES[active].heading[0]}
-              highlight={FEATURES[active].heading[1]}
-              description="Talk to the best AI models in one private place, on our servers or your own."
+              title={t(`landing.features.${FEATURES[active].key}.heading1`)}
+              highlight={t(`landing.features.${FEATURES[active].key}.heading2`)}
+              description={t('landing.features.description')}
             />
           </motion.div>
 
@@ -278,9 +257,9 @@ export default function Features() {
             className="mt-16 grid items-center gap-8 lg:grid-cols-5 lg:gap-12"
           >
             <div className="space-y-2 lg:col-span-2">
-              {FEATURES.map(({ icon: Icon, title, description }, i) => (
+              {FEATURES.map(({ icon: Icon, key }, i) => (
                 <button
-                  key={title}
+                  key={key}
                   type="button"
                   aria-expanded={i === active}
                   onClick={() => {
@@ -311,7 +290,7 @@ export default function Features() {
                         i === active ? 'text-zinc-900 dark:text-white' : 'text-zinc-600 dark:text-zinc-400',
                       )}
                     >
-                      {title}
+                      {t(`landing.features.${key}.title`)}
                     </span>
                   </span>
                   <AnimatePresence initial={false}>
@@ -323,7 +302,7 @@ export default function Features() {
                         transition={{ duration: 0.3, ease: 'easeOut' }}
                         className="block overflow-hidden pl-12 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400"
                       >
-                        <span className="block pt-2">{description}</span>
+                        <span className="block pt-2">{t(`landing.features.${key}.description`)}</span>
                       </motion.span>
                     )}
                   </AnimatePresence>
