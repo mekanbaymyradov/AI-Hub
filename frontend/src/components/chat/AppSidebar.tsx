@@ -119,7 +119,8 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
 
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.key.toLowerCase() === "k") {
+      // The physical key, so it works in any layout: in Russian, Ctrl+K types "л".
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.code === "KeyK") {
         e.preventDefault();
         if (isMobile) setOpenMobile(true);
         else setOpen(true);
