@@ -102,7 +102,9 @@ export function ChatInput({
     saveDraft(draft, input);
   }, [draft, input]);
   const [attachments, setAttachments] = useState<AttachmentPublic[]>([]);
-  const [isUploadingAttachments, setIsUploadingAttachments] = useState(false);
+  // Names of the files being uploaded, shown as chips until they land in attachments.
+  const [uploadingNames, setUploadingNames] = useState<string[]>([]);
+  const isUploadingAttachments = uploadingNames.length > 0;
   const [attachmentError, setAttachmentError] = useState<string | null>(null);
   const [isDraggingFiles, setIsDraggingFiles] = useState(false);
   const isMobile = useIsMobile();
@@ -123,6 +125,15 @@ export function ChatInput({
     el.style.height = `${el.scrollHeight}px`;
   }, [input]);
 
+  // Ready to type on opening a chat, with the caret after any restored draft. Skipped on
+  // touch screens, where focusing pops the keyboard over the conversation.
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el || window.matchMedia("(pointer: coarse)").matches) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  }, [draft]);
+
   const voice = useVoiceInput((text) => {
     setInput((prev) => (prev.trim() ? `${prev.trimEnd()} ${text}` : text));
     textareaRef.current?.focus();
@@ -142,14 +153,14 @@ export function ChatInput({
     setAttachmentError(problem);
     if (problem) return;
 
-    setIsUploadingAttachments(true);
+    setUploadingNames(files.map((f) => f.name));
     try {
       const uploaded = await chatApi.uploadAttachments(files);
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (err) {
       setAttachmentError(getErrorMessage(err, "Failed to upload attachments."));
     } finally {
-      setIsUploadingAttachments(false);
+      setUploadingNames([]);
     }
   };
 
@@ -261,6 +272,13 @@ export function ChatInput({
             onDrop={handleDrop}
             className={cn("relative flex flex-col bg-composer border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-[border-color,box-shadow] duration-200 overflow-hidden shadow-[0_10px_32px_-8px_rgb(24_24_27/0.14),0_2px_8px_-2px_rgb(24_24_27/0.06)] dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
           >
+            {isDraggingFiles && (
+              // Pointer events off, so drag events keep reaching the form underneath.
+              <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-[inherit] bg-blue-500/10 backdrop-blur-[2px] text-sm font-medium text-blue-600 dark:text-blue-400 pointer-events-none">
+                <Paperclip className="h-4 w-4" />
+                {modelSupportsFiles ? "Drop files to attach" : "This model doesn't accept files"}
+              </div>
+            )}
             {!isOnline && (
               <div role="status" className="flex items-start gap-1.5 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
                 <WifiOff className="h-3.5 w-3.5 shrink-0 mt-px" />
@@ -295,17 +313,17 @@ export function ChatInput({
               </div>
             )}
 
-            {attachments.length > 0 && (
+            {(attachments.length > 0 || isUploadingAttachments) && (
               <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1">
                 {attachments.map((att) => (
                   <div
                     key={att.id}
-                    className="flex items-center gap-1.5 bg-fill-1 hover:bg-zinc-200/80 dark:hover:bg-white/15 border border-line-1 rounded-lg px-2.5 py-1 text-xs text-fg-3 transition-colors"
+                    className="flex items-center gap-1.5 bg-fill-1 hover:bg-zinc-200/80 dark:hover:bg-white/15 border border-line-1 rounded-lg pl-1 pr-2.5 py-1 text-xs text-fg-3 transition-colors"
                   >
                     {att.media_type.startsWith("image/") ? (
-                      <Paperclip className="h-3 w-3 text-fg-7 shrink-0" />
+                      <img src={att.url} alt="" className="h-6 w-6 rounded object-cover shrink-0" />
                     ) : (
-                      <FileText className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0" />
+                      <FileText className="h-6 w-6 p-1 text-blue-600 dark:text-blue-400 shrink-0" />
                     )}
                     <span className="truncate max-w-[140px]">{att.filename}</span>
                     <button
@@ -316,6 +334,15 @@ export function ChatInput({
                     >
                       <X className="h-3 w-3" />
                     </button>
+                  </div>
+                ))}
+                {uploadingNames.map((name, i) => (
+                  <div
+                    key={`uploading-${i}`}
+                    className="flex items-center gap-1.5 bg-fill-1 border border-line-1 rounded-lg pl-1 pr-2.5 py-1 text-xs text-fg-7"
+                  >
+                    <Loader2 className="h-6 w-6 p-1 animate-spin shrink-0" />
+                    <span className="truncate max-w-[140px]">{name}</span>
                   </div>
                 ))}
               </div>
