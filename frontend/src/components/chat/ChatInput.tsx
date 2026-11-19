@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ChangeEvent,
@@ -114,11 +115,12 @@ export function ChatInput({
   const selectedModel = models.find((m) => m.id === selectedModelId) ?? models[0];
   const modelSupportsFiles = selectedModel?.supports_files ?? true;
 
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
-    }
+  // Before paint, so the box never shows a frame at the old height; the CSS max-height caps it.
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
   }, [input]);
 
   const voice = useVoiceInput((text) => {
@@ -213,7 +215,10 @@ export function ChatInput({
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // An IME's Enter confirms the composed word, so it must not send.
+    if (e.nativeEvent.isComposing) return;
+    // Touch keyboards have no Shift, so Enter adds a line there and the button sends.
+    if (e.key === "Enter" && !e.shiftKey && !window.matchMedia("(pointer: coarse)").matches) {
       e.preventDefault();
       handleSubmit();
     } else if (e.key === "Escape" && isStreaming) {
@@ -226,14 +231,13 @@ export function ChatInput({
   };
 
   return (
-    <motion.div
-      layout
-      initial={false}
-      animate={{
-        justifyContent: isInitialState ? (isMobile ? "flex-start" : "center") : "flex-end",
-        paddingBottom: isInitialState ? (isMobile ? "24px" : "0px") : isMobile ? "12px" : "32px",
-      }}
-      className={cn("absolute inset-0 flex flex-col px-3 sm:px-4 z-0 pt-12 overflow-y-auto", isInitialState ? "pointer-events-auto" : "pointer-events-none")}
+    <div
+      className={cn(
+        "absolute inset-0 flex flex-col px-3 sm:px-4 z-0 pt-12 overflow-y-auto",
+        isInitialState
+          ? cn("pointer-events-auto", isMobile ? "justify-start pb-6" : "justify-center")
+          : cn("pointer-events-none justify-end", isMobile ? "pb-3" : "pb-8"),
+      )}
     >
       {/* Phones leave only a thin gap under the composer, so cover it instead of showing messages scroll through. */}
       {!isInitialState && isMobile && (
@@ -242,25 +246,32 @@ export function ChatInput({
       <div className={cn("w-full max-w-2xl mx-auto flex flex-col pointer-events-auto", isInitialState && isMobile ? "mt-4 mb-6" : "")}>
         <AnimatePresence>{isInitialState && <ChatGreeting onSelectPrompt={selectPrompt} />}</AnimatePresence>
 
-        <motion.div layoutId="input-box" className="relative group w-full">
+        {/* Only the position animates: animating size scales the box and stretches its text while it grows. */}
+        <motion.div
+          layout="position"
+          // Measured only on this switch; otherwise the box would also slide each time it grows a line.
+          layoutDependency={isInitialState}
+          transition={{ type: "spring", duration: 0.45, bounce: 0 }}
+          className="relative group w-full"
+        >
           <form
             onSubmit={handleSubmit}
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={cn("relative flex flex-col bg-composer border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-all overflow-hidden shadow-xl shadow-zinc-200/50 dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
+            className={cn("relative flex flex-col bg-composer border border-zinc-200/90 dark:border-white/10 rounded-[20px] sm:rounded-[24px] focus-within:ring-2 focus-within:ring-blue-500/20 dark:focus-within:ring-1 dark:focus-within:ring-blue-500/40 focus-within:border-blue-500/50 dark:focus-within:border-white/20 transition-[border-color,box-shadow] duration-200 overflow-hidden shadow-[0_10px_32px_-8px_rgb(24_24_27/0.14),0_2px_8px_-2px_rgb(24_24_27/0.06)] dark:shadow-2xl", isDraggingFiles && "border-blue-500 ring-2 ring-blue-500/30 dark:border-blue-500/60")}
           >
             {!isOnline && (
-              <div role="status" className="flex items-center gap-1.5 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
-                <WifiOff className="h-3.5 w-3.5 shrink-0" />
-                <span className="truncate">You're offline. Your message is saved here until you reconnect.</span>
+              <div role="status" className="flex items-start gap-1.5 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
+                <WifiOff className="h-3.5 w-3.5 shrink-0 mt-px" />
+                <span className="min-w-0">You're offline. Your message is saved here until you reconnect.</span>
               </div>
             )}
             {error && (
-              <div className="flex items-center justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                  <span className="truncate">{error}</span>
+              <div className="flex items-start justify-between bg-red-500/10 border-b border-red-500/20 px-4 py-2 text-xs text-red-500 dark:text-red-400">
+                <div className="flex items-start gap-1.5 min-w-0">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0 mt-px" />
+                  <span className="break-words min-w-0">{error}</span>
                 </div>
                 <div className="flex items-center gap-2 ml-2 shrink-0">
                   {voice.error && voice.canRetry && (
@@ -317,12 +328,12 @@ export function ChatInput({
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
               placeholder="Send a message..."
-              className="min-h-[50px] sm:min-h-[52px] max-h-[200px] sm:max-h-[220px] w-full resize-none border-0 shadow-none focus-visible:ring-0 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-12 text-base sm:text-[15px] bg-transparent text-fg-1 placeholder:text-fg-8"
+              className="min-h-11 max-h-[200px] sm:max-h-[260px] w-full resize-none overflow-y-auto border-0 rounded-none shadow-none focus-visible:ring-0 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-1 text-base sm:text-[15px] bg-transparent dark:bg-transparent text-fg-1 placeholder:text-fg-8"
               rows={1}
             />
 
             {isDictating ? (
-              <div className="absolute bottom-2 left-2 right-2 flex items-center gap-2">
+              <div className="flex items-center gap-2 px-2 pb-2">
                 <Button
                   type="button"
                   variant="ghost"
@@ -357,7 +368,7 @@ export function ChatInput({
                 </Button>
               </div>
             ) : (
-              <div className="absolute bottom-2 left-2 right-2 flex justify-between items-center">
+              <div className="flex justify-between items-center px-2 pb-2">
                 <div className="flex items-center gap-1">
                   <input
                     type="file"
@@ -460,6 +471,6 @@ export function ChatInput({
           </form>
         </motion.div>
       </div>
-    </motion.div>
+    </div>
   );
 }
