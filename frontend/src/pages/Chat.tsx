@@ -197,7 +197,8 @@ export default function Chat() {
   // The shortcut ChatGPT uses, so it's already familiar to many people.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === "o") {
+      // The physical key, so it works in any layout: in Russian, Ctrl+K types "л".
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.code === "KeyO") {
         e.preventDefault();
         handleNewThread();
       }

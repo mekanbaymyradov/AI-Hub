@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion } from "framer-motion";
@@ -13,6 +13,7 @@ import {
   PanelLeft,
   PanelLeftClose,
   Pencil,
+  Search,
   SquarePen,
   Sun,
   Trash2,
@@ -52,7 +53,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { IS_MAC, NEW_CHAT_KEYS } from "@/lib/shortcuts";
+import { IS_MAC, NEW_CHAT_KEYS, SEARCH_KEYS } from "@/lib/shortcuts";
 import { ConfirmModal } from "./ConfirmModal";
 import { MENU_CONTENT, MENU_ITEM, MENU_ITEM_DANGER, MENU_ITEM_SELECTED } from "./menu-styles";
 import { ProfileSettingsModal } from "./ProfileSettingsModal";
@@ -106,6 +107,33 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   );
   const isNewChat = activeChatId === null;
 
+  const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
+  const search = query.trim().toLowerCase();
+  // Only loaded chats are searched; while a search shows few rows, the list's
+  // sentinel stays on screen and older pages keep loading into it.
+  const visibleChats = useMemo(
+    () => (search ? chats.filter((chat) => chat.name.toLowerCase().includes(search)) : chats),
+    [chats, search]
+  );
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      // The physical key, so it works in any layout: in Russian, Ctrl+K types "л".
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && e.code === "KeyK") {
+        e.preventDefault();
+        if (isMobile) setOpenMobile(true);
+        else setOpen(true);
+        // At once when the sidebar is open, so no keystroke is lost; again
+        // after a collapsed one opens, when the input exists.
+        searchRef.current?.select();
+        requestAnimationFrame(() => searchRef.current?.select());
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMobile, setOpen, setOpenMobile]);
+
   const [isChatMenuOpen, setIsChatMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const renameDialog = useDialog<ChatPublic>();
@@ -150,10 +178,10 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
   };
 
   const handleSelectAll = () => {
-    if (selectedChatIds.size === chats.length) {
+    if (selectedChatIds.size === visibleChats.length) {
       setSelectedChatIds(new Set());
     } else {
-      setSelectedChatIds(new Set(chats.map((c) => c.id)));
+      setSelectedChatIds(new Set(visibleChats.map((c) => c.id)));
     }
   };
 
@@ -361,7 +389,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                     onClick={handleSelectAll}
                     className="px-2 py-0.5 rounded text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                   >
-                    {selectedChatIds.size === chats.length && chats.length > 0 ? "Deselect all" : "Select all"}
+                    {selectedChatIds.size === visibleChats.length && visibleChats.length > 0 ? "Deselect all" : "Select all"}
                   </button>
                   <button
                     type="button"
@@ -399,18 +427,62 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
               </div>
             )}
 
+            {(chats.length > 0 || query) && (
+              <div className="relative mx-1 mb-2 shrink-0">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-fg-7" />
+                <input
+                  ref={searchRef}
+                  type="search"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Escape" && query) {
+                      e.stopPropagation();
+                      setQuery("");
+                    }
+                  }}
+                  placeholder="Search chats"
+                  aria-label="Search chats"
+                  aria-keyshortcuts={IS_MAC ? "Meta+K" : "Control+K"}
+                  className="peer h-8 w-full rounded-lg border border-line-1 bg-fill-2 pl-8 pr-14 text-xs text-fg-2 placeholder:text-fg-7 outline-none transition-colors focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 pointer-coarse:h-10 [&::-webkit-search-cancel-button]:hidden"
+                />
+                {query ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setQuery("");
+                      searchRef.current?.focus();
+                    }}
+                    aria-label="Clear search"
+                    className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-fg-7 hover:bg-fill-1 hover:text-fg-1 cursor-pointer"
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                ) : (
+                  <kbd className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 rounded border border-line-1 bg-fill-1 px-1 py-px font-mono text-[10px] text-fg-7 peer-focus:hidden pointer-coarse:hidden">
+                    {SEARCH_KEYS}
+                  </kbd>
+                )}
+              </div>
+            )}
+
             <SidebarGroupContent className="flex-1 overflow-y-auto min-h-0">
               <SidebarMenu className="gap-0.5">
-                {isNewChat && !isSelectionMode && (
+                {search && visibleChats.length === 0 && (
+                  <li className="list-none px-2 py-3 text-xs text-fg-7">
+                    {chatsQuery.hasNextPage ? "Searching older chats…" : `No chats match "${query.trim()}"`}
+                  </li>
+                )}
+                {isNewChat && !isSelectionMode && !search && (
                   <SidebarMenuItem>
                     <ChatRowContent name={NEW_CHAT_LABEL} active onSelect={handleNewThread} />
                   </SidebarMenuItem>
                 )}
                 <AnimatePresence initial={false}>
-                  {chats.flatMap((chat, index) => {
+                  {visibleChats.flatMap((chat, index) => {
                     const group = dateGroup(chat.updated_at, now);
                     const startsGroup =
-                      index === 0 || dateGroup(chats[index - 1].updated_at, now) !== group;
+                      index === 0 || dateGroup(visibleChats[index - 1].updated_at, now) !== group;
                     const row = (
                       <motion.li
                         key={chat.id}
