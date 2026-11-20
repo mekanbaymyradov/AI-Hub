@@ -104,7 +104,7 @@ back without a deploy, and each new version is measured before it goes live.
 The guidance costs time: on GPT-OSS 120B, the average answer took 4.4 s instead
 of 2.3 s.
 
-![Logfire's experiment comparison on GPT-OSS 120B, answers_first against average task duration: baseline 67% at 2.3 s, v1 67% at 4.1 s, prompt-v1 100% at 4.4 s](images/experiments.png)
+![Logfire's comparison of baseline and prompt-v1 on GPT-OSS 120B: cases passed 53% to 93%, answers_first 67% to 100%, correct_and_complete 93% to 100%, and average task duration 2.26 s to 4.35 s](images/experiments.png)
 
 ## Attachments
 
