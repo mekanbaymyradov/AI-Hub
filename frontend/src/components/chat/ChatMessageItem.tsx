@@ -66,15 +66,13 @@ export const ChatMessageItem = memo(
     isFailedPrompt = false,
     failedModelId = null,
   }: ChatMessageItemProps) {
-    const [userReasoningOpen, setUserReasoningOpen] = useState<boolean | null>(null);
+    const [isReasoningOpen, setIsReasoningOpen] = useState(false);
     const [copyState, copy] = useCopy();
     const { t } = useTranslation();
     const isUser = message.role === "user";
     const isReasoningStreaming = Boolean(
       !isUser && isStreaming && isLastMessage && message.isReasoningStreaming
     );
-    // Auto-expand while actively thinking, then auto-collapse once the answer starts unless toggled.
-    const isReasoningOpen = userReasoningOpen ?? (isReasoningStreaming && !message.content);
 
     const handleCopy = useCallback(() => {
       if (message.content) void copy(message.content);
@@ -241,7 +239,7 @@ export const ChatMessageItem = memo(
                 <div className="mb-2.5">
                   <button
                     type="button"
-                    onClick={() => setUserReasoningOpen(!isReasoningOpen)}
+                    onClick={() => setIsReasoningOpen((open) => !open)}
                     aria-expanded={isReasoningOpen}
                     className="inline-flex items-center gap-1.5 py-1 px-2 -ml-2 rounded-lg text-xs font-medium text-fg-7 hover:text-fg-3 hover:bg-fill-2 transition-colors cursor-pointer select-none"
                   >
