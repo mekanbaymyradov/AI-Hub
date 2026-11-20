@@ -1,16 +1,28 @@
 from http import HTTPStatus
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from opentelemetry import trace
+from opentelemetry.trace import format_trace_id
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from src.exceptions import AppError
 
 
+def error_body(exc: AppError) -> dict[str, Any]:
+    """Return the response body; a server error also carries the trace ID, for the user to quote."""
+    body: dict[str, Any] = {"detail": [exc.serialize()]}
+    if exc.status >= 500:
+        span_context = trace.get_current_span().get_span_context()
+        body["trace_id"] = format_trace_id(span_context.trace_id)
+    return body
+
+
 async def handle_app_error(request: Request, exc: AppError) -> JSONResponse:
     return JSONResponse(
         status_code=exc.status,
-        content={"detail": [exc.serialize()]},
+        content=error_body(exc),
         headers=exc.headers,
     )
 
