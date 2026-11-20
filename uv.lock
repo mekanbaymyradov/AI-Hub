@@ -12,7 +12,7 @@ dependencies = [
     { name = "boto3-stubs", extra = ["s3"] },
     { name = "fastapi", extra = ["standard"] },
     { name = "httpx2" },
-    { name = "logfire", extra = ["fastapi", "fleet", "httpx", "redis", "sqlalchemy"] },
+    { name = "logfire", extra = ["fastapi", "fleet", "httpx", "redis", "sqlalchemy", "variables"] },
     { name = "opentelemetry-instrumentation-botocore" },
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic", extra = ["email"] },
@@ -41,7 +41,7 @@ requires-dist = [
     { name = "boto3-stubs", extras = ["s3"], specifier = ">=1.35" },
     { name = "fastapi", extras = ["standard"], specifier = ">=0.141.1" },
     { name = "httpx2", specifier = ">=2.13.1" },
-    { name = "logfire", extras = ["fastapi", "httpx", "sqlalchemy", "redis", "fleet"], specifier = ">=5.5.0,<6" },
+    { name = "logfire", extras = ["fastapi", "httpx", "sqlalchemy", "redis", "fleet", "variables"], specifier = ">=5.5.0,<6" },
     { name = "opentelemetry-instrumentation-botocore", specifier = ">=0.65b0,<0.66" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.3.5" },
     { name = "pydantic", extras = ["email"], specifier = ">=2.13.5" },
@@ -1405,6 +1405,9 @@ redis = [
 sqlalchemy = [
     { name = "logfire-sdk", extra = ["sqlalchemy"] },
 ]
+variables = [
+    { name = "logfire-sdk", extra = ["variables"] },
+]
 
 [[package]]
 name = "logfire-api"
@@ -1494,6 +1497,10 @@ redis = [
 ]
 sqlalchemy = [
     { name = "opentelemetry-instrumentation-sqlalchemy" },
+]
+variables = [
+    { name = "pydantic" },
+    { name = "pydantic-handlebars" },
 ]
 
 [[package]]
@@ -2412,6 +2419,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/eb/40/e31e2b9ca23f116f6a488e6114e803604e488ac05cb64aaab6b4633c52f0/pydantic_graph-2.53.0.tar.gz", hash = "sha256:28f05d5f66f5f6b11ef8f1c263f93781271b3af77ef3b313cc51b88a2e33445a", size = 45267, upload-time = "2026-10-02T03:18:12.674Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/07/6c5a2e57aad764dd81f8a8552b47ad88c598108c6794f703fe919a31bf26/pydantic_graph-2.53.0-py3-none-any.whl", hash = "sha256:48d70fd7affe15f33773a74b9657ab9442569725d9e67263ac3a3b95de89f714", size = 52764, upload-time = "2026-10-02T03:18:03.622Z" },
+]
+
+[[package]]
+name = "pydantic-handlebars"
+version = "0.2.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pydantic" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/96/73/e55a1fe1a8788a5fa82d9209e796f4111e28f2d2fecab7173aa6d80516ad/pydantic_handlebars-0.2.1.tar.gz", hash = "sha256:d4124cfbf7d6e3bded9331a08ccccf6f29f3e3a93665b35b5d6061650aeeb49f", size = 176949, upload-time = "2026-05-25T01:24:38.354Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/55/11/364bc401f1d8fdb3947079fc43ffdfbfc9132d065981a03a95d2e87440c4/pydantic_handlebars-0.2.1-py3-none-any.whl", hash = "sha256:c713427d6498cf4b66814447d54753a2748f8a8d3a9f00c194192ddb3df61e52", size = 50476, upload-time = "2026-05-25T01:24:37.104Z" },
 ]
 
 [[package]]

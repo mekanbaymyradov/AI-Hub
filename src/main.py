@@ -17,6 +17,7 @@ from src.config import settings
 from src.database import DbSession
 from src.error_handlers import register_error_handlers
 from src.exceptions import RateLimitExceeded, error_responses
+from src.llm.agents import chat_prompt
 from src.llm.config import llm_settings
 from src.llm.registry import LLMRegistry, llm_lifespan
 from src.llm.router import llm_router
@@ -51,6 +52,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
             httpx2.AsyncClient(timeout=10) as http,
             llm_lifespan(llm_settings) as registry,
         ):
+            # The first read of a Logfire prompt blocks on a fetch of up to 20s,
+            # which would stall every request; afterwards reads are in memory.
+            await chat_prompt.refresh()
             # app runs here
             yield {
                 "registry": registry,
