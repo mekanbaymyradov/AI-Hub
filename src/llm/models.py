@@ -13,6 +13,8 @@ class AgentDeps:
     name: str | None
     instructions: str | None
     http: httpx2.AsyncClient
+    # Which Logfire label of the chat prompt to answer with; evals test others.
+    prompt_label: str = "production"
 
 
 class ModelSpec(BaseModel):

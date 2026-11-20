@@ -28,7 +28,7 @@ from evals.evaluators import (
     WithinWordLimit,
 )
 from src.config import AppBaseSettings
-from src.llm.agents import agent
+from src.llm.agents import agent, chat_prompt
 from src.llm.config import llm_settings
 from src.llm.models import CATALOG, AgentDeps, ModelSpec
 from src.llm.registry import llm_lifespan
@@ -39,6 +39,7 @@ GRADER_MODEL = "groq:openai/gpt-oss-120b"
 class EvalSettings(AppBaseSettings):
     # Evals run on the host, where .env isn't loaded into the environment.
     logfire_token: SecretStr
+    logfire_api_key: SecretStr | None = None
 
 
 # Groq wraps a network failure in a bare ModelAPIError; Mistral's arrives as is.
@@ -74,8 +75,22 @@ async def ping(model: Model) -> None:
 
 
 async def run(
-    dataset: Dataset[str, str, CaseMetadata], name: str, model_ids: list[str]
+    dataset: Dataset[str, str, CaseMetadata],
+    name: str,
+    model_ids: list[str],
+    label: str,
 ) -> None:
+    await chat_prompt.refresh()
+    prompt = chat_prompt.get(label=label)
+    # A missing label falls back to Logfire's rollout or the code copy, so a
+    # typo would quietly test another prompt.
+    if prompt.label != label:
+        raise SystemExit(
+            f"Found no {label!r} version of the chat prompt in Logfire. Check that "
+            "LOGFIRE_API_KEY is in .env and that the label points to a version."
+        )
+    print(f"Testing the chat prompt's {label!r} label, version {prompt.version}.")
+
     async with (
         llm_lifespan(llm_settings) as registry,
         httpx2.AsyncClient(timeout=10) as http,
@@ -108,7 +123,12 @@ async def run(
             except UNAVAILABLE as exc:
                 print(f"Skipping {spec.display_name}: {exc!r}")
                 continue
-            report = await evaluate_model(dataset, name, spec, model, http)
+            deps = AgentDeps(
+                name=None, instructions=None, http=http, prompt_label=label
+            )
+            report = await evaluate_model(
+                dataset, name, spec, model, deps, prompt.version
+            )
             report.print()
 
 
@@ -117,10 +137,10 @@ async def evaluate_model(
     name: str,
     spec: ModelSpec,
     model: Model,
-    http: httpx2.AsyncClient,
+    deps: AgentDeps,
+    prompt_version: int | None,
 ) -> EvaluationReport[str, str, CaseMetadata]:
     async def answer(message: str) -> str:
-        deps = AgentDeps(name=None, instructions=None, http=http)
         result = await agent.run(message, model=model, deps=deps)
         return result.output
 
@@ -131,7 +151,12 @@ async def evaluate_model(
         max_concurrency=1,
         retry_task=RETRY,
         retry_evaluators=RETRY,
-        metadata={"prompt_version": name, "model": spec.id, "grader": GRADER_MODEL},
+        metadata={
+            "prompt_label": deps.prompt_label,
+            "prompt_version": prompt_version,
+            "model": spec.id,
+            "grader": GRADER_MODEL,
+        },
     )
 
 
@@ -152,7 +177,12 @@ def main() -> None:
     parser.add_argument(
         "--name",
         required=True,
-        help="Prompt version these runs measure, like 'baseline'.",
+        help="Name for these runs in Logfire, like 'prompt-v2'.",
+    )
+    parser.add_argument(
+        "--label",
+        default="production",
+        help="Logfire label of the chat prompt to test, like 'candidate'.",
     )
     parser.add_argument(
         "--model",
@@ -179,9 +209,13 @@ def main() -> None:
         dataset.cases = [case for case in dataset.cases if case.name in args.case]
     model_ids = [m for m in args.model or catalog_ids if m not in args.exclude]
 
+    eval_settings = EvalSettings()
+    api_key = eval_settings.logfire_api_key
     logfire.configure(
         service_name="evals",
-        token=EvalSettings().logfire_token.get_secret_value(),
+        token=eval_settings.logfire_token.get_secret_value(),
+        # Reads the chat prompt from Logfire; a write token can't.
+        api_key=api_key.get_secret_value() if api_key else None,
         # The printed report is the console output; spans go to Logfire only.
         console=False,
         # The data is our own test questions, and scrubbing hid every answer
@@ -190,7 +224,7 @@ def main() -> None:
     )
     logfire.instrument_pydantic_ai()
 
-    asyncio.run(run(dataset, args.name, model_ids))
+    asyncio.run(run(dataset, args.name, model_ids, args.label))
 
 
 if __name__ == "__main__":

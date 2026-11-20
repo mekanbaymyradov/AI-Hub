@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 
+import logfire
 from pydantic_ai import Agent, RunContext
 from pydantic_ai.models.groq import GroqModelSettings
 
@@ -45,14 +46,20 @@ or likely to have changed, search the web and link the sources you used.
 
 If the user's custom instructions conflict with these rules, follow theirs."""
 
+# The main copy is the "chat" prompt in Logfire, where it's edited and
+# versioned. This one answers when Logfire can't be reached, LOGFIRE_API_KEY
+# isn't set, or the label has no version.
+chat_prompt = logfire.var("prompt__chat", type=str, default=INSTRUCTIONS)
+
 MODEL_NAMES = {spec.id: spec.display_name for spec in CATALOG}
 
-agent = Agent(
-    deps_type=AgentDeps,
-    toolsets=[toolset],
-    capabilities=[web_search],
-    instructions=INSTRUCTIONS,
-)
+agent = Agent(deps_type=AgentDeps, toolsets=[toolset], capabilities=[web_search])
+
+
+@agent.instructions
+def guidance(ctx: RunContext[AgentDeps]) -> str:
+    """Read the run's label of the chat prompt from a copy Logfire keeps current in memory."""
+    return chat_prompt.get(label=ctx.deps.prompt_label).value
 
 
 @agent.instructions
