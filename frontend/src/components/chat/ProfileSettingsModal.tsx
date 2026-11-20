@@ -1,5 +1,6 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from "react";
 import { Camera, Check, Loader2, Sparkles, Trash2, User as UserIcon, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import { getErrorMessage } from "@/api/errors";
 import { type UserPublic } from "@/api/types";
 import { useAuth } from "@/context/auth";
@@ -10,33 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Modal, ModalTitle } from "@/components/Modal";
 import { UserAvatar } from "@/components/UserAvatar";
+import { LanguageSwitch } from "@/components/LanguageSwitch";
 
 // The API's limits for UserUpdate.
 const NAME_MAX_LENGTH = 50;
 const INSTRUCTIONS_MAX_LENGTH = 1500;
 
-const INSTRUCTION_SUGGESTIONS = [
-  {
-    label: "Concise & direct",
-    text: "Be concise and direct. Focus on actionable answers without unnecessary filler.",
-  },
-  {
-    label: "Code-first",
-    text: "Prioritize clean, production-ready code with minimal explanation.",
-  },
-  {
-    label: "Step-by-step",
-    text: "Break down complex topics and explain step-by-step with clear examples.",
-  },
-  {
-    label: "Senior engineer",
-    text: "Act as a senior software engineer. Focus on best practices and architecture.",
-  },
-  {
-    label: "Simple & clear",
-    text: "Explain in simple, everyday language without overly technical jargon.",
-  },
-];
+// Label and text are under profile.suggestions.<key>; the text is in the user's language, as the model will read it.
+const INSTRUCTION_SUGGESTIONS = ["concise", "code", "steps", "senior", "simple"] as const;
 
 // 16px on phones, since iOS zooms into any focused field smaller than that.
 const FIELD = "h-10 rounded-xl border-line-1 bg-zinc-50 text-base sm:text-sm text-fg-1 focus-visible:ring-1 focus-visible:ring-blue-500 dark:bg-zinc-900";
@@ -48,6 +30,7 @@ interface ProfileSettingsModalProps {
 
 export function ProfileSettingsModal({ open, onClose }: ProfileSettingsModalProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   return (
     <Modal
       open={open}
@@ -59,13 +42,13 @@ export function ProfileSettingsModal({ open, onClose }: ProfileSettingsModalProp
           <div className="flex h-8 w-8 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600 dark:border-blue-900/40 dark:bg-blue-950/60 dark:text-blue-400">
             <UserIcon className="h-4 w-4" />
           </div>
-          <ModalTitle className="text-lg font-semibold tracking-tight text-fg-1">Profile</ModalTitle>
+          <ModalTitle className="text-lg font-semibold tracking-tight text-fg-1">{t("profile.title")}</ModalTitle>
         </div>
         <button
           type="button"
           onClick={onClose}
           className="cursor-pointer rounded-xl p-1.5 text-zinc-400 transition-colors hover:bg-fill-1 hover:text-fg-1"
-          aria-label="Close"
+          aria-label={t("common.close")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -84,6 +67,7 @@ export function ProfileSettingsModal({ open, onClose }: ProfileSettingsModalProp
 
 function AvatarSection({ user }: { user: UserPublic }) {
   const { uploadAvatar, removeAvatar } = useAuth();
+  const { t } = useTranslation();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -104,7 +88,7 @@ function AvatarSection({ user }: { user: UserPublic }) {
     const file = e.target.files?.[0];
     // Cleared now, so choosing the same file again still fires a change.
     e.target.value = "";
-    if (file) run(async () => uploadAvatar(await toSquareWebP(file)), "Failed to upload photo.");
+    if (file) run(async () => uploadAvatar(await toSquareWebP(file)), t("profile.uploadFailed"));
   };
 
   return (
@@ -140,23 +124,23 @@ function AvatarSection({ user }: { user: UserPublic }) {
             className="h-8 cursor-pointer rounded-xl border-zinc-200 bg-white px-3 text-xs text-fg-3 hover:bg-zinc-100 dark:border-zinc-700 dark:bg-zinc-800 dark:hover:bg-zinc-700/80"
           >
             <Camera className="mr-1.5 h-3.5 w-3.5" />
-            Upload photo
+            {t("profile.uploadPhoto")}
           </Button>
           {user.avatar_url && (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={() => run(removeAvatar, "Failed to remove photo.")}
+              onClick={() => run(removeAvatar, t("profile.removeFailed"))}
               disabled={busy}
               className="h-8 cursor-pointer rounded-xl px-2.5 text-xs text-red-500 hover:bg-red-50 hover:text-red-600 dark:text-red-400 dark:hover:bg-red-500/10 dark:hover:text-red-300"
             >
               <Trash2 className="mr-1.5 h-3.5 w-3.5" />
-              Remove
+              {t("profile.removePhoto")}
             </Button>
           )}
         </div>
-        <span className="text-xs text-fg-7">JPG, PNG, or WebP up to 2MB</span>
+        <span className="text-xs text-fg-7">{t("profile.photoHint")}</span>
         {error && <span className="text-xs font-medium text-red-500">{error}</span>}
       </div>
     </div>
@@ -165,6 +149,7 @@ function AvatarSection({ user }: { user: UserPublic }) {
 
 function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void }) {
   const { updateUser } = useAuth();
+  const { t } = useTranslation();
   const [name, setName] = useState(user.name ?? "");
   const [instructions, setInstructions] = useState(user.instructions ?? "");
   const [saving, setSaving] = useState(false);
@@ -181,7 +166,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
       // A beat to show "Saved" before closing.
       setTimeout(onClose, 500);
     } catch (err) {
-      setError(getErrorMessage(err, "Failed to save your profile."));
+      setError(getErrorMessage(err, t("profile.saveFailed")));
     } finally {
       setSaving(false);
     }
@@ -192,21 +177,21 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1.5">
           <label htmlFor="profile-name" className="text-xs font-medium text-fg-4">
-            Name
+            {t("profile.name")}
           </label>
           <Input
             id="profile-name"
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={NAME_MAX_LENGTH}
-            placeholder="Your name"
+            placeholder={t("profile.namePlaceholder")}
             className={FIELD}
           />
         </div>
 
         <div className="space-y-1.5">
           <label htmlFor="profile-email" className="text-xs font-medium text-fg-7">
-            Email
+            {t("profile.email")}
           </label>
           <Input
             id="profile-email"
@@ -218,9 +203,14 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
       </div>
 
       <div className="space-y-1.5">
+        <span className="text-xs font-medium text-fg-4">{t("common.language")}</span>
+        <LanguageSwitch />
+      </div>
+
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <label htmlFor="profile-instructions" className="text-xs font-medium text-fg-4">
-            Instructions
+            {t("profile.instructions")}
           </label>
           <span
             className={cn(
@@ -238,25 +228,26 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
           value={instructions}
           onChange={(e) => setInstructions(e.target.value)}
           maxLength={INSTRUCTIONS_MAX_LENGTH}
-          placeholder="How would you like the AI to respond? (e.g., concise, code-first)"
+          placeholder={t("profile.instructionsPlaceholder")}
           rows={4}
           className={cn(FIELD, "h-auto min-h-[110px] resize-none")}
         />
         <div className="space-y-2 pt-1">
           <div className="flex items-center gap-1.5 text-xs text-fg-7">
             <Sparkles className="h-3 w-3 text-blue-500" />
-            <span>Suggestions</span>
+            <span>{t("profile.suggestionsLabel")}</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {INSTRUCTION_SUGGESTIONS.map((item) => {
-              const isSelected = instructions === item.text;
+            {INSTRUCTION_SUGGESTIONS.map((key) => {
+              const text = t(`profile.suggestions.${key}.text`);
+              const isSelected = instructions === text;
               return (
                 <button
-                  key={item.label}
+                  key={key}
                   type="button"
-                  onClick={() => setInstructions(isSelected ? "" : item.text)}
+                  onClick={() => setInstructions(isSelected ? "" : text)}
                   aria-pressed={isSelected}
-                  title={item.text}
+                  title={text}
                   className={cn(
                     "cursor-pointer rounded-lg border px-2.5 py-1 text-left text-xs transition-all select-none",
                     isSelected
@@ -264,7 +255,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
                       : "border-line-1 bg-zinc-50 text-fg-6 hover:border-zinc-300 hover:bg-zinc-100 hover:text-fg-2 dark:bg-zinc-900/50 dark:hover:border-white/20 dark:hover:bg-zinc-800/80"
                   )}
                 >
-                  {item.label}
+                  {t(`profile.suggestions.${key}.label`)}
                 </button>
               );
             })}
@@ -276,7 +267,7 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
         <div className="text-xs font-medium">
           {saved && (
             <span className="flex items-center gap-1.5 text-emerald-500 dark:text-emerald-400">
-              <Check className="h-4 w-4" /> Saved
+              <Check className="h-4 w-4" /> {t("profile.saved")}
             </span>
           )}
           {error && <span className="text-red-500">{error}</span>}
@@ -289,14 +280,14 @@ function ProfileForm({ user, onClose }: { user: UserPublic; onClose: () => void 
             disabled={saving}
             className="h-10 cursor-pointer rounded-xl px-4 text-xs font-medium text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
           >
-            Cancel
+            {t("common.cancel")}
           </Button>
           <Button
             type="submit"
             disabled={saving}
             className="h-10 cursor-pointer rounded-xl bg-blue-600 px-5 text-xs font-semibold text-white shadow-md shadow-blue-500/20 transition-all hover:bg-blue-700"
           >
-            {saving ? "Saving..." : "Save"}
+            {saving ? t("common.saving") : t("common.save")}
           </Button>
         </div>
       </div>

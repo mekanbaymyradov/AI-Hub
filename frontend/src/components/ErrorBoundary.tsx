@@ -1,6 +1,8 @@
 import * as React from "react";
 import { AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+// The instance, not the hook: a class component can't call hooks.
+import i18n from "@/i18n";
 
 interface ErrorBoundaryProps {
   children: React.ReactNode;
@@ -31,9 +33,9 @@ export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoun
         className="flex h-full w-full flex-1 flex-col items-center justify-center gap-3 px-4 py-24 text-center"
       >
         <AlertCircle className="h-6 w-6 text-red-500" />
-        <p className="text-sm text-muted-foreground">Something went wrong while showing this page.</p>
+        <p className="text-sm text-muted-foreground">{i18n.t("app.crashed")}</p>
         <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
-          Reload
+          {i18n.t("app.reload")}
         </Button>
       </div>
     );

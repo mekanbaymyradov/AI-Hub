@@ -10,6 +10,8 @@ import {
   type KeyboardEvent,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { type TFunction } from "i18next";
+import { useTranslation } from "react-i18next";
 import { AlertCircle, ArrowUp, Check, FileText, Loader2, Mic, Paperclip, Square, WifiOff, X } from "lucide-react";
 
 import { chatApi } from "@/api/chat";
@@ -61,16 +63,16 @@ function formatElapsed(seconds: number): string {
 }
 
 /** Return why these files can't be attached, or null when they can. */
-function attachmentProblem(files: File[], alreadyAttached: number): string | null {
+function attachmentProblem(files: File[], alreadyAttached: number, t: TFunction): string | null {
   if (alreadyAttached + files.length > MAX_ATTACHMENTS) {
-    return `You can attach at most ${MAX_ATTACHMENTS} files per message.`;
+    return t("composer.tooManyFiles", { count: MAX_ATTACHMENTS });
   }
   for (const file of files) {
     if (!ATTACHMENT_TYPES.includes(file.type)) {
-      return `Unsupported file "${file.name}". Only images (JPEG, PNG, WebP, GIF) and PDFs are allowed.`;
+      return t("composer.unsupportedFile", { name: file.name });
     }
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      return `File "${file.name}" exceeds the 10 MiB size limit.`;
+      return t("composer.fileTooLarge", { name: file.name });
     }
   }
   return null;
@@ -89,6 +91,7 @@ export function ChatInput({
   onEffortChange,
 }: ChatInputProps) {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const draft = draftKey(user?.id, chatId);
   const [input, setInput] = useState(() => readDraft(draft));
   // Swapped during the render that changes chats, so the old chat's text never shows in the new one.
@@ -148,8 +151,8 @@ export function ChatInput({
     if (files.length === 0 || !canAttach) return;
 
     const problem = modelSupportsFiles
-      ? attachmentProblem(files, attachments.length)
-      : `The selected model (${selectedModel?.display_name}) does not accept file attachments.`;
+      ? attachmentProblem(files, attachments.length, t)
+      : t("composer.modelRejectsFiles", { model: selectedModel?.display_name });
     setAttachmentError(problem);
     if (problem) return;
 
@@ -158,7 +161,7 @@ export function ChatInput({
       const uploaded = await chatApi.uploadAttachments(files);
       setAttachments((prev) => [...prev, ...uploaded]);
     } catch (err) {
-      setAttachmentError(getErrorMessage(err, "Failed to upload attachments."));
+      setAttachmentError(getErrorMessage(err, t("composer.uploadFailed")));
     } finally {
       setUploadingNames([]);
     }
@@ -210,7 +213,7 @@ export function ChatInput({
     if (!selectedModel) return;
 
     if (attachments.length > 0 && !modelSupportsFiles) {
-      setAttachmentError(`Model "${selectedModel.display_name}" cannot accept files. Please select a compatible model.`);
+      setAttachmentError(t("composer.pickFileModel", { model: selectedModel.display_name }));
       return;
     }
 
@@ -276,13 +279,13 @@ export function ChatInput({
               // Pointer events off, so drag events keep reaching the form underneath.
               <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 rounded-[inherit] bg-blue-500/10 backdrop-blur-[2px] text-sm font-medium text-blue-600 dark:text-blue-400 pointer-events-none">
                 <Paperclip className="h-4 w-4" />
-                {modelSupportsFiles ? "Drop files to attach" : "This model doesn't accept files"}
+                {modelSupportsFiles ? t("composer.dropFiles") : t("composer.dropNotAccepted")}
               </div>
             )}
             {!isOnline && (
               <div role="status" className="flex items-start gap-1.5 bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
                 <WifiOff className="h-3.5 w-3.5 shrink-0 mt-px" />
-                <span className="min-w-0">You're offline. Your message is saved here until you reconnect.</span>
+                <span className="min-w-0">{t("composer.offline")}</span>
               </div>
             )}
             {error && (
@@ -298,13 +301,13 @@ export function ChatInput({
                       onClick={voice.retry}
                       className="font-medium hover:text-red-600 dark:hover:text-red-300 hover:underline underline-offset-2 cursor-pointer"
                     >
-                      Retry
+                      {t("common.retry")}
                     </button>
                   )}
                   <button
                     type="button"
                     onClick={voice.error ? voice.dismissError : () => setAttachmentError(null)}
-                    aria-label="Dismiss"
+                    aria-label={t("common.dismiss")}
                     className="text-red-500 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -329,7 +332,7 @@ export function ChatInput({
                     <button
                       type="button"
                       onClick={() => removeAttachment(att.id)}
-                      aria-label={`Remove ${att.filename}`}
+                      aria-label={t("composer.removeFile", { name: att.filename })}
                       className="text-zinc-400 hover:text-zinc-700 dark:hover:text-white ml-0.5 cursor-pointer"
                     >
                       <X className="h-3 w-3" />
@@ -354,7 +357,7 @@ export function ChatInput({
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
-              placeholder="Send a message..."
+              placeholder={t("composer.placeholder")}
               className="min-h-11 max-h-[200px] sm:max-h-[260px] w-full resize-none overflow-y-auto border-0 rounded-none shadow-none focus-visible:ring-0 px-3.5 sm:px-4 pt-3.5 sm:pt-4 pb-1 text-base sm:text-[15px] bg-transparent dark:bg-transparent text-fg-1 placeholder:text-fg-8"
               rows={1}
             />
@@ -365,7 +368,7 @@ export function ChatInput({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  aria-label="Cancel dictation"
+                  aria-label={t("composer.cancelDictation")}
                   onClick={voice.cancel}
                   className="h-8 w-8 pointer-coarse:size-11 shrink-0 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
                 >
@@ -380,7 +383,7 @@ export function ChatInput({
                 </span>
                 <Button
                   type="button"
-                  aria-label={voice.state === "transcribing" ? "Transcribing" : "Stop and transcribe"}
+                  aria-label={voice.state === "transcribing" ? t("composer.transcribing") : t("composer.stopAndTranscribe")}
                   onClick={voice.finish}
                   disabled={voice.state === "transcribing"}
                   // Focused when the bar appears, since the mic button that had focus is gone.
@@ -411,7 +414,7 @@ export function ChatInput({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        aria-label="Attach files"
+                        aria-label={t("composer.attach")}
                         onClick={() => fileInputRef.current?.click()}
                         disabled={!canAttach || !modelSupportsFiles}
                         className={cn(
@@ -429,8 +432,8 @@ export function ChatInput({
                     <TooltipContent side="top" align="center">
                       <span>
                         {modelSupportsFiles
-                          ? `Attach images or PDFs (up to ${MAX_ATTACHMENTS} files, max 10MB each)`
-                          : "Selected model does not support file attachments"}
+                          ? t("composer.attachHint", { count: MAX_ATTACHMENTS })
+                          : t("composer.noFilesHint")}
                       </span>
                     </TooltipContent>
                   </Tooltip>
@@ -453,7 +456,7 @@ export function ChatInput({
                           type="button"
                           variant="ghost"
                           size="icon"
-                          aria-label="Dictate"
+                          aria-label={t("composer.dictate")}
                           onClick={voice.start}
                           disabled={voice.state === "starting"}
                           className="h-8 w-8 pointer-coarse:size-11 rounded-full text-fg-7 hover:text-fg-1 hover:bg-fill-1 dark:hover:bg-fill-1 transition-colors cursor-pointer"
@@ -466,7 +469,7 @@ export function ChatInput({
                         </Button>
                       } />
                       <TooltipContent side="top" align="center">
-                        <span>Dictate</span>
+                        <span>{t("composer.dictate")}</span>
                       </TooltipContent>
                     </Tooltip>
                   )}
@@ -475,9 +478,9 @@ export function ChatInput({
                     <Button
                       type="button"
                       onClick={onStop}
-                      aria-label="Stop generation"
+                      aria-label={t("composer.stop")}
                       aria-keyshortcuts="Escape"
-                      title="Stop generation (Esc)"
+                      title={t("composer.stopHint")}
                       className="h-8 w-8 pointer-coarse:size-11 rounded-full bg-red-600 hover:bg-red-500 text-white p-0 flex items-center justify-center transition-all shadow-none cursor-pointer"
                     >
                       <Square className="h-3 w-3 fill-current" />
@@ -485,7 +488,7 @@ export function ChatInput({
                   ) : (
                     <Button
                       type="submit"
-                      aria-label="Send message"
+                      aria-label={t("composer.send")}
                       disabled={(!input.trim() && attachments.length === 0) || isUploadingAttachments || !isOnline}
                       className="h-8 w-8 pointer-coarse:size-11 rounded-full bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-40 disabled:bg-zinc-200 dark:disabled:bg-zinc-800 disabled:text-zinc-400 dark:disabled:text-zinc-600 p-0 flex items-center justify-center transition-all shadow-sm shadow-blue-500/20 cursor-pointer"
                     >

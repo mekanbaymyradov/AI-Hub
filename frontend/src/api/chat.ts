@@ -5,6 +5,8 @@ import {
   type UIMessageChunk,
 } from "ai";
 import { API_BASE_URL } from "@/config";
+// The instance, not the hook: this runs outside React.
+import i18n from "@/i18n";
 import {
   type ChatUIMessage,
   type SendRequestMetadata,
@@ -100,7 +102,7 @@ class AppChatTransport extends DefaultChatTransport<ChatUIMessage> {
             {
               id: lastUserMessage?.id ?? id,
               role: "user",
-              parts: textParts.length > 0 ? textParts : [{ type: "text", text: "Attached files" }],
+              parts: textParts.length > 0 ? textParts : [{ type: "text", text: i18n.t("chat.attachedFiles") }],
             },
           ],
           modelId: meta.modelId,
@@ -138,7 +140,7 @@ class AppChatTransport extends DefaultChatTransport<ChatUIMessage> {
         }
       } catch (error) {
         if (options.abortSignal?.aborted) throw error;
-        throw new Error(getErrorMessage(error, "Failed to start a new chat."), {
+        throw new Error(getErrorMessage(error, i18n.t("chat.newChatFailed")), {
           cause: error,
         });
       }

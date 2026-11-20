@@ -2,6 +2,8 @@ import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import './index.css'
+// Before App, so the first render already has its language.
+import '@/i18n'
 import App from './App.tsx'
 import { TooltipProvider } from "@/components/ui/tooltip"
 const queryClient = new QueryClient()

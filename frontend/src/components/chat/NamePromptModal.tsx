@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from "react";
+import { useTranslation } from "react-i18next";
 import { getErrorMessage } from "@/api/errors";
 import { useAuth } from "@/context/auth";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ const skippedKey = (userId: number) => `name-prompt-skipped:${userId}`;
 /** Ask a user without a name what to call them, until they answer or skip. */
 export function NamePromptModal() {
   const { user, updateUser } = useAuth();
+  const { t } = useTranslation();
   const [skipped, setSkipped] = useState(() => user !== null && localStorage.getItem(skippedKey(user.id)) !== null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -35,7 +37,7 @@ export function NamePromptModal() {
       // On success the user has a name, which closes the modal.
       await updateUser({ name: trimmed });
     } catch (err) {
-      setError(getErrorMessage(err, "Couldn't save your name. Please try again."));
+      setError(getErrorMessage(err, t("namePrompt.saveFailed")));
       setSaving(false);
     }
   };
@@ -49,9 +51,9 @@ export function NamePromptModal() {
           if (e.key === "Escape" && !saving) skip();
         }}
       >
-        <ModalTitle className="text-lg font-semibold text-fg-1">Hey, what should I call you?</ModalTitle>
+        <ModalTitle className="text-lg font-semibold text-fg-1">{t("namePrompt.title")}</ModalTitle>
         <ModalDescription className="mt-1 text-sm text-fg-7">
-          You can change it anytime in Profile Settings.
+          {t("namePrompt.description")}
         </ModalDescription>
 
         <Input
@@ -61,10 +63,10 @@ export function NamePromptModal() {
             setName(e.target.value);
             setError(null);
           }}
-          placeholder="Your name"
+          placeholder={t("namePrompt.placeholder")}
           autoComplete="given-name"
           maxLength={NAME_MAX_LENGTH}
-          aria-label="Your name"
+          aria-label={t("namePrompt.placeholder")}
           aria-invalid={error !== null}
           className="mt-5 h-11 rounded-xl border-line-1 bg-field dark:bg-field px-3.5 text-center text-fg-1"
         />
@@ -82,14 +84,14 @@ export function NamePromptModal() {
             disabled={saving}
             className="h-10 rounded-xl text-sm text-fg-5 hover:bg-fill-1 dark:hover:bg-fill-1 hover:text-fg-1"
           >
-            Skip
+            {t("namePrompt.skip")}
           </Button>
           <Button
             type="submit"
             disabled={!name.trim() || saving}
             className="h-10 rounded-xl bg-blue-600 text-sm font-semibold text-white hover:bg-blue-500"
           >
-            {saving ? "Saving…" : "Continue"}
+            {saving ? t("common.saving") : t("namePrompt.continue")}
           </Button>
         </div>
       </form>

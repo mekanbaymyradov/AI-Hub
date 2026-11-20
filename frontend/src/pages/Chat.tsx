@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useChat } from "@ai-sdk/react";
+import { useTranslation } from "react-i18next";
 import { isAxiosError } from "axios";
 
 import { SidebarProvider } from "@/components/ui/sidebar";
@@ -37,6 +38,7 @@ import {
 
 export default function Chat() {
   const queryClient = useQueryClient();
+  const { t, i18n } = useTranslation();
 
   // Saved, so a returning user finds the model and effort they last picked.
   const [selectedModelId, setSelectedModelId] = useStoredState<string | null>(
@@ -93,7 +95,8 @@ export default function Chat() {
       if (streamChatIdRef.current !== null) {
         dirtyChatIdRef.current = streamChatIdRef.current;
       }
-      setAnnouncement(isError ? "The reply failed." : isAbort ? "Reply stopped." : "Reply ready.");
+      // i18n.t, not t: useChat keeps the callbacks from the first render, and t would keep its language.
+      setAnnouncement(i18n.t(isError ? "chat.replyFailed" : isAbort ? "chat.replyStopped" : "chat.replyReady"));
     },
   });
 
@@ -107,7 +110,7 @@ export default function Chat() {
 
   const currentChatTitle = activeChatId
     ? chatsData?.pages.flatMap((page) => page.items).find((chat) => chat.id === activeChatId)?.name ??
-      "Conversation"
+      t("chat.conversation")
     : undefined;
 
   const messagesQuery = useChatMessages(activeChatId);
@@ -210,9 +213,9 @@ export default function Chat() {
   const handleSend = async ({ prompt, attachments, modelId, effort }: OutgoingMessage) => {
     if (isStreaming) return;
 
-    const sendText = prompt || "Attached files";
+    const sendText = prompt || t("chat.attachedFiles");
     clearError();
-    setAnnouncement("Writing a reply…");
+    setAnnouncement(t("chat.writingReply"));
     streamChatIdRef.current = activeChatId;
 
     if (activeChatId !== null) {
@@ -257,7 +260,7 @@ export default function Chat() {
       if (!modelToUse) return;
 
       clearError();
-      setAnnouncement("Writing a reply…");
+      setAnnouncement(t("chat.writingReply"));
       streamChatIdRef.current = activeChatId;
       touchChatInCache(queryClient, activeChatId);
 
@@ -277,14 +280,14 @@ export default function Chat() {
         metadata: requestMetadata,
       });
     },
-    [isStreaming, activeChatId, activeModelId, selectedModelId, effort, models, clearError, queryClient, regenerate, setSelectedModelId]
+    [isStreaming, activeChatId, activeModelId, selectedModelId, effort, models, clearError, queryClient, regenerate, setSelectedModelId, t]
   );
 
   const lastChatMessage = chatMessages[chatMessages.length - 1];
   const activeTool = isStreaming ? getActiveToolName(lastChatMessage) : null;
   const streamErrorText =
     status === "error" && error
-      ? getErrorMessage(error, "An error occurred during response streaming.")
+      ? getErrorMessage(error, t("chat.streamFailed"))
       : undefined;
 
   const lastPromptHasAttachments = useMemo(() => {

@@ -20,6 +20,7 @@ import {
   User as UserIcon,
   X,
 } from "lucide-react";
+import { Trans, useTranslation } from "react-i18next";
 
 import { getErrorMessage } from "@/api/errors";
 import { useChats, useDeleteChat, useDeleteChats, useRenameChat } from "@/api/queries";
@@ -60,8 +61,6 @@ import { ProfileSettingsModal } from "./ProfileSettingsModal";
 import { RenameChatModal } from "./RenameChatModal";
 
 
-// Shown at the top of the list while the open chat hasn't been created yet.
-const NEW_CHAT_LABEL = "New Chat";
 
 interface AppSidebarProps {
   activeChatId: number | null;
@@ -71,21 +70,22 @@ interface AppSidebarProps {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Return the sidebar heading for a chat last active at `iso`, counted in local calendar days. */
-function dateGroup(iso: string, now: Date): string {
+/** Return the translation key of the sidebar heading for a chat last active at `iso`, counted in local calendar days. */
+function dateGroup(iso: string, now: Date) {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
   const daysAgo = Math.ceil((startOfToday - new Date(iso).getTime()) / DAY_MS);
-  if (daysAgo <= 0) return "Today";
-  if (daysAgo === 1) return "Yesterday";
-  if (daysAgo <= 7) return "Previous 7 days";
-  if (daysAgo <= 30) return "Previous 30 days";
-  return "Older";
+  if (daysAgo <= 0) return "sidebar.groups.today";
+  if (daysAgo === 1) return "sidebar.groups.yesterday";
+  if (daysAgo <= 7) return "sidebar.groups.previous7";
+  if (daysAgo <= 30) return "sidebar.groups.previous30";
+  return "sidebar.groups.older";
 }
 
 export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSidebarProps) {
   const { toggleSidebar, setOpen, isMobile, setOpenMobile } = useSidebar();
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const handleSelectChat = (id: number) => {
@@ -254,7 +254,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
               <Button
                 variant="ghost"
                 size="icon"
-                aria-label="Toggle sidebar"
+                aria-label={t("sidebar.toggle")}
                 className="group/logo-btn group-data-[state=expanded]:h-9 group-data-[state=expanded]:w-9 group-data-[state=collapsed]:h-8 group-data-[state=collapsed]:w-8 text-zinc-500 hover:text-fg-1 dark:text-muted-foreground rounded-lg p-0 cursor-pointer"
                 onClick={toggleSidebar}
               >
@@ -271,7 +271,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
               </Button>
             } />
             <TooltipContent side="right" align="center">
-              <span>Toggle sidebar</span>
+              <span>{t("sidebar.toggle")}</span>
               <kbd className="px-1.5 py-0.5 text-[10px] font-mono font-medium rounded bg-fill-1 text-fg-4 border border-line-1 shadow-xs">
                 {IS_MAC ? "⌘ B" : "Ctrl + B"}
               </kbd>
@@ -287,7 +287,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   if (isSelectionMode) handleCancelSelection();
                   handleNewThread();
                 }}
-                tooltip={`New thread  ${NEW_CHAT_KEYS}`}
+                tooltip={`${t("sidebar.newThread")}  ${NEW_CHAT_KEYS}`}
                 className={cn(
                   "group/new-btn relative transition-all duration-200 overflow-hidden cursor-pointer active:scale-[0.97]",
                   "group-data-[state=expanded]:w-full group-data-[state=expanded]:h-10 group-data-[state=expanded]:px-2.5",
@@ -308,7 +308,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   </div>
                   <div className="flex-1 min-w-0 overflow-hidden group-data-[state=collapsed]:hidden">
                     <span className="font-medium text-sm text-zinc-800 dark:text-zinc-100 group-hover/new-btn:text-blue-600 dark:group-hover/new-btn:text-white transition-colors whitespace-nowrap block truncate select-none">
-                      New thread
+                      {t("sidebar.newThread")}
                     </span>
                   </div>
                   <kbd className="hidden shrink-0 rounded border border-line-1 bg-fill-1 px-1.5 py-0.5 font-mono text-[10px] font-medium text-fg-6 shadow-xs group-hover/new-btn:inline group-data-[state=collapsed]:hidden">
@@ -327,7 +327,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Recent chats"
+                        aria-label={t("sidebar.recentChats")}
                         className="h-8 w-8 rounded-md text-zinc-500 hover:text-fg-1 dark:text-muted-foreground hover:bg-fill-2 dark:hover:bg-fill-2 cursor-pointer"
                       >
                         <MessageSquare className="h-4 w-4" />
@@ -347,14 +347,14 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                           className="flex items-center gap-1 text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
                         >
                           <ListChecks className="h-3 w-3" />
-                          <span>Select</span>
+                          <span>{t("sidebar.select")}</span>
                         </button>
                       )}
                     </div>
                     <div className="max-h-[340px] overflow-y-auto space-y-0.5">
                       {isNewChat && (
                         <DropdownMenuItem onClick={handleNewThread} className={cn(MENU_ITEM_SELECTED, "px-3 py-2 text-[13px] rounded-xl")}>
-                          <span className="truncate">{NEW_CHAT_LABEL}</span>
+                          <span className="truncate">{t("sidebar.newChat")}</span>
                         </DropdownMenuItem>
                       )}
                       {chats.map((chat) => (
@@ -370,7 +370,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                   </DropdownMenuContent>
                 </DropdownMenu>
                 <TooltipContent side="right" align="center">
-                  Click to view the list
+                  {t("sidebar.openList")}
                 </TooltipContent>
               </Tooltip>
             </SidebarMenuItem>
@@ -389,12 +389,12 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                     onClick={handleSelectAll}
                     className="px-2 py-0.5 rounded text-[11px] font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
                   >
-                    {selectedChatIds.size === visibleChats.length && visibleChats.length > 0 ? "Deselect all" : "Select all"}
+                    {selectedChatIds.size === visibleChats.length && visibleChats.length > 0 ? t("sidebar.deselectAll") : t("sidebar.selectAll")}
                   </button>
                   <button
                     type="button"
                     onClick={handleCancelSelection}
-                    aria-label="Cancel selection"
+                    aria-label={t("sidebar.cancelSelection")}
                     className="p-1 rounded text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-zinc-200/60 dark:hover:bg-white/10 transition-colors cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -404,7 +404,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
             ) : (
               <div className="flex items-center justify-between px-1 mb-1 shrink-0">
                 <SidebarGroupLabel className="p-0 text-xs font-medium text-zinc-500 dark:text-muted-foreground select-none">
-                  Chats
+                  {t("sidebar.chats")}
                 </SidebarGroupLabel>
                 {chats.length > 0 && (
                   <Tooltip>
@@ -412,15 +412,15 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                       <button
                         type="button"
                         onClick={() => handleStartSelect()}
-                        aria-label="Select chats"
+                        aria-label={t("sidebar.selectChats")}
                         className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[11px] font-medium text-fg-7 hover:text-fg-1 hover:bg-fill-1 transition-colors cursor-pointer"
                       >
                         <ListChecks className="h-3.5 w-3.5" />
-                        <span>Select</span>
+                        <span>{t("sidebar.select")}</span>
                       </button>
                     } />
                     <TooltipContent side="top" align="end">
-                      Select multiple chats
+                      {t("sidebar.selectMultiple")}
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -441,8 +441,8 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                       setQuery("");
                     }
                   }}
-                  placeholder="Search chats"
-                  aria-label="Search chats"
+                  placeholder={t("sidebar.search")}
+                  aria-label={t("sidebar.search")}
                   aria-keyshortcuts={IS_MAC ? "Meta+K" : "Control+K"}
                   className="peer h-8 w-full rounded-lg border border-line-1 bg-fill-2 pl-8 pr-14 text-xs text-fg-2 placeholder:text-fg-7 outline-none transition-colors focus:border-blue-500/50 focus:ring-2 focus:ring-blue-500/20 pointer-coarse:h-10 [&::-webkit-search-cancel-button]:hidden"
                 />
@@ -453,7 +453,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                       setQuery("");
                       searchRef.current?.focus();
                     }}
-                    aria-label="Clear search"
+                    aria-label={t("sidebar.clearSearch")}
                     className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-fg-7 hover:bg-fill-1 hover:text-fg-1 cursor-pointer"
                   >
                     <X className="h-3.5 w-3.5" />
@@ -470,12 +470,12 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
               <SidebarMenu className="gap-0.5">
                 {search && visibleChats.length === 0 && (
                   <li className="list-none px-2 py-3 text-xs text-fg-7">
-                    {chatsQuery.hasNextPage ? "Searching older chats…" : `No chats match "${query.trim()}"`}
+                    {chatsQuery.hasNextPage ? t("sidebar.searchingOlder") : t("sidebar.noMatch", { query: query.trim() })}
                   </li>
                 )}
                 {isNewChat && !isSelectionMode && !search && (
                   <SidebarMenuItem>
-                    <ChatRowContent name={NEW_CHAT_LABEL} active onSelect={handleNewThread} />
+                    <ChatRowContent name={t("sidebar.newChat")} active onSelect={handleNewThread} />
                   </SidebarMenuItem>
                 )}
                 <AnimatePresence initial={false}>
@@ -533,7 +533,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                         exit={{ opacity: 0 }}
                         className="list-none px-2 pt-3 pb-1 text-[11px] font-medium text-fg-8 select-none first:pt-1"
                       >
-                        {group}
+                        {t(group)}
                       </motion.li>,
                       row,
                     ];
@@ -555,7 +555,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                 onClick={handleCancelSelection}
                 className="h-8 px-2.5 text-xs text-fg-6 hover:text-fg-1 cursor-pointer"
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
               <Button
                 type="button"
@@ -569,7 +569,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
                 className="h-8 gap-1.5 px-3 text-xs bg-red-600 hover:bg-red-500 text-white font-medium shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete{selectedChatIds.size > 0 ? ` (${selectedChatIds.size})` : ""}</span>
+                <span>{t("sidebar.delete")}{selectedChatIds.size > 0 ? ` (${selectedChatIds.size})` : ""}</span>
               </Button>
             </div>
           )}
@@ -581,7 +581,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
               <DropdownMenuTrigger render={
                 <Button
                   variant="ghost"
-                  aria-label="Account menu"
+                  aria-label={t("sidebar.accountMenu")}
                   className={cn(
                     "cursor-pointer text-zinc-600 dark:text-muted-foreground hover:text-zinc-900 dark:hover:text-foreground transition-colors",
                     "group-data-[state=expanded]:w-full group-data-[state=expanded]:justify-start group-data-[state=expanded]:h-12 group-data-[state=expanded]:px-2 group-data-[state=expanded]:rounded-xl group-data-[state=expanded]:hover:bg-fill-2 dark:group-data-[state=expanded]:hover:bg-fill-2",
@@ -608,20 +608,20 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
 
                 <DropdownMenuItem onClick={() => { if (isMobile) setOpenMobile(false); setIsProfileOpen(true); }} className={cn(MENU_ITEM, "py-2")}>
                   <UserIcon className="h-3.5 w-3.5 text-fg-7" />
-                  <span>Profile Settings</span>
+                  <span>{t("sidebar.profileSettings")}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem onClick={toggleTheme} className={cn(MENU_ITEM, "justify-between py-2")}>
                   <div className="flex items-center gap-2">
                     {theme === "dark" ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-                    <span>{theme === "dark" ? "Light Mode" : "Dark Mode"}</span>
+                    <span>{theme === "dark" ? t("sidebar.lightMode") : t("sidebar.darkMode")}</span>
                   </div>
-                  <span className="text-[10px] text-zinc-400 uppercase font-mono">{theme}</span>
+                  <span className="text-[10px] text-zinc-400 uppercase font-mono">{t(`sidebar.themes.${theme}`)}</span>
                 </DropdownMenuItem>
 
                 <DropdownMenuItem onClick={() => { if (isMobile) setOpenMobile(false); setIsLogoutOpen(true); }} className={cn(MENU_ITEM_DANGER, "py-2")}>
                   <LogOut className="h-3.5 w-3.5" />
-                  <span>Log out</span>
+                  <span>{t("sidebar.logOut")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -635,7 +635,7 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
         onClose={renameDialog.close}
         onRename={handleRename}
         pending={renameChat.isPending}
-        error={renameChat.error && getErrorMessage(renameChat.error, "Couldn't rename the chat.")}
+        error={renameChat.error && getErrorMessage(renameChat.error, t("sidebar.renameFailed"))}
       />
 
       <ConfirmModal
@@ -643,18 +643,18 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
         onClose={deleteDialog.close}
         onConfirm={handleDelete}
         pending={deleteChat.isPending}
-        error={deleteChat.error && getErrorMessage(deleteChat.error, "Couldn't delete the chat.")}
+        error={deleteChat.error && getErrorMessage(deleteChat.error, t("sidebar.deleteFailed"))}
         icon={Trash2}
-        title="Delete Chat?"
+        title={t("sidebar.deleteTitle")}
         description={
-          <>
-            Are you sure you want to delete{" "}
-            <span className="text-fg-2 font-medium">"{deleteDialog.item?.name}"</span>? This
-            will permanently remove the conversation and its history.
-          </>
+          <Trans
+            i18nKey="sidebar.deleteBody"
+            values={{ name: deleteDialog.item?.name }}
+            components={{ b: <span className="text-fg-2 font-medium" /> }}
+          />
         }
-        confirmLabel="Delete"
-        pendingLabel="Deleting..."
+        confirmLabel={t("sidebar.delete")}
+        pendingLabel={t("sidebar.deleting")}
       />
 
       <ConfirmModal
@@ -662,26 +662,30 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
         onClose={() => setIsBulkDeleteOpen(false)}
         onConfirm={handleConfirmBulkDelete}
         pending={deleteChats.isPending}
-        error={deleteChats.error && getErrorMessage(deleteChats.error, "Couldn't delete the selected chats.")}
+        error={deleteChats.error && getErrorMessage(deleteChats.error, t("sidebar.deleteManyFailed"))}
         icon={Trash2}
-        title={selectedChatIds.size === 1 ? "Delete Chat?" : `Delete ${selectedChatIds.size} Chats?`}
+        title={
+          selectedChatIds.size === 1
+            ? t("sidebar.deleteTitle")
+            : t("sidebar.deleteManyTitle", { count: selectedChatIds.size })
+        }
         description={
           selectedChatIds.size === 1 ? (
-            <>
-              Are you sure you want to delete this chat? This will permanently remove the conversation and its history.
-            </>
+            t("sidebar.deleteThisBody")
           ) : (
-            <>
-              Are you sure you want to delete{" "}
-              <span className="text-fg-2 font-medium">
-                {selectedChatIds.size} chats
-              </span>
-              ? This will permanently remove these conversations and their message history.
-            </>
+            <Trans
+              i18nKey="sidebar.deleteManyBody"
+              count={selectedChatIds.size}
+              components={{ b: <span className="text-fg-2 font-medium" /> }}
+            />
           )
         }
-        confirmLabel={selectedChatIds.size === 1 ? "Delete" : `Delete ${selectedChatIds.size} Chats`}
-        pendingLabel="Deleting..."
+        confirmLabel={
+          selectedChatIds.size === 1
+            ? t("sidebar.delete")
+            : t("sidebar.deleteMany", { count: selectedChatIds.size })
+        }
+        pendingLabel={t("sidebar.deleting")}
       />
 
       <ConfirmModal
@@ -690,16 +694,16 @@ export function AppSidebar({ activeChatId, onSelectChat, onNewThread }: AppSideb
         onConfirm={() => logOut.mutate()}
         pending={logOut.isPending}
         icon={LogOut}
-        title="Log out?"
+        title={t("sidebar.logOutTitle")}
         description={
-          <>
-            Are you sure you want to log out of{" "}
-            <span className="text-fg-2 font-medium">{user?.email}</span>? You will need to sign
-            in again to access your account.
-          </>
+          <Trans
+            i18nKey="sidebar.logOutBody"
+            values={{ email: user?.email }}
+            components={{ b: <span className="text-fg-2 font-medium" /> }}
+          />
         }
-        confirmLabel="Log out"
-        pendingLabel="Logging out..."
+        confirmLabel={t("sidebar.logOut")}
+        pendingLabel={t("sidebar.loggingOut")}
       />
 
       <ProfileSettingsModal open={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
@@ -731,6 +735,8 @@ function ChatRowContent({
   selected = false,
   onToggleSelect,
 }: ChatRowContentProps) {
+  const { t } = useTranslation();
+
   if (selectionMode) {
     return (
       <div
@@ -783,7 +789,7 @@ function ChatRowContent({
           <DropdownMenuTrigger render={
             <button
               type="button"
-              aria-label={`Options for ${name}`}
+              aria-label={t("sidebar.chatOptions", { name })}
               className="opacity-0 pointer-coarse:opacity-100 group-hover/chat-row:opacity-100 data-[popup-open]:opacity-100 aria-expanded:opacity-100 focus:opacity-100 flex items-center justify-center h-6 w-6 rounded-md text-zinc-400 hover:text-fg-1 hover:bg-zinc-200 dark:hover:bg-white/10 shrink-0 transition-opacity duration-150 cursor-pointer"
             >
               <MoreVertical className="h-3.5 w-3.5" />
@@ -792,17 +798,17 @@ function ChatRowContent({
           <DropdownMenuContent side="top" align="start" sideOffset={6} className={cn(MENU_CONTENT, "w-32")}>
             <DropdownMenuItem onClick={onRename} className={MENU_ITEM}>
               <Pencil className="h-3.5 w-3.5" />
-              <span>Rename</span>
+              <span>{t("sidebar.rename")}</span>
             </DropdownMenuItem>
             {onStartSelect && (
               <DropdownMenuItem onClick={onStartSelect} className={MENU_ITEM}>
                 <CheckSquare className="h-3.5 w-3.5" />
-                <span>Select</span>
+                <span>{t("sidebar.select")}</span>
               </DropdownMenuItem>
             )}
             <DropdownMenuItem onClick={onDelete} className={MENU_ITEM_DANGER}>
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Delete</span>
+              <span>{t("sidebar.delete")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

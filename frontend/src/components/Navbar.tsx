@@ -2,10 +2,13 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { Menu, X, Sparkles, Info, Mail, ArrowRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { Logo } from '@/components/Logo';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageMenu } from '@/components/LanguageSwitch';
 
 export default function Navbar() {
+  const { t } = useTranslation();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Close mobile menu on resize to desktop breakpoint or Escape key
@@ -33,7 +36,7 @@ export default function Navbar() {
           <Link
             to="/"
             onClick={closeMenu}
-            aria-label="AI-Hub home"
+            aria-label={t('common.homeLink')}
             className="transition-opacity hover:opacity-80 shrink-0"
           >
             <Logo className="text-xl" />
@@ -44,35 +47,36 @@ export default function Navbar() {
               href="#features"
               className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
             >
-              Features
+              {t('landing.nav.features')}
             </a>
             <a
               href="#about"
               className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
             >
-              About
+              {t('landing.nav.about')}
             </a>
             <a
               href="#contact"
               className="text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
             >
-              Contact
+              {t('landing.nav.contact')}
             </a>
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageMenu />
             <ThemeToggle />
             <Link
               to="/login"
               className="hidden sm:inline-flex text-sm font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-colors px-2 py-1"
             >
-              Log in
+              {t('landing.nav.logIn')}
             </Link>
             <Link
               to="/login"
               className="hidden md:inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-full transition-all shadow-xs"
             >
-              <span>Get Started</span>
+              <span>{t('landing.nav.getStarted')}</span>
               <ArrowRight className="h-3 w-3" />
             </Link>
 
@@ -80,7 +84,7 @@ export default function Navbar() {
             <button
               type="button"
               onClick={() => setMobileMenuOpen((open) => !open)}
-              aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+              aria-label={mobileMenuOpen ? t('landing.nav.closeMenu') : t('landing.nav.openMenu')}
               aria-expanded={mobileMenuOpen}
               className="md:hidden flex items-center justify-center size-9 rounded-xl border border-zinc-200/80 dark:border-white/10 text-zinc-600 dark:text-zinc-300 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors cursor-pointer"
             >
@@ -108,7 +112,7 @@ export default function Navbar() {
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                   <Sparkles className="size-4 text-blue-600 dark:text-blue-400" />
-                  <span>Features</span>
+                  <span>{t('landing.nav.features')}</span>
                 </a>
                 <a
                   href="#about"
@@ -116,7 +120,7 @@ export default function Navbar() {
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                   <Info className="size-4 text-zinc-500" />
-                  <span>About</span>
+                  <span>{t('landing.nav.about')}</span>
                 </a>
                 <a
                   href="#contact"
@@ -124,7 +128,7 @@ export default function Navbar() {
                   className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-white transition-colors"
                 >
                   <Mail className="size-4 text-zinc-500" />
-                  <span>Contact</span>
+                  <span>{t('landing.nav.contact')}</span>
                 </a>
               </nav>
 
@@ -134,7 +138,7 @@ export default function Navbar() {
                   onClick={closeMenu}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors shadow-sm shadow-blue-500/20"
                 >
-                  <span>Get Started</span>
+                  <span>{t('landing.nav.getStarted')}</span>
                   <ArrowRight className="size-4" />
                 </Link>
                 <Link
@@ -142,7 +146,7 @@ export default function Navbar() {
                   onClick={closeMenu}
                   className="w-full flex items-center justify-center px-4 py-2 rounded-xl text-xs font-medium text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white transition-colors"
                 >
-                  Already have an account? Sign in
+                  {t('landing.nav.haveAccount')}
                 </Link>
               </div>
             </div>

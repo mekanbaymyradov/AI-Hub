@@ -1,7 +1,9 @@
+import { useTranslation } from 'react-i18next';
 import { Logo } from '@/components/Logo';
 import { REPO_URL, SUPPORT_EMAIL } from '@/lib/links';
 
 export default function Footer() {
+  const { t } = useTranslation();
   return (
     <footer id="contact" className="scroll-mt-16 bg-white dark:bg-zinc-950 border-t border-zinc-200 dark:border-zinc-800 transition-colors duration-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
@@ -10,7 +12,7 @@ export default function Footer() {
           <div className="col-span-2 sm:col-span-2 md:col-span-4 lg:col-span-1">
             <Logo className="mb-4 text-lg" />
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-6">
-              The all-in-one workspace for your AI workflows. Build, deploy, and scale with ease.
+              {t('landing.footer.tagline')}
             </p>
             <div className="flex space-x-4">
               <a href="#" className="text-zinc-400 hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300 transition-colors">
@@ -32,46 +34,46 @@ export default function Footer() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">Product</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">{t('landing.footer.product')}</h3>
             <ul className="space-y-3 text-sm text-zinc-500 dark:text-zinc-400">
-              <li><a href="#features" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Features</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Pricing</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Integrations</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Changelog</a></li>
+              <li><a href="#features" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.features')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.pricing')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.integrations')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.changelog')}</a></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">Resources</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">{t('landing.footer.resources')}</h3>
             <ul className="space-y-3 text-sm text-zinc-500 dark:text-zinc-400">
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Documentation</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Blog</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Community</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Guides</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.documentation')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.blog')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.community')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.guides')}</a></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">Legal</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">{t('landing.footer.legal')}</h3>
             <ul className="space-y-3 text-sm text-zinc-500 dark:text-zinc-400">
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Privacy Policy</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Terms of Service</a></li>
-              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Cookie Policy</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.privacy')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.terms')}</a></li>
+              <li><a href="#" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">{t('landing.footer.cookies')}</a></li>
             </ul>
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">Contact</h3>
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white tracking-wider uppercase mb-4">{t('landing.footer.contact')}</h3>
             <ul className="space-y-3 text-sm text-zinc-500 dark:text-zinc-400">
               <li><a href={`mailto:${SUPPORT_EMAIL}`} className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors break-all">{SUPPORT_EMAIL}</a></li>
-              <li><a href={`${REPO_URL}/issues`} target="_blank" rel="noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors break-all">GitHub Issues</a></li>
+              <li><a href={`${REPO_URL}/issues`} target="_blank" rel="noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors break-all">{t('landing.footer.issues')}</a></li>
             </ul>
           </div>
         </div>
 
         <div className="mt-12 pt-8 border-t border-zinc-200/80 dark:border-zinc-800/80 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-sm text-zinc-500 dark:text-zinc-500">
-            &copy; {new Date().getFullYear()} AI-Hub. All rights reserved.
+            {t('landing.footer.rights', { year: new Date().getFullYear() })}
           </p>
         </div>
       </div>

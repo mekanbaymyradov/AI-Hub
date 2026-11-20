@@ -7,6 +7,7 @@ import { unified } from "unified";
 import rehypeHighlight from "rehype-highlight";
 import rehypeKatex from "rehype-katex";
 import { Check, Copy, X } from "lucide-react";
+import { useTranslation } from "react-i18next";
 import type { Element, ElementContent } from "hast";
 import type { Nodes, Root } from "mdast";
 import "katex/dist/katex.min.css";
@@ -37,6 +38,7 @@ function textOf(node: ElementContent): string {
 
 function CodeBlock({ node, children }: { node?: Element; children?: ReactNode }) {
   const [copyState, copy] = useCopy();
+  const { t } = useTranslation();
 
   const code = node?.children.find((child): child is Element => child.type === "element");
   const language = (code?.properties.className as string[] | undefined)
@@ -59,8 +61,8 @@ function CodeBlock({ node, children }: { node?: Element; children?: ReactNode })
           type="button"
           onClick={handleCopy}
           className="flex items-center justify-center size-7 pointer-coarse:size-10 rounded-md text-fg-6 hover:bg-zinc-200 hover:text-fg-1 dark:hover:bg-white/10 transition-colors cursor-pointer"
-          title={copyState === "copied" ? "Copied!" : copyState === "failed" ? "Couldn't copy" : "Copy code"}
-          aria-label="Copy code"
+          title={copyState === "copied" ? t("message.codeCopied") : copyState === "failed" ? t("message.copyFailed") : t("message.copyCode")}
+          aria-label={t("message.copyCode")}
         >
           {copyState === "copied" ? (
             <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />

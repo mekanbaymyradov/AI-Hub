@@ -1,5 +1,6 @@
 import axios from "axios";
 import { useEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { getErrorMessage } from "@/api/errors";
 import { voiceApi } from "@/api/voice";
@@ -45,6 +46,7 @@ function isRetryable(error: unknown): boolean {
 
 /** Dictate into the composer: record, check that something was said, transcribe and pass the text to `onText`. */
 export function useVoiceInput(onText: (text: string) => void) {
+  const { t } = useTranslation();
   const [state, setState] = useState<VoiceInputState>("idle");
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
   const [elapsed, setElapsed] = useState(0);
@@ -85,10 +87,10 @@ export function useVoiceInput(onText: (text: string) => void) {
     try {
       const text = await voiceApi.transcribe(audio, upload.signal);
       if (text) onText(text);
-      else setError("Didn't catch that. Try again.");
+      else setError(t("voice.nothingHeard"));
     } catch (err) {
       if (upload.signal.aborted) return;
-      setError(getErrorMessage(err, "Couldn't transcribe the recording."));
+      setError(getErrorMessage(err, t("voice.transcribeFailed")));
       if (isRetryable(err)) setFailedAudio(audio);
     } finally {
       // Not after a cancel, which has already moved on and may have started a new recording.
@@ -121,8 +123,8 @@ export function useVoiceInput(onText: (text: string) => void) {
       setState("idle");
       setError(
         err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Microphone access was denied. Allow it in your browser to use voice input."
-          : "Couldn't start the microphone.",
+          ? t("voice.micDenied")
+          : t("voice.micFailed"),
       );
       return;
     }
