@@ -1,6 +1,6 @@
 import { AxiosError, type AxiosResponse } from "axios";
 import { describe, expect, it } from "vitest";
-import { getErrorMessage, getErrorType } from "./errors";
+import { getErrorMessage, getErrorTraceId, getErrorType } from "./errors";
 
 function apiError(data: unknown, status = 422) {
   return new AxiosError("Request failed", "ERR_BAD_REQUEST", undefined, undefined, {
@@ -53,5 +53,23 @@ describe("getErrorType", () => {
   it("is undefined when there is no type", () => {
     expect(getErrorType(apiError({ detail: "Not found" }, 404))).toBeUndefined();
     expect(getErrorType(new Error("Network down"))).toBeUndefined();
+  });
+});
+
+describe("getErrorTraceId", () => {
+  // The chat stream reports a failed reply as an Error holding the API's JSON body.
+  it("reads the trace ID from an API body inside an Error message", () => {
+    const body = {
+      detail: [{ msg: "The model failed to reply.", type: "llm.model_error" }],
+      trace_id: "01a1a23e4f05572d5e6aa3e9686f91e1",
+    };
+    expect(getErrorTraceId(new Error(JSON.stringify(body)))).toBe("01a1a23e4f05572d5e6aa3e9686f91e1");
+  });
+
+  it("is undefined without a trace ID", () => {
+    const body = { detail: [{ msg: "Not found", type: "not_found" }] };
+    expect(getErrorTraceId(new Error(JSON.stringify(body)))).toBeUndefined();
+    expect(getErrorTraceId(new Error("Network down"))).toBeUndefined();
+    expect(getErrorTraceId("boom")).toBeUndefined();
   });
 });

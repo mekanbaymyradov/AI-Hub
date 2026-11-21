@@ -1,19 +1,33 @@
 import axios from "axios";
 import { type ErrorDetail, type ErrorResponse } from "./types";
 
-function parseErrorDetail(raw: string): ErrorDetail | undefined {
+type ErrorBody = { detail?: ErrorDetail[] | string; trace_id?: string };
+
+function parseErrorBody(raw: string): ErrorBody | null {
   try {
-    const parsed = JSON.parse(raw) as { detail?: ErrorDetail[] | string } | null;
-    if (parsed && Array.isArray(parsed.detail) && parsed.detail.length > 0) {
-      return parsed.detail[0];
-    }
-    if (parsed && typeof parsed.detail === "string" && parsed.detail) {
-      return { msg: parsed.detail, type: "http_error" };
-    }
+    return JSON.parse(raw) as ErrorBody | null;
   } catch {
     // Plain error message, not a JSON ErrorResponse body.
+    return null;
+  }
+}
+
+function parseErrorDetail(raw: string): ErrorDetail | undefined {
+  const parsed = parseErrorBody(raw);
+  if (parsed && Array.isArray(parsed.detail) && parsed.detail.length > 0) {
+    return parsed.detail[0];
+  }
+  if (parsed && typeof parsed.detail === "string" && parsed.detail) {
+    return { msg: parsed.detail, type: "http_error" };
   }
   return undefined;
+}
+
+/** Return the trace ID the API sends with a failed reply or server error, for the user to quote to support. */
+export function getErrorTraceId(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined;
+  const traceId = parseErrorBody(error.message)?.trace_id;
+  return typeof traceId === "string" ? traceId : undefined;
 }
 
 /** Return the API's error type code (e.g. `llm.model_error`) if present. */

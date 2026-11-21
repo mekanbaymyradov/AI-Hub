@@ -37,6 +37,8 @@ export interface UIMessage {
   isReasoningStreaming?: boolean;
   // Why the reply stopped early; shown under whatever content arrived.
   error?: string;
+  // The failed request's trace ID, which the user quotes to support.
+  errorId?: string;
   attachments?: AttachmentPublic[];
   /** Model id that generated this response, if available. */
   modelId?: string | null;
@@ -73,7 +75,8 @@ export function getActiveToolName(msg: ChatUIMessage | undefined): string | null
 /** Convert a Vercel AI SDK ChatUIMessage into the UI view-model for rendering. */
 export function toRenderableUIMessage(
   msg: ChatUIMessage,
-  errorText?: string
+  errorText?: string,
+  errorId?: string
 ): UIMessage {
   let content = "";
   for (const part of msg.parts) {
@@ -99,6 +102,7 @@ export function toRenderableUIMessage(
     reasoning: reasoning || undefined,
     isReasoningStreaming,
     error: errorText,
+    errorId,
     attachments: msg.metadata?.attachments,
     modelId: msg.metadata?.modelId,
   };
