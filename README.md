@@ -29,8 +29,9 @@ I'd use at work.
 - **A failed search no longer kills the reply.** 4 of 15 web searches failed and
   took the whole answer down; now the model is told the search failed and
   answers anyway. ([code](src/llm/tools.py))
-- **A failed reply still returns HTTP 200.** The stream starts before the model
-  can fail, so 5xx alerts miss it; a dedicated alert names the cause.
+- **A failed reply returns HTTP 200, and still gets found.** The stream starts
+  before the model can fail, so 5xx alerts miss it. A dedicated alert names the
+  cause, and the user gets an Error ID that opens the trace in Logfire.
   ([guide](docs/debugging-a-failed-reply.md))
 
 ## One reply, end to end
@@ -104,6 +105,7 @@ keys, see [docs/development.md](docs/development.md)).
 - Fall back to another provider when one fails
 - 👍/👎 on replies, turning bad answers into new eval cases
 - Host metrics, so a full disk raises an alert
+- A report button that sends the Error ID to support
 
 ## Credits
 

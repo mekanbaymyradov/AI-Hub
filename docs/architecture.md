@@ -40,8 +40,8 @@ pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
   `data-chat-name` chunk.
 - **Errors:** `ChatEventStream.on_error` logs the failure and replaces the
   adapter's raw error text with an `ErrorResponse` body, so provider details
-  never reach the client. The body carries the reply's `trace_id`, for the
-  user to quote.
+  never reach the client. The body carries the reply's `trace_id`, which the
+  chat shows as the Error ID.
 
 ## Agent tools
 
