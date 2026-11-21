@@ -90,7 +90,7 @@ services:
       timeout: 5s
       retries: 3
   caddy:
-    image: caddy:2.11.7-alpine
+    image: caddy:2.11.8-alpine
     restart: unless-stopped
     # IPv4 only: Docker would proxy IPv6 clients in from the gateway address,
     # putting them all in one rate-limit bucket.
@@ -112,7 +112,7 @@ services:
       - caddy_data:/data
       - caddy_config:/config
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.162.0
+    image: otel/opentelemetry-collector-contrib:0.165.0
     user: 0:0 # root, to read the Docker socket
     restart: unless-stopped
     # Only the token, not .env: the collector needs none of the app's secrets.
