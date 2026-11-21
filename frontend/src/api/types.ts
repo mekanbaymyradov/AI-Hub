@@ -112,4 +112,6 @@ export interface ErrorDetail {
 
 export interface ErrorResponse {
   detail: ErrorDetail[];
+  /** Sent only with server errors: the request's trace ID, for the user to quote. */
+  trace_id?: string;
 }

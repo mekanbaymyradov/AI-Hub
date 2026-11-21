@@ -146,6 +146,7 @@ export const tk: Translation = {
     copy: "Göçür",
     copied: "Göçürildi",
     copyFailed: "Göçürip bolmady",
+    errorId: "Ýalňyşlyk ID-si",
     copyMessage: "Habary göçür",
     copyResponse: "Jogaby göçür",
     copyCode: "Kody göçür",

@@ -41,6 +41,41 @@ const TOOL_LABELS = {
   search_web: "message.tools.search_web",
 } as const;
 
+// Its own useCopy, so copying the ID doesn't flip the message's Copy button.
+function ErrorId({ id }: { id: string }) {
+  const [copyState, copy] = useCopy();
+  const { t } = useTranslation();
+  const label =
+    copyState === "copied"
+      ? t("message.copied")
+      : copyState === "failed"
+        ? t("message.copyFailed")
+        : t("message.copy");
+
+  return (
+    <div className="flex items-center gap-1 mt-1.5 text-xs text-fg-8">
+      <span className="min-w-0 break-all">
+        {t("message.errorId")}: <code className="font-mono select-all">{id}</code>
+      </span>
+      <button
+        type="button"
+        onClick={() => void copy(id)}
+        className="inline-flex shrink-0 items-center justify-center size-6 pointer-coarse:size-10 rounded-md hover:text-fg-5 hover:bg-fill-3 transition-colors cursor-pointer select-none"
+        title={label}
+        aria-label={label}
+      >
+        {copyState === "copied" ? (
+          <Check className="h-3.5 w-3.5 text-green-500" />
+        ) : copyState === "failed" ? (
+          <X className="h-3.5 w-3.5 text-red-500" />
+        ) : (
+          <Copy className="h-3.5 w-3.5" />
+        )}
+      </button>
+    </div>
+  );
+}
+
 interface ChatMessageItemProps {
   message: UIMessage;
   isStreaming?: boolean;
@@ -66,15 +101,13 @@ export const ChatMessageItem = memo(
     isFailedPrompt = false,
     failedModelId = null,
   }: ChatMessageItemProps) {
-    const [userReasoningOpen, setUserReasoningOpen] = useState<boolean | null>(null);
+    const [isReasoningOpen, setIsReasoningOpen] = useState(false);
     const [copyState, copy] = useCopy();
     const { t } = useTranslation();
     const isUser = message.role === "user";
     const isReasoningStreaming = Boolean(
       !isUser && isStreaming && isLastMessage && message.isReasoningStreaming
     );
-    // Auto-expand while actively thinking, then auto-collapse once the answer starts unless toggled.
-    const isReasoningOpen = userReasoningOpen ?? (isReasoningStreaming && !message.content);
 
     const handleCopy = useCallback(() => {
       if (message.content) void copy(message.content);
@@ -241,7 +274,7 @@ export const ChatMessageItem = memo(
                 <div className="mb-2.5">
                   <button
                     type="button"
-                    onClick={() => setUserReasoningOpen(!isReasoningOpen)}
+                    onClick={() => setIsReasoningOpen((open) => !open)}
                     aria-expanded={isReasoningOpen}
                     className="inline-flex items-center gap-1.5 py-1 px-2 -ml-2 rounded-lg text-xs font-medium text-fg-7 hover:text-fg-3 hover:bg-fill-2 transition-colors cursor-pointer select-none"
                   >
@@ -322,6 +355,8 @@ export const ChatMessageItem = memo(
                 </div>
               )}
 
+              {message.error && message.errorId && <ErrorId id={message.errorId} />}
+
               {activeTool && (
                 <div className="flex items-center gap-2 h-6 px-1 text-sm text-fg-7">
                   <Loader2 className="h-3.5 w-3.5 animate-spin shrink-0" />
@@ -379,6 +414,7 @@ export const ChatMessageItem = memo(
       prev.message.reasoning === next.message.reasoning &&
       prev.message.isReasoningStreaming === next.message.isReasoningStreaming &&
       prev.message.error === next.message.error &&
+      prev.message.errorId === next.message.errorId &&
       prev.message.attachments === next.message.attachments &&
       prev.message.modelId === next.message.modelId &&
       prev.isStreaming === next.isStreaming &&

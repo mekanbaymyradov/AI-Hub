@@ -146,6 +146,7 @@ export const ru: Translation = {
     copy: "Копировать",
     copied: "Скопировано",
     copyFailed: "Не удалось скопировать",
+    errorId: "ID ошибки",
     copyMessage: "Копировать сообщение",
     copyResponse: "Копировать ответ",
     copyCode: "Копировать код",

@@ -148,6 +148,7 @@ export const en = {
     copy: "Copy",
     copied: "Copied",
     copyFailed: "Couldn't copy",
+    errorId: "Error ID",
     copyMessage: "Copy message",
     copyResponse: "Copy response",
     copyCode: "Copy code",

@@ -1,0 +1,3 @@
+# Leave the React app out of GitHub's language stats, so the repo shows as the
+# Python backend it is about. The frontend still builds and ships as before.
+frontend/** linguist-detectable=false
