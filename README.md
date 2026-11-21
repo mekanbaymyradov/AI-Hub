@@ -4,9 +4,9 @@ A live LLM chat backend, run like a production service: every request traced,
 every prompt change scored by evals before it ships, and any failed reply
 [found in a minute](docs/debugging-a-failed-reply.md).
 
-[![CI](https://github.com/mekanbaymyradov/AI-Hub/actions/workflows/ci.yml/badge.svg)](https://github.com/mekanbaymyradov/AI-Hub/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/mekanbaymyradov/AI-Hub/main/pyproject.toml)](pyproject.toml)
-[![License](https://img.shields.io/github/license/mekanbaymyradov/AI-Hub)](LICENSE)
+[![CI](https://github.com/mekanbaymyradov/ai-hub/actions/workflows/ci.yml/badge.svg)](https://github.com/mekanbaymyradov/ai-hub/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/python/required-version-toml?tomlFilePath=https://raw.githubusercontent.com/mekanbaymyradov/ai-hub/main/pyproject.toml)](pyproject.toml)
+[![License](https://img.shields.io/github/license/mekanbaymyradov/ai-hub)](LICENSE)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
 **Live:** [ai-hub.techship.fun](https://ai-hub.techship.fun/)
