@@ -5,6 +5,7 @@ from unittest.mock import ANY
 
 import pytest
 from httpx2 import AsyncClient
+from logfire.testing import CaptureLogfire
 from mypy_boto3_s3 import S3Client
 from pydantic_ai import capture_run_messages
 from pydantic_ai.exceptions import ModelHTTPError
@@ -45,6 +46,7 @@ from tests.utils import (
     REPLY,
     add_message,
     auth_header,
+    request_trace_id,
     retry_reply,
     send_message,
     store_attachment,
@@ -673,7 +675,7 @@ async def test_send_message_passes_effort(
 
 
 async def test_send_message_reports_model_failure(
-    client: AsyncClient, token: str, new_chat: Chat
+    client: AsyncClient, token: str, new_chat: Chat, capfire: CaptureLogfire
 ):
     async def fail(
         _messages: list[ModelMessage], _info: AgentInfo
@@ -691,7 +693,8 @@ async def test_send_message_reports_model_failure(
     chunks = await stream_chunks(response)
     [error] = [chunk for chunk in chunks if chunk["type"] == "error"]
     assert json.loads(error["errorText"]) == {
-        "detail": [{"msg": "The model failed to reply.", "type": "llm.model_error"}]
+        "detail": [{"msg": "The model failed to reply.", "type": "llm.model_error"}],
+        "trace_id": request_trace_id(capfire, "POST /chats/{chat_id}/messages"),
     }
     stored = await client.get(
         f"/chats/{new_chat.id}/messages", headers=auth_header(token)

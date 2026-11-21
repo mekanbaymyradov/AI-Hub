@@ -40,7 +40,8 @@ pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
   `data-chat-name` chunk.
 - **Errors:** `ChatEventStream.on_error` logs the failure and replaces the
   adapter's raw error text with an `ErrorResponse` body, so provider details
-  never reach the client.
+  never reach the client. The body carries the reply's `trace_id`, for the
+  user to quote.
 
 ## Agent tools
 
@@ -158,8 +159,10 @@ Logfire is the only logging API: code calls `logfire.info()`,
   (`src/jobs.py`). `/healthz` is left out. Signed-in requests carry `user_id` on
   the request span (`get_current_user` in `src/auth/dependencies.py`), so one
   filter finds a user's requests and logs.
-- **Logs:** attach to the span they are emitted in, so there is no request ID.
-  Library warnings and errors from `logging` reach Logfire too.
+- **Logs:** attach to the span they are emitted in, so a request's logs share
+  its trace ID. A 5xx response or a failed reply returns that ID as `trace_id`,
+  for the user to quote (`error_body` in `src/error_handlers.py`). Library
+  warnings and errors from `logging` reach Logfire too.
 - **Naming:** every log and span message is a fixed `"<Subject> <outcome>"`
   template in sentence case, such as `"Reply failed"`. Values go in as
   `{placeholders}` or keyword arguments; both become queryable attributes. Never

@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from uuid import uuid4
 
 from httpx2 import AsyncClient, EventSource, Response
+from logfire.testing import CaptureLogfire
 from mypy_boto3_s3 import S3Client
 from pydantic_ai.messages import ModelMessage, ModelMessagesTypeAdapter
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,6 +37,13 @@ async def sign_in(client: AsyncClient, sent_codes: dict[str, str], email: str) -
     response = await verify_code(client, email, code)
     assert response.status_code == 200
     return response.json()["access_token"]
+
+
+def request_trace_id(capfire: CaptureLogfire, name: str) -> str:
+    """Return the trace ID of the request span named like "GET /llms/models", as Logfire shows it."""
+    spans = capfire.exporter.exported_spans_as_dict()
+    span = next(span for span in spans if span["name"] == name)
+    return f"{span['context']['trace_id']:032x}"
 
 
 def auth_header(token: str) -> dict[str, str]:

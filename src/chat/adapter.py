@@ -9,6 +9,7 @@ from pydantic_ai.messages import ModelMessage
 from pydantic_ai.ui.vercel_ai import VercelAIAdapter, VercelAIEventStream
 from pydantic_ai.ui.vercel_ai.response_types import BaseChunk, ErrorChunk
 
+from src.error_handlers import error_body
 from src.exceptions import AppError
 from src.llm.exceptions import ModelError
 from src.llm.models import AgentDeps
@@ -16,14 +17,14 @@ from src.llm.models import AgentDeps
 
 @dataclass(kw_only=True)
 class ChatEventStream(VercelAIEventStream[AgentDeps, str]):
-    """Vercel AI stream that logs a failed reply and sends the client only its error code."""
+    """Vercel AI stream that logs a failed reply and sends the client only its error code and trace ID."""
 
     model_id: str
 
     async def on_error(self, error: Exception) -> AsyncIterator[BaseChunk]:
         logfire.exception("Reply failed", _exc_info=error, model_id=self.model_id)
         app_error = ModelError() if isinstance(error, AgentRunError) else AppError()
-        error_text = json.dumps({"detail": [app_error.serialize()]})
+        error_text = json.dumps(error_body(app_error))
         # The base also closes the tool calls left open, so only its error is replaced.
         async for chunk in super().on_error(error):
             # The base sends str(error), which can carry provider internals.
