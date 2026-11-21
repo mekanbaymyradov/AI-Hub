@@ -4,7 +4,7 @@
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#57606a"/>
     </marker>
-    <marker id="arrow-telemetry" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#8250df"/>
     </marker>
   </defs>
@@ -46,9 +46,12 @@
   <text x="900" y="192" text-anchor="middle" font-size="12" fill="#57606a">Docker container metrics</text>
 
   <line x1="380" y1="178" x2="420" y2="178" stroke="#57606a" stroke-width="1.5" marker-end="url(#arrow)"/>
-  <path d="M340,150 V118 H700 V150" fill="none" stroke="#8250df" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-telemetry)"/>
+  <path d="M340,150 V118 H700 V150" fill="none" stroke="#8250df" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-purple)"/>
   <text x="520" y="111" text-anchor="middle" font-size="12" fill="#8250df">telemetry</text>
-  <line x1="820" y1="178" x2="780" y2="178" stroke="#8250df" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-telemetry)"/>
+  <line x1="820" y1="178" x2="780" y2="178" stroke="#8250df" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#arrow-purple)"/>
+  <!-- Solid: what Logfire sends back, the live prompt and Fleet's settings. -->
+  <path d="M700,206 V232 H340 V206" fill="none" stroke="#8250df" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <text x="520" y="226" text-anchor="middle" font-size="12" fill="#8250df">prompt, Fleet policy</text>
 
   <!-- Bottom: the data stores -->
   <rect x="10" y="258" width="580" height="104" rx="10" fill="none" stroke="#d0d7de" stroke-width="1.5" stroke-dasharray="6 4"/>

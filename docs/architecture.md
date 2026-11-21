@@ -40,8 +40,8 @@ pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
   `data-chat-name` chunk.
 - **Errors:** `ChatEventStream.on_error` logs the failure and replaces the
   adapter's raw error text with an `ErrorResponse` body, so provider details
-  never reach the client. The body carries the reply's `trace_id`, for the
-  user to quote.
+  never reach the client. The body carries the reply's `trace_id`, which the
+  chat shows as the Error ID.
 
 ## Agent tools
 
@@ -72,6 +72,39 @@ pydantic-ai's `VercelAIAdapter` (`src/chat/adapter.py`).
   call that follows text still runs. Each call streams as a Vercel tool part
   with its input and output. Tool calls and results are stored with the chat
   but left out of its transcript.
+
+## Prompt and evals
+
+The chat prompt is the managed prompt `chat` in Logfire, so it changes and rolls
+back without a deploy, and each new version is measured before it goes live.
+
+- **Prompt:** `chat_prompt` in `src/llm/agents.py`. The app fetches it at
+  startup (`src/main.py`), since the first fetch can take up to 20 seconds, and
+  Logfire pushes later changes into memory. Replies always use the `production`
+  label. The copy in code answers when Logfire can't be reached,
+  `LOGFIRE_API_KEY` isn't set, or the label has no version. Each reply's trace
+  records the label and version (`Resolve variable prompt__chat`).
+- **Evals:** `evals/` asks every model with a key 15 questions in 5 languages
+  (`evals/cases.yaml`). Code checks (no filler opener, tagged code fences, word
+  limits) and a GPT-OSS 120B judge (answers first, format, language, no closing
+  filler, correct and complete) score each answer. Each model's run is a Logfire
+  experiment that records the prompt's label and version.
+- **Changing the prompt:**
+  1. Save a new version of `chat` in Logfire and point `candidate` at it.
+  2. Run `uv run python -m evals --name <name> --label candidate`.
+  3. If it beats `production`, move `production` to it. Replies switch as soon
+     as Logfire pushes the change, and moving the label back rolls it back.
+
+| Run | Prompt | Answers first | Correct and complete |
+|---|---|---|---|
+| baseline, Nov 10 | The old one-line prompt | 41/59 (69%) | 56/59 |
+| v1, Nov 11 | First draft of the guidance, never shipped | 37/60 (62%) | 58/60 |
+| prompt-v1, Nov 16 | The guidance now in `production` | 54/60 (90%) | 56/60 |
+
+The guidance costs time: on GPT-OSS 120B, the average answer took 4.4 s instead
+of 2.3 s.
+
+![Logfire's comparison of baseline and prompt-v1 on GPT-OSS 120B: cases passed 53% to 93%, answers_first 67% to 100%, correct_and_complete 93% to 100%, and average task duration 2.26 s to 4.35 s](images/experiments.png)
 
 ## Attachments
 
@@ -176,6 +209,13 @@ Logfire is the only logging API: code calls `logfire.info()`,
   container's CPU, memory and restarts to Logfire
   ([`deploy/otel-collector.yaml`](../deploy/otel-collector.yaml)). It doesn't
   run locally.
+- **Fleet:** the app connects to Logfire Fleet (`fleet=True` in
+  `src/observability.py`), so sampling and log levels change from Logfire
+  without a redeploy. The collector reports its health and running config to
+  Fleet, but its config stays in git. The scheduler stays out, since each job
+  exits before a policy can arrive.
+
+  ![Logfire Fleet's SDK view: the ai-hub-production application connected with 3 live instances on the newest SDK, none needing attention, and its span, log and metric volume for the last day](images/fleet.png)
 - **Privacy:** production traces carry no chat text, only model, tokens and
   timing. Request spans record the client's
   input locally, but in production only validation errors, without the rejected
@@ -184,10 +224,12 @@ Logfire is the only logging API: code calls `logfire.info()`,
   production, because tools put user input there, like a city name, and Logfire
   never scrubs URLs (`drop_url_query` in `src/observability.py`). Logs and spans
   identify users by ID, never by email.
+
+  ![Logfire's view of one model call in production: the model, its tools, tokens and timing are recorded, while the question, the tool call and the answer read "Not captured"](images/model-run.png)
 - **Dashboard:** the *AI-Hub* Logfire dashboard puts product numbers (active
   users, LLM cost per user and model, time to first token) next to system
   health (errors, latency per release, containers, the DB pool, sign-ins and
   cron jobs). Each panel's description says how to read it, and ten alerts
   watch the same data.
 
-![The Logfire dashboard for Oct 12–24: 1,749 requests, 10 active users, 116 messages, 30 failed replies and no server errors, with a launch-day spike of 89 messages on Oct 13, a users table with cost per user, the models users pick, requests by status and p95 latency](images/dashboard.png)
+  ![The Logfire dashboard for Oct 12–24: 1,749 requests, 10 active users, 116 messages, 30 failed replies and no server errors, with a launch-day spike of 89 messages on Oct 13, a users table with cost per user, the models users pick, requests by status and p95 latency](images/dashboard.png)

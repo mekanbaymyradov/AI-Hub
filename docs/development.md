@@ -25,6 +25,14 @@ Optional: set `LOGFIRE_TOKEN` to a write token from your Logfire project. The
 `app` and `scheduler` containers then send traces tagged `environment=local`,
 with full LLM prompts and replies. Without it, they only print to the console.
 
+Optional: set `LOGFIRE_API_KEY` to a Logfire API key with only
+`project:read_variables`. The app then reads the chat prompt from Logfire, and
+the evals can run. Without it, the app uses the prompt in code.
+
+Optional: `OTEL_OPAMP_ENDPOINT` and `LOGFIRE_FLEET_KEY` connect the app to
+Logfire Fleet; on the server, `LOGFIRE_OPAMP_TOKEN` connects the collector too.
+Without them, the app runs outside Fleet, unchanged.
+
 Optional: set `TAVILY_API_KEY` to a free key from app.tavily.com (1,000
 searches a month) to give Groq and Mistral models web search. Claude and Gemini
 use their own search and don't need it.
