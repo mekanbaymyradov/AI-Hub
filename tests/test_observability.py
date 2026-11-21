@@ -1,13 +1,16 @@
 from typing import Any
 
 import pytest
-from httpx2 import AsyncClient, ConnectError
+from httpx2 import ASGITransport, AsyncClient, ConnectError
 from logfire.testing import CaptureLogfire
 
 from src.auth.constants import INSTRUCTIONS_MAX_LENGTH
 from src.auth.models import User
 from src.config import settings
-from tests.utils import auth_header, request_code, verify_code
+from src.llm.dependencies import get_llm_registry
+from src.llm.registry import LLMRegistry
+from src.main import app
+from tests.utils import auth_header, request_code, request_trace_id, verify_code
 
 pytestmark = pytest.mark.anyio
 
@@ -103,4 +106,23 @@ async def test_local_request_span_records_only_client_input(
     attributes = request_span_attributes(capfire, "POST /auth/otp/request")
     assert attributes["fastapi.arguments.values"] == {
         "payload": {"email": "new@example.com"}
+    }
+
+
+@pytest.mark.usefixtures("client")
+async def test_unexpected_error_returns_its_trace_id(capfire: CaptureLogfire):
+    def fail() -> LLMRegistry:
+        raise RuntimeError("Registry broke")
+
+    app.dependency_overrides[get_llm_registry] = fail
+    # Starlette re-raises the error after sending the 500, and the default
+    # transport would raise it here instead of returning the response.
+    transport = ASGITransport(app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as http:
+        response = await http.get("/llms/models")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": [{"msg": "An unexpected error occurred.", "type": "internal_error"}],
+        "trace_id": request_trace_id(capfire, "GET /llms/models"),
     }

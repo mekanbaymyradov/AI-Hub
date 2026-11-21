@@ -45,6 +45,11 @@ class ErrorDetail(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: list[ErrorDetail]
+    trace_id: str | None = Field(
+        default=None,
+        description="Sent with server errors. The user quotes it, and it finds "
+        "the request's trace in Logfire.",
+    )
 
 
 def error_responses(*errors: type[AppError]) -> dict[int | str, dict[str, Any]]:
